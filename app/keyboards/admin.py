@@ -1,0 +1,93 @@
+"""Common administrator keyboards."""
+
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+from app.keyboards.admin_callbacks import (
+    AdminCancelCallback,
+    AdminConfirmCallback,
+    AdminEntityCallback,
+    AdminPanelCallback,
+)
+from app.keyboards.callbacks import MainCallback
+
+
+def build_admin_panel_keyboard() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for text, entity in (
+        ("📁 Разделы", "c"),
+        ("🗂 Подразделы", "s"),
+        ("📇 Позиции", "i"),
+        ("➕ Быстро добавить позицию", "q"),
+    ):
+        builder.button(
+            text=text,
+            callback_data=AdminEntityCallback(entity=entity),
+        )
+    builder.button(
+        text="🏠 Главное меню",
+        callback_data=MainCallback(action="home"),
+    )
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def build_admin_cancel_keyboard() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text="❌ Отмена",
+        callback_data=AdminCancelCallback(),
+    )
+    return builder.as_markup()
+
+
+def build_admin_wizard_keyboard(
+    allow_back: bool = True,
+) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    if allow_back:
+        builder.button(
+            text="⬅️ Назад",
+            callback_data=AdminCancelCallback(action="b"),
+        )
+    builder.button(
+        text="❌ Отмена",
+        callback_data=AdminCancelCallback(action="x"),
+    )
+    builder.adjust(2)
+    return builder.as_markup()
+
+
+def build_admin_confirm_keyboard(
+    *,
+    action: str,
+    category_id: str = "_",
+    subcategory_id: str = "_",
+    item_id: str = "_",
+) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(
+            text="✅ Подтвердить",
+            callback_data=AdminConfirmCallback(
+                action=action,
+                category_id=category_id,
+                subcategory_id=subcategory_id,
+                item_id=item_id,
+            ).pack(),
+        ),
+        InlineKeyboardButton(
+            text="❌ Отмена",
+            callback_data=AdminCancelCallback().pack(),
+        ),
+    )
+    return builder.as_markup()
+
+
+def build_admin_back_keyboard() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text="⬅️ В панель",
+        callback_data=AdminPanelCallback(action="o"),
+    )
+    return builder.as_markup()

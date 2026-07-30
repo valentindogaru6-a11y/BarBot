@@ -4,9 +4,12 @@ from aiogram.types import InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.keyboards.callbacks import MainCallback, SearchCallback
+from app.keyboards.admin_callbacks import AdminPanelCallback
 
 
-def build_main_menu_keyboard() -> InlineKeyboardMarkup:
+def build_main_menu_keyboard(
+    is_admin: bool = False,
+) -> InlineKeyboardMarkup:
     """Build the static top-level menu without catalog business logic."""
 
     builder = InlineKeyboardBuilder()
@@ -18,6 +21,11 @@ def build_main_menu_keyboard() -> InlineKeyboardMarkup:
         text="🔍 Поиск",
         callback_data=MainCallback(action="search"),
     )
+    if is_admin:
+        builder.button(
+            text="🛠 Управление каталогом",
+            callback_data=AdminPanelCallback(action="o"),
+        )
     builder.adjust(1)
     return builder.as_markup()
 

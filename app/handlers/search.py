@@ -19,6 +19,7 @@ from app.keyboards.main_menu import (
     build_search_retry_keyboard,
 )
 from app.services.search_service import SearchService
+from app.services.auth_service import AuthService
 from app.storage.json_storage import CatalogStorageError
 from app.utils.text import normalize_search_text
 
@@ -76,6 +77,7 @@ async def handle_search_retry(
 async def handle_search_cancel_callback(
     callback: CallbackQuery,
     state: FSMContext,
+    auth_service: AuthService,
 ) -> None:
     """Cancel search through the inline button."""
 
@@ -85,7 +87,9 @@ async def handle_search_cancel_callback(
         await edit_or_send_text(
             callback.message,
             "Поиск отменён.",
-            build_main_menu_keyboard(),
+            build_main_menu_keyboard(
+                is_admin=auth_service.is_admin(callback.from_user.id)
+            ),
         )
 
 
@@ -93,13 +97,19 @@ async def handle_search_cancel_callback(
 async def handle_search_cancel_command(
     message: Message,
     state: FSMContext,
+    auth_service: AuthService,
 ) -> None:
     """Cancel search through the command."""
 
     await state.clear()
     await message.answer(
         "Поиск отменён.",
-        reply_markup=build_main_menu_keyboard(),
+        reply_markup=build_main_menu_keyboard(
+            is_admin=bool(
+                message.from_user
+                and auth_service.is_admin(message.from_user.id)
+            )
+        ),
     )
 
 
@@ -108,6 +118,7 @@ async def handle_search_query(
     message: Message,
     state: FSMContext,
     catalog_path: Path,
+    auth_service: AuthService,
 ) -> None:
     """Execute a normalized search and show at most twenty results."""
 
@@ -126,7 +137,12 @@ async def handle_search_query(
         await state.clear()
         await message.answer(
             catalog_error_message(exc),
-            reply_markup=build_main_menu_keyboard(),
+            reply_markup=build_main_menu_keyboard(
+                is_admin=bool(
+                    message.from_user
+                    and auth_service.is_admin(message.from_user.id)
+                )
+            ),
         )
         return
 

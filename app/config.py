@@ -22,6 +22,42 @@ class Settings(BaseSettings):
 
     bot_token: SecretStr
     catalog_path: Path = DEFAULT_CATALOG_PATH
+    admin_ids: frozenset[int] = frozenset()
+
+    @field_validator("admin_ids", mode="before")
+    @classmethod
+    def parse_admin_ids(cls, value: object) -> frozenset[int]:
+        """Parse a comma-separated list of positive Telegram user IDs."""
+
+        if value is None or value == "":
+            return frozenset()
+        if isinstance(value, str):
+            parts = [part.strip() for part in value.split(",")]
+            if all(not part for part in parts):
+                return frozenset()
+            values: object = parts
+        else:
+            values = value
+
+        if not isinstance(values, (list, tuple, set, frozenset)):
+            raise ValueError(
+                "ADMIN_IDS должен быть списком положительных числовых ID"
+            )
+
+        parsed: set[int] = set()
+        for raw_id in values:
+            try:
+                user_id = int(raw_id)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"ADMIN_IDS содержит нечисловое значение: {raw_id!r}"
+                ) from exc
+            if user_id <= 0:
+                raise ValueError(
+                    "ADMIN_IDS должен содержать только положительные ID"
+                )
+            parsed.add(user_id)
+        return frozenset(parsed)
 
     @field_validator("catalog_path")
     @classmethod

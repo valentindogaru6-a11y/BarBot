@@ -7,8 +7,13 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
-from app.config import Settings
+from app.config import PROJECT_ROOT, Settings
 from app.handlers import catalog, search, start
+from app.handlers.admin import router as admin_router
+from app.services.admin_service import AdminService
+from app.services.audit_service import AuditService
+from app.services.auth_service import AuthService
+from app.storage.json_storage import JsonCatalogStorage
 
 
 async def main() -> None:
@@ -19,6 +24,11 @@ async def main() -> None:
         format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
     )
     settings = Settings()
+    auth_service = AuthService(settings.admin_ids)
+    admin_service = AdminService(
+        storage=JsonCatalogStorage(settings.catalog_path),
+        audit=AuditService(PROJECT_ROOT / "logs" / "admin_audit.jsonl"),
+    )
     bot = Bot(
         token=settings.bot_token.get_secret_value(),
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
@@ -27,6 +37,7 @@ async def main() -> None:
     dispatcher.include_router(start.router)
     dispatcher.include_router(catalog.router)
     dispatcher.include_router(search.router)
+    dispatcher.include_router(admin_router)
     dispatcher.errors.register(start.handle_unexpected_error)
 
     try:
@@ -34,6 +45,8 @@ async def main() -> None:
         await dispatcher.start_polling(
             bot,
             catalog_path=settings.catalog_path,
+            auth_service=auth_service,
+            admin_service=admin_service,
             close_bot_session=False,
         )
     finally:
