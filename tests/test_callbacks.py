@@ -6,6 +6,7 @@ from app.keyboards.callbacks import (
     MainCallback,
     PaginationCallback,
     SearchCallback,
+    SubcategoryCallback,
 )
 
 
@@ -25,12 +26,21 @@ def test_callback_factories_pack_and_unpack_stable_ids() -> None:
 def test_all_callback_factories_produce_short_data() -> None:
     callbacks = [
         MainCallback(action="catalog"),
-        CategoryCallback(category_id="a" * 28),
-        ItemCallback(category_id="a" * 28, item_id="b" * 28),
+        CategoryCallback(category_id="a" * 18),
+        SubcategoryCallback(
+            category_id="a" * 18,
+            subcategory_id="b" * 18,
+        ),
+        ItemCallback(
+            category_id="a" * 18,
+            subcategory_id="b" * 18,
+            item_id="c" * 18,
+        ),
         PaginationCallback(
             section="items",
             page=999,
-            category_id="a" * 28,
+            category_id="a" * 18,
+            subcategory_id="b" * 18,
         ),
         SearchCallback(action="retry"),
     ]

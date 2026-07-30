@@ -6,6 +6,7 @@ from typing import Any
 
 from app.models.catalog_item import CatalogItem
 from app.models.category import Category
+from app.models.subcategory import Subcategory
 
 FIELD_LABELS = {
     "glassware": "Бокал",
@@ -48,14 +49,26 @@ def humanize_field_name(key: str) -> str:
     return key.replace("_", " ").strip().capitalize() or "Поле"
 
 
+def _format_section_heading(
+    section: Category | Subcategory,
+) -> str:
+    emoji = f"{escape(section.emoji.strip())} " if section.emoji else ""
+    parts = [f"<b>{emoji}{escape(section.name)}</b>"]
+    if section.description and section.description.strip():
+        parts.append(escape(section.description.strip()))
+    return "\n\n".join(parts)
+
+
 def format_category_heading(category: Category) -> str:
     """Format a category heading with escaped user-managed content."""
 
-    emoji = f"{escape(category.emoji.strip())} " if category.emoji else ""
-    parts = [f"<b>{emoji}{escape(category.name)}</b>"]
-    if category.description and category.description.strip():
-        parts.append(escape(category.description.strip()))
-    return "\n\n".join(parts)
+    return _format_section_heading(category)
+
+
+def format_subcategory_heading(subcategory: Subcategory) -> str:
+    """Format a subcategory heading with escaped user-managed content."""
+
+    return _format_section_heading(subcategory)
 
 
 def format_item_card(item: CatalogItem) -> str:

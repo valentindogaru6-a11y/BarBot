@@ -17,16 +17,22 @@ from app.keyboards.callbacks import (
     ItemCallback,
     MainCallback,
     PaginationCallback,
+    SubcategoryCallback,
 )
 from app.keyboards.catalog import (
     build_categories_keyboard,
     build_item_keyboard,
     build_items_keyboard,
+    build_subcategories_keyboard,
 )
 from app.keyboards.main_menu import build_main_menu_keyboard
 from app.services.catalog_service import CatalogService
 from app.storage.json_storage import CatalogStorageError
-from app.utils.formatting import format_category_heading, format_item_card
+from app.utils.formatting import (
+    format_category_heading,
+    format_item_card,
+    format_subcategory_heading,
+)
 
 router = Router(name=__name__)
 logger = logging.getLogger(__name__)
@@ -87,23 +93,34 @@ async def _show_category(
         )
         return
 
-    items = service.get_active_items(category.id)
+    subcategories = service.get_active_subcategories(category.id)
     text = format_category_heading(category)
-    text += "\n\nВыберите позицию:"
-    if not items:
-        text += "\nВ этой категории пока нет активных позиций."
+    if subcategories:
+        text += "\n\nВыберите раздел:"
+        keyboard = build_subcategories_keyboard(
+            category,
+            subcategories,
+            page,
+        )
+    else:
+        items = service.get_active_items(category.id)
+        text += "\n\nВыберите позицию:"
+        if not items:
+            text += "\nВ этой категории пока нет активных позиций."
+        keyboard = build_items_keyboard(category, items, page)
     await edit_or_send_text(
         message,
         text,
-        build_items_keyboard(category, items, page),
+        keyboard,
     )
 
 
-async def _show_item(
+async def _show_subcategory(
     message: Message,
     catalog_path: Path,
     category_id: str,
-    item_id: str,
+    subcategory_id: str,
+    page: int = 0,
 ) -> None:
     try:
         service = CatalogService(load_catalog(catalog_path))
@@ -117,10 +134,76 @@ async def _show_item(
         return
 
     category = service.get_category(category_id)
-    item = service.get_item(category_id, item_id)
+    subcategory = service.get_subcategory(category_id, subcategory_id)
     if (
         category is None
         or not category.is_active
+        or subcategory is None
+        or not subcategory.is_active
+    ):
+        await edit_or_send_text(
+            message,
+            "Подкатегория не найдена или больше недоступна.",
+            build_categories_keyboard(service.get_active_categories()),
+        )
+        return
+
+    items = service.get_active_items(category.id, subcategory.id)
+    text = format_subcategory_heading(subcategory)
+    text += "\n\nВыберите позицию:"
+    if not items:
+        text += "\nВ этом разделе пока нет активных позиций."
+    await edit_or_send_text(
+        message,
+        text,
+        build_items_keyboard(
+            category,
+            items,
+            page,
+            subcategory=subcategory,
+        ),
+    )
+
+
+async def _show_item(
+    message: Message,
+    catalog_path: Path,
+    category_id: str,
+    item_id: str,
+    subcategory_id: str | None = None,
+) -> None:
+    try:
+        service = CatalogService(load_catalog(catalog_path))
+    except CatalogStorageError as exc:
+        logger.error("Could not load catalog from %s: %s", catalog_path, exc)
+        await edit_or_send_text(
+            message,
+            catalog_error_message(exc),
+            build_main_menu_keyboard(),
+        )
+        return
+
+    category = service.get_category(category_id)
+    subcategory = (
+        service.get_subcategory(category_id, subcategory_id)
+        if subcategory_id is not None
+        else None
+    )
+    if subcategory_id is None:
+        item = service.get_item(category_id, item_id)
+    else:
+        item = service.get_subcategory_item(
+            category_id,
+            subcategory_id,
+            item_id,
+        )
+    if (
+        category is None
+        or not category.is_active
+        or (
+            subcategory_id is not None
+            and (subcategory is None or not subcategory.is_active)
+        )
         or item is None
         or not item.is_active
     ):
@@ -132,7 +215,7 @@ async def _show_item(
         return
 
     card = format_item_card(item)
-    keyboard = build_item_keyboard(category.id)
+    keyboard = build_item_keyboard(category.id, subcategory_id)
     if not item.photo_file_id:
         await edit_or_send_text(message, card, keyboard)
         return
@@ -206,6 +289,44 @@ async def handle_category(
         )
 
 
+@router.callback_query(
+    PaginationCallback.filter(F.section == "subcategories")
+)
+async def handle_subcategory_page(
+    callback: CallbackQuery,
+    callback_data: PaginationCallback,
+    catalog_path: Path,
+) -> None:
+    """Show a safely bounded subcategory page."""
+
+    await callback.answer()
+    if isinstance(callback.message, Message):
+        await _show_category(
+            callback.message,
+            catalog_path,
+            callback_data.category_id,
+            callback_data.page,
+        )
+
+
+@router.callback_query(SubcategoryCallback.filter())
+async def handle_subcategory(
+    callback: CallbackQuery,
+    callback_data: SubcategoryCallback,
+    catalog_path: Path,
+) -> None:
+    """Show active items for a selected subcategory."""
+
+    await callback.answer()
+    if isinstance(callback.message, Message):
+        await _show_subcategory(
+            callback.message,
+            catalog_path,
+            callback_data.category_id,
+            callback_data.subcategory_id,
+        )
+
+
 @router.callback_query(PaginationCallback.filter(F.section == "items"))
 async def handle_item_page(
     callback: CallbackQuery,
@@ -216,12 +337,21 @@ async def handle_item_page(
 
     await callback.answer()
     if isinstance(callback.message, Message):
-        await _show_category(
-            callback.message,
-            catalog_path,
-            callback_data.category_id,
-            callback_data.page,
-        )
+        if callback_data.subcategory_id == "_":
+            await _show_category(
+                callback.message,
+                catalog_path,
+                callback_data.category_id,
+                callback_data.page,
+            )
+        else:
+            await _show_subcategory(
+                callback.message,
+                catalog_path,
+                callback_data.category_id,
+                callback_data.subcategory_id,
+                callback_data.page,
+            )
 
 
 @router.callback_query(ItemCallback.filter())
@@ -239,4 +369,9 @@ async def handle_item(
             catalog_path,
             callback_data.category_id,
             callback_data.item_id,
+            (
+                None
+                if callback_data.subcategory_id == "_"
+                else callback_data.subcategory_id
+            ),
         )

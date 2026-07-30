@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from app.models.catalog import Catalog
 from app.models.catalog_item import CatalogItem
 from app.models.category import Category
+from app.models.subcategory import Subcategory
 from app.services.catalog_service import CatalogService
 from app.utils.text import normalize_search_text
 
@@ -15,6 +16,7 @@ class SearchResult:
 
     category: Category
     item: CatalogItem
+    subcategory: Subcategory | None = None
 
 
 class SearchService:
@@ -34,7 +36,24 @@ class SearchService:
         for category in self.catalog_service.get_active_categories():
             for item in self.catalog_service.get_active_items(category.id):
                 if self._matches(item, normalized_query):
-                    results.append(SearchResult(category=category, item=item))
+                    results.append(
+                        SearchResult(category=category, item=item)
+                    )
+            for subcategory in self.catalog_service.get_active_subcategories(
+                category.id
+            ):
+                for item in self.catalog_service.get_active_items(
+                    category.id,
+                    subcategory.id,
+                ):
+                    if self._matches(item, normalized_query):
+                        results.append(
+                            SearchResult(
+                                category=category,
+                                subcategory=subcategory,
+                                item=item,
+                            )
+                        )
 
         return results
 

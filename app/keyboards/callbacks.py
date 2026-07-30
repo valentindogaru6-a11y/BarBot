@@ -17,19 +17,28 @@ class CategoryCallback(CallbackData, prefix="c"):
     category_id: str
 
 
+class SubcategoryCallback(CallbackData, prefix="u"):
+    """Open a subcategory by stable category and subcategory IDs."""
+
+    category_id: str
+    subcategory_id: str
+
+
 class ItemCallback(CallbackData, prefix="i"):
-    """Open an item by stable category and item IDs."""
+    """Open an item by stable category, optional subcategory, and item IDs."""
 
     category_id: str
     item_id: str
+    subcategory_id: str = "_"
 
 
 class PaginationCallback(CallbackData, prefix="p"):
     """Move to a bounded page of categories or items."""
 
-    section: Literal["categories", "items"]
+    section: Literal["categories", "subcategories", "items"]
     page: int
     category_id: str = "_"
+    subcategory_id: str = "_"
 
 
 class SearchCallback(CallbackData, prefix="s"):

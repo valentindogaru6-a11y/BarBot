@@ -3,6 +3,7 @@
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.catalog_item import CatalogItem, NonEmptyString, StableId
+from app.models.subcategory import Subcategory
 
 
 class Category(BaseModel):
@@ -16,4 +17,5 @@ class Category(BaseModel):
     description: str | None = None
     sort_order: int = 0
     is_active: bool = True
+    subcategories: list[Subcategory] = Field(default_factory=list)
     items: list[CatalogItem] = Field(default_factory=list)

@@ -19,10 +19,11 @@ def test_loads_repository_catalog_successfully() -> None:
     catalog = JsonCatalogStorage(catalog_path).load()
 
     assert catalog.version == 1
-    assert [category.id for category in catalog.categories] == [
-        "cocktails",
-        "coffee",
-    ]
+    assert [category.id for category in catalog.categories] == ["cocktails"]
+    assert [
+        subcategory.id
+        for subcategory in catalog.categories[0].subcategories
+    ] == ["signature", "classic", "non_alcoholic", "methods"]
 
 
 def test_missing_file_has_clear_error(tmp_path: Path) -> None:
