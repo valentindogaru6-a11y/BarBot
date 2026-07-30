@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "categories": [
+    {
+      "id": "cocktails",
+      "name": "Коктейли",
+      "emoji": "🍸",
+      "description": "Тестовая категория для проверки структуры каталога.",
+      "sort_order": 10,
+      "is_active": true,
+      "items": [
+        {
+          "id": "test-passion-cocktail",
+          "name": "Тестовый коктейль с маракуйей",
+          "short_description": "Демонстрационная позиция, не реальная техкарта.",
+          "description": "Только пример заполнения универсальной модели каталога.",
+          "photo_file_id": null,
+          "ingredients": [
+            {
+              "name": "Тестовая основа",
+              "amount": 50,
+              "unit": "мл"
+            },
+            {
+              "name": "Тестовое пюре маракуйи",
+              "amount": "по вкусу",
+              "unit": ""
+            }
+          ],
+          "fields": {
+            "glassware": "Купе",
+            "ice": "Без льда",
+            "method": "Шейк",
+            "garnish": "Тестовое украшение"
+          },
+          "steps": [
+            "Смешать тестовые ингредиенты.",
+            "Подать как демонстрационный пример."
+          ],
+          "tags": [
+            "тест",
+            "демо"
+          ],
+          "sort_order": 10,
+          "is_active": true
+        }
+      ]
+    },
+    {
+      "id": "coffee",
+      "name": "Кофе",
+      "emoji": "☕",
+      "description": "Тестовая пустая категория для будущих позиций.",
+      "sort_order": 20,
+      "is_active": true,
+      "items": []
+    }
+  ]
+}
