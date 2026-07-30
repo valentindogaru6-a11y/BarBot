@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.catalog_item import CatalogItem, NonEmptyString
+from app.models.catalog_item import CatalogItem, NonEmptyString, StableId
 
 
 class Category(BaseModel):
@@ -10,7 +10,7 @@ class Category(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    id: NonEmptyString
+    id: StableId
     name: NonEmptyString
     emoji: str | None = None
     description: str | None = None

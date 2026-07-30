@@ -1,10 +1,19 @@
 """Models for catalog items and their ingredients."""
 
-from typing import Any, Annotated
+from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 NonEmptyString = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+StableId = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True,
+        min_length=1,
+        max_length=28,
+        pattern=r"^[a-z0-9][a-z0-9_-]*$",
+    ),
+]
 
 
 class Ingredient(BaseModel):
@@ -22,7 +31,7 @@ class CatalogItem(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    id: NonEmptyString
+    id: StableId
     name: NonEmptyString
     short_description: str | None = None
     description: str | None = None
