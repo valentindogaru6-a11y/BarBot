@@ -52,3 +52,39 @@ class AuditService:
         except OSError:
             logger.exception("Could not append administrative audit record")
             return False
+
+    def record_user_event(
+        self,
+        *,
+        actor_user_id: int,
+        target_user_id: int,
+        previous_role: str,
+        new_role: str,
+        action: str,
+        status: Literal["success", "error"],
+        description: str,
+    ) -> bool:
+        """Append a sanitized user/role audit event."""
+
+        record = {
+            "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+            "actor_user_id": actor_user_id,
+            "target_user_id": target_user_id,
+            "previous_role": previous_role,
+            "new_role": new_role,
+            "action": action,
+            "status": status,
+            "description": description,
+        }
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            with self.path.open("a", encoding="utf-8") as audit_file:
+                audit_file.write(
+                    json.dumps(record, ensure_ascii=False, separators=(",", ":"))
+                    + "\n"
+                )
+                audit_file.flush()
+            return True
+        except OSError:
+            logger.exception("Could not append user role audit record")
+            return False

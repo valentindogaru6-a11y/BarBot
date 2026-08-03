@@ -13,6 +13,7 @@ from app.storage.json_storage import (
     JsonCatalogStorage,
     load_catalog,
 )
+from app.storage.user_database import UserDatabase, UserDatabaseError
 
 __all__ = [
     "DEFAULT_CATALOG_PATH",
@@ -26,4 +27,6 @@ __all__ = [
     "CatalogValidationError",
     "JsonCatalogStorage",
     "load_catalog",
+    "UserDatabase",
+    "UserDatabaseError",
 ]

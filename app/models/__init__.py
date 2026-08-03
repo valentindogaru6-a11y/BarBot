@@ -4,6 +4,7 @@ from app.models.catalog import Catalog
 from app.models.catalog_item import CatalogItem, Ingredient
 from app.models.category import Category
 from app.models.subcategory import Subcategory
+from app.models.user import Role, UserRecord
 
 __all__ = [
     "Catalog",
@@ -11,4 +12,6 @@ __all__ = [
     "Category",
     "Ingredient",
     "Subcategory",
+    "Role",
+    "UserRecord",
 ]

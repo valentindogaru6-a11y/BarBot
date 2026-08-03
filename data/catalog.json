@@ -1192,6 +1192,46 @@
         }
       ],
       "items": []
+    },
+    {
+      "id": "semi_finished",
+      "name": "Полуфабрикаты",
+      "emoji": "🧪",
+      "description": null,
+      "sort_order": 20,
+      "is_active": true,
+      "subcategories": [],
+      "items": []
+    },
+    {
+      "id": "signature_tea",
+      "name": "Фирменные чаи",
+      "emoji": "🫖",
+      "description": null,
+      "sort_order": 30,
+      "is_active": true,
+      "subcategories": [],
+      "items": []
+    },
+    {
+      "id": "coffee",
+      "name": "Кофейная карта",
+      "emoji": "☕",
+      "description": null,
+      "sort_order": 40,
+      "is_active": true,
+      "subcategories": [],
+      "items": []
+    },
+    {
+      "id": "wine",
+      "name": "Винная карта",
+      "emoji": "🍷",
+      "description": null,
+      "sort_order": 50,
+      "is_active": true,
+      "subcategories": [],
+      "items": []
     }
   ]
 }

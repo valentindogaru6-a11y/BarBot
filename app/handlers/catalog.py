@@ -28,6 +28,7 @@ from app.keyboards.catalog import (
     build_subcategories_keyboard,
 )
 from app.keyboards.main_menu import build_main_menu_keyboard
+from app.middlewares.access import CatalogAccessFilter
 from app.services.auth_service import AuthService
 from app.services.catalog_service import CatalogService
 from app.storage.json_storage import CatalogStorageError
@@ -38,6 +39,8 @@ from app.utils.formatting import (
 )
 
 router = Router(name=__name__)
+router.message.filter(CatalogAccessFilter())
+router.callback_query.filter(CatalogAccessFilter())
 logger = logging.getLogger(__name__)
 
 TELEGRAM_CAPTION_LIMIT = 1024

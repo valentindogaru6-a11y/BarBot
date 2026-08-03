@@ -18,12 +18,15 @@ from app.keyboards.main_menu import (
     build_search_prompt_keyboard,
     build_search_retry_keyboard,
 )
+from app.middlewares.access import CatalogAccessFilter
 from app.services.search_service import SearchService
 from app.services.auth_service import AuthService
 from app.storage.json_storage import CatalogStorageError
 from app.utils.text import normalize_search_text
 
 router = Router(name=__name__)
+router.message.filter(CatalogAccessFilter())
+router.callback_query.filter(CatalogAccessFilter())
 logger = logging.getLogger(__name__)
 
 SEARCH_PROMPT = (

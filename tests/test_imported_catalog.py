@@ -1,5 +1,7 @@
 """Integrity tests for imported production catalog data."""
 
+import hashlib
+import json
 from pathlib import Path
 
 import pytest
@@ -23,7 +25,7 @@ def _all_items(catalog: Catalog):
 
 
 def test_imported_catalog_counts(imported_catalog: Catalog) -> None:
-    assert len(imported_catalog.categories) == 1
+    assert len(imported_catalog.categories) == 5
     assert len(imported_catalog.categories[0].subcategories) == 4
     assert len(list(_all_items(imported_catalog))) == 24
     counts = {
@@ -36,6 +38,53 @@ def test_imported_catalog_counts(imported_catalog: Catalog) -> None:
         "non_alcoholic": 1,
         "methods": 0,
     }
+
+
+def test_new_empty_categories_are_present_once(
+    imported_catalog: Catalog,
+) -> None:
+    expected = {
+        "semi_finished": ("Полуфабрикаты", "🧪", 20),
+        "signature_tea": ("Фирменные чаи", "🫖", 30),
+        "coffee": ("Кофейная карта", "☕", 40),
+        "wine": ("Винная карта", "🍷", 50),
+    }
+    by_id = {category.id: category for category in imported_catalog.categories}
+
+    assert len(by_id) == len(imported_catalog.categories)
+    for category_id, (name, emoji, sort_order) in expected.items():
+        category = by_id[category_id]
+        assert (category.name, category.emoji, category.sort_order) == (
+            name,
+            emoji,
+            sort_order,
+        )
+        assert category.description is None
+        assert category.is_active
+        assert category.subcategories == []
+        assert category.items == []
+
+
+def test_existing_cocktail_category_is_byte_semantically_unchanged(
+    imported_catalog: Catalog,
+) -> None:
+    cocktail = next(
+        category
+        for category in imported_catalog.categories
+        if category.id == "cocktails"
+    )
+    payload = json.dumps(
+        cocktail.model_dump(mode="json"),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode()
+
+    assert cocktail.sort_order == 10
+    assert hashlib.sha256(payload).hexdigest() == (
+        "8772ab82d4bda80f83daa797f94c5c66"
+        "aa46f3fe2a8363f5f64e7a021e30a1b8"
+    )
 
 
 def test_imported_catalog_keeps_existing_photos(

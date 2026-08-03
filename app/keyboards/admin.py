@@ -10,6 +10,7 @@ from app.keyboards.admin_callbacks import (
     AdminPanelCallback,
 )
 from app.keyboards.callbacks import MainCallback
+from app.keyboards.user_callbacks import UserAdminCallback
 
 
 def build_admin_panel_keyboard() -> InlineKeyboardMarkup:
@@ -24,6 +25,10 @@ def build_admin_panel_keyboard() -> InlineKeyboardMarkup:
             text=text,
             callback_data=AdminEntityCallback(entity=entity),
         )
+    builder.button(
+        text="👥 Управление пользователями",
+        callback_data=UserAdminCallback(action="menu"),
+    )
     builder.button(
         text="🏠 Главное меню",
         callback_data=MainCallback(action="home"),

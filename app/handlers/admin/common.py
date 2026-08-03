@@ -5,7 +5,7 @@ import logging
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message, User
+from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove, User
 
 from app.handlers.common import edit_or_send_text
 from app.keyboards.admin import build_admin_panel_keyboard
@@ -73,6 +73,12 @@ async def handle_admin_command(
 ) -> None:
     if not await require_admin_message(message, auth_service):
         return
+    current_state = await state.get_state()
+    if current_state and current_state.startswith("UserPickerStates:"):
+        await message.answer(
+            "Выбор пользователя отменён.",
+            reply_markup=ReplyKeyboardRemove(),
+        )
     await state.clear()
     await message.answer(
         f"{ADMIN_HEADER}\n\nВыберите действие:",
@@ -90,6 +96,16 @@ async def handle_admin_panel(
 ) -> None:
     if not await require_admin_callback(callback, auth_service):
         return
+    current_state = await state.get_state()
+    if (
+        current_state
+        and current_state.startswith("UserPickerStates:")
+        and isinstance(callback.message, Message)
+    ):
+        await callback.message.answer(
+            "Выбор пользователя отменён.",
+            reply_markup=ReplyKeyboardRemove(),
+        )
     await state.clear()
     if not isinstance(callback.message, Message):
         return

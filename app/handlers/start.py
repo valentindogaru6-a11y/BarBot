@@ -2,16 +2,19 @@
 
 import logging
 
-from aiogram import F, Router
+from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramAPIError
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, ErrorEvent, Message
+from aiogram.types import CallbackQuery, ErrorEvent, Message, ReplyKeyboardRemove
 
 from app.handlers.common import edit_or_send_text
 from app.keyboards.callbacks import MainCallback
 from app.keyboards.main_menu import build_main_menu_keyboard
+from app.middlewares.access import BLOCKED_TEXT
+from app.models.user import Role
 from app.services.auth_service import AuthService
+from app.telegram_commands import update_user_commands
 
 router = Router(name=__name__)
 logger = logging.getLogger(__name__)
@@ -37,15 +40,29 @@ async def handle_start(
     message: Message,
     state: FSMContext,
     auth_service: AuthService,
+    bot: Bot,
 ) -> None:
     """Show the main menu and reset an unfinished interaction."""
 
+    current_state = await state.get_state()
+    if current_state and current_state.startswith("UserPickerStates:"):
+        await message.answer(
+            "Выбор пользователя отменён.",
+            reply_markup=ReplyKeyboardRemove(),
+        )
     await state.clear()
     user = message.from_user
+    if user is None:
+        return
+    context = auth_service.get_context(user.id)
+    await update_user_commands(bot, user.id, context.role)
+    if context.role is Role.BLOCKED:
+        await message.answer(BLOCKED_TEXT)
+        return
     await message.answer(
         WELCOME_TEXT,
         reply_markup=build_main_menu_keyboard(
-            is_admin=bool(user and auth_service.is_admin(user.id))
+            is_admin=context.can_manage_catalog
         ),
     )
 
@@ -66,8 +83,17 @@ async def handle_help(
 ) -> None:
     """Show concise usage help and the role-aware main menu."""
 
+    current_state = await state.get_state()
+    if current_state and current_state.startswith("UserPickerStates:"):
+        await message.answer(
+            "Выбор пользователя отменён.",
+            reply_markup=ReplyKeyboardRemove(),
+        )
     await state.clear()
     user = message.from_user
+    if user and not auth_service.can_view_catalog(user.id):
+        await message.answer(BLOCKED_TEXT)
+        return
     is_admin = bool(user and auth_service.is_admin(user.id))
     text = HELP_TEXT
     if is_admin:
@@ -89,7 +115,20 @@ async def handle_home(
 ) -> None:
     """Return to the main menu."""
 
+    if not auth_service.can_view_catalog(callback.from_user.id):
+        await callback.answer(BLOCKED_TEXT, show_alert=True)
+        return
     await callback.answer()
+    current_state = await state.get_state()
+    if (
+        current_state
+        and current_state.startswith("UserPickerStates:")
+        and isinstance(callback.message, Message)
+    ):
+        await callback.message.answer(
+            "Выбор пользователя отменён.",
+            reply_markup=ReplyKeyboardRemove(),
+        )
     await state.clear()
     if isinstance(callback.message, Message):
         await edit_or_send_text(

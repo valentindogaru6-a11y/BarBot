@@ -19,7 +19,13 @@ def test_loads_repository_catalog_successfully() -> None:
     catalog = JsonCatalogStorage(catalog_path).load()
 
     assert catalog.version == 1
-    assert [category.id for category in catalog.categories] == ["cocktails"]
+    assert [category.id for category in catalog.categories] == [
+        "cocktails",
+        "semi_finished",
+        "signature_tea",
+        "coffee",
+        "wine",
+    ]
     assert [
         subcategory.id
         for subcategory in catalog.categories[0].subcategories
