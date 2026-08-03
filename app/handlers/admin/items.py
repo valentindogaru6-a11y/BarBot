@@ -5,7 +5,7 @@ from html import escape
 
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, ForceReply, Message
 
 from app.handlers.admin.common import (
     ADMIN_HEADER,
@@ -16,12 +16,18 @@ from app.handlers.admin.common import (
 from app.handlers.admin.states import (
     CreateItemStates,
     EditItemStates,
+    FullEditItemStates,
     MoveItemStates,
+    TemplateConfirmationStates,
+    TemplateCorrectionStates,
+    TemplateCreateItemStates,
 )
 from app.handlers.common import edit_or_send_text
 from app.keyboards.admin import (
     build_admin_confirm_keyboard,
     build_admin_item_missing_keyboard,
+    build_admin_template_error_keyboard,
+    build_admin_text_input_keyboard,
     build_admin_wizard_keyboard,
 )
 from app.keyboards.admin_callbacks import (
@@ -32,9 +38,11 @@ from app.keyboards.admin_callbacks import (
 )
 from app.keyboards.admin_catalog import (
     build_admin_category_picker,
+    build_admin_item_creation_modes,
     build_admin_item_actions,
     build_admin_items_keyboard,
     build_admin_placement_keyboard,
+    build_created_item_keyboard,
 )
 from app.models.catalog_item import CatalogItem, MAX_STABLE_ID_LENGTH
 from app.services.admin_service import (
@@ -47,6 +55,13 @@ from app.services.admin_service import (
     parse_tags,
 )
 from app.services.auth_service import AuthService
+from app.services.card_template import (
+    CardTemplateError,
+    ParsedItemUpdate,
+    empty_item_template,
+    parse_item_template,
+    serialize_item_template,
+)
 from app.services.stable_id import (
     StableIdGenerationError,
     generate_stable_id,
@@ -55,6 +70,80 @@ from app.utils.formatting import format_item_card
 
 router = Router(name=__name__)
 logger = logging.getLogger(__name__)
+
+TELEGRAM_TEXT_LIMIT = 4096
+
+
+def _split_telegram_text(text: str) -> list[str]:
+    """Split copyable text without truncating it or changing its contents."""
+
+    if not text:
+        return ["-"]
+    chunks: list[str] = []
+    remaining = text
+    while len(remaining) > TELEGRAM_TEXT_LIMIT:
+        boundary = remaining.rfind("\n", 0, TELEGRAM_TEXT_LIMIT + 1)
+        if boundary <= 0:
+            boundary = TELEGRAM_TEXT_LIMIT
+        else:
+            boundary += 1
+        chunks.append(remaining[:boundary])
+        remaining = remaining[boundary:]
+    chunks.append(remaining)
+    return chunks
+
+
+async def _send_copyable_text(
+    message: Message,
+    text: str,
+    *,
+    placeholder: str,
+) -> None:
+    """Send the entire raw value, then open a convenient reply composer."""
+
+    chunks = _split_telegram_text(text)
+    for index, chunk in enumerate(chunks):
+        await message.answer(
+            chunk,
+            parse_mode=None,
+            reply_markup=(
+                build_admin_text_input_keyboard(text)
+                if index == len(chunks) - 1
+                else None
+            ),
+        )
+    instruction = (
+        "Текст длиннее лимита кнопки копирования. Используйте стандартное "
+        "действие Telegram «Копировать», измените текст и отправьте обратно."
+        if len(text) > 256
+        else "Скопируйте текст, измените нужные строки и отправьте обратно."
+    )
+    await message.answer(
+        instruction,
+        reply_markup=ForceReply(input_field_placeholder=placeholder),
+    )
+
+
+def _serialize_item_field(item: CatalogItem, field: str) -> str:
+    if field == "name":
+        return item.name
+    if field in {"short_description", "description"}:
+        value = getattr(item, field)
+        return value.strip() if value and value.strip() else "-"
+    if field == "ingredients":
+        return "\n".join(
+            f"{entry.name} | {entry.amount} | {entry.unit}"
+            for entry in item.ingredients
+        ) or "-"
+    if field == "fields":
+        return "\n".join(
+            f"{key} | {value}" for key, value in item.fields.items()
+        ) or "-"
+    if field == "steps":
+        return "\n".join(item.steps) or "-"
+    if field == "tags":
+        return ", ".join(item.tags) or "-"
+    raise ValueError(f"Unsupported editable field: {field}")
 
 
 def _sub_id(value: str) -> str | None:
@@ -342,6 +431,29 @@ async def item_create_start(
     state: FSMContext,
     auth_service: AuthService,
 ) -> None:
+    if not await require_admin_callback(callback, auth_service):
+        return
+    await state.clear()
+    if isinstance(callback.message, Message):
+        await edit_or_send_text(
+            callback.message,
+            f"{ADMIN_HEADER}\n\nВыберите способ создания позиции:",
+            build_admin_item_creation_modes(
+                callback_data.category_id,
+                _sub_id(callback_data.subcategory_id),
+            ),
+        )
+
+
+@router.callback_query(AdminItemCallback.filter(F.action == "w"))
+async def item_create_wizard_start(
+    callback: CallbackQuery,
+    callback_data: AdminItemCallback,
+    state: FSMContext,
+    auth_service: AuthService,
+) -> None:
+    """Start the unchanged step-by-step item creation wizard."""
+
     if not await require_admin_callback(callback, auth_service):
         return
     await state.set_state(CreateItemStates.name)
@@ -743,6 +855,332 @@ async def create_item_save(
         )
 
 
+async def _show_full_template_input(
+    message: Message,
+    template: str,
+    *,
+    creating: bool,
+) -> None:
+    action = "создания" if creating else "редактирования"
+    await edit_or_send_text(
+        message,
+        f"{ADMIN_HEADER}\n\n"
+        f"Скопируйте весь шаблон для {action} карточки, измените "
+        "нужные значения и отправьте его одним сообщением. "
+        "Фото и размещение редактируются отдельно.",
+    )
+    await _send_copyable_text(
+        message,
+        template,
+        placeholder="Заполненный шаблон",
+    )
+
+
+@router.callback_query(AdminItemCallback.filter(F.action == "ea"))
+async def item_full_edit_start(
+    callback: CallbackQuery,
+    callback_data: AdminItemCallback,
+    state: FSMContext,
+    auth_service: AuthService,
+    admin_service: AdminService,
+) -> None:
+    """Show a populated template for an existing item."""
+
+    if not await require_admin_callback(callback, auth_service):
+        return
+    catalog = await admin_service.get_catalog()
+    try:
+        item = _item_from_catalog(
+            catalog,
+            callback_data.category_id,
+            _sub_id(callback_data.subcategory_id),
+            callback_data.item_id,
+        )
+    except ObjectChangedError:
+        if isinstance(callback.message, Message):
+            await callback.message.answer(
+                "Позиция уже удалена или перемещена."
+            )
+        return
+
+    template = serialize_item_template(item)
+    await state.set_state(FullEditItemStates.input)
+    await state.set_data(
+        {
+            "template_mode": "edit",
+            "category_id": callback_data.category_id,
+            "subcategory_id": _sub_id(callback_data.subcategory_id),
+            "item_id": callback_data.item_id,
+            "raw_template": template,
+        }
+    )
+    if isinstance(callback.message, Message):
+        await _show_full_template_input(
+            callback.message,
+            template,
+            creating=False,
+        )
+
+
+@router.callback_query(AdminItemCallback.filter(F.action == "k"))
+async def item_template_create_start(
+    callback: CallbackQuery,
+    callback_data: AdminItemCallback,
+    state: FSMContext,
+    auth_service: AuthService,
+) -> None:
+    """Show an empty full-card template after placement was selected."""
+
+    if not await require_admin_callback(callback, auth_service):
+        return
+    template = empty_item_template()
+    await state.set_state(TemplateCreateItemStates.input)
+    await state.set_data(
+        {
+            "template_mode": "create",
+            "category_id": callback_data.category_id,
+            "subcategory_id": _sub_id(callback_data.subcategory_id),
+            "raw_template": template,
+        }
+    )
+    if isinstance(callback.message, Message):
+        await _show_full_template_input(
+            callback.message,
+            template,
+            creating=True,
+        )
+
+
+async def _show_template_errors(
+    message: Message,
+    errors: list[str],
+) -> None:
+    error_text = "\n".join(f"• {error}" for error in errors)
+    await message.answer(
+        "⚠️ Шаблон содержит ошибки:\n\n" + error_text,
+        parse_mode=None,
+        reply_markup=build_admin_template_error_keyboard(),
+    )
+
+
+async def _process_item_template(
+    message: Message,
+    state: FSMContext,
+    auth_service: AuthService,
+    admin_service: AdminService,
+) -> None:
+    if not await require_admin_message(message, auth_service):
+        return
+    raw = message.text or ""
+    if raw.lstrip().startswith("/"):
+        await message.answer(
+            "Команда не записана в шаблон. Для выхода используйте /cancel."
+        )
+        return
+
+    data = await state.get_data()
+    try:
+        parsed = parse_item_template(raw)
+    except CardTemplateError as exc:
+        await state.update_data(raw_template=raw, pending_update=None)
+        await state.set_state(TemplateCorrectionStates.input)
+        await _show_template_errors(message, exc.errors)
+        return
+
+    mode = data.get("template_mode")
+    await state.update_data(
+        raw_template=raw,
+        pending_update=parsed.model_dump(mode="python"),
+    )
+    if mode == "edit":
+        catalog = await admin_service.get_catalog()
+        try:
+            current = _item_from_catalog(
+                catalog,
+                data["category_id"],
+                data.get("subcategory_id"),
+                data["item_id"],
+            )
+        except ObjectChangedError:
+            await message.answer(
+                "Позиция уже удалена или перемещена. Изменения не сохранены."
+            )
+            return
+        preview = parsed.build_item(
+            item_id=current.id,
+            photo_file_id=current.photo_file_id,
+        )
+        await state.set_state(TemplateConfirmationStates.edit)
+        await message.answer(
+            f"{ADMIN_HEADER}\n\n👀 <b>Предпросмотр полной карточки:</b>"
+            f"\n\n{format_item_card(preview)}\n\n"
+            "ID, фото и размещение останутся без изменений. Сохранить?",
+            reply_markup=build_admin_confirm_keyboard(action="fu"),
+        )
+        return
+
+    if mode != "create":
+        await state.clear()
+        await message.answer("Сценарий устарел. Начните создание заново.")
+        return
+
+    catalog = await admin_service.get_catalog()
+    items = AdminService._items(
+        catalog,
+        data["category_id"],
+        data.get("subcategory_id"),
+    )
+    try:
+        stable_id = generate_stable_id(
+            parsed.name,
+            {item.id for item in items},
+            MAX_STABLE_ID_LENGTH,
+        )
+    except StableIdGenerationError as exc:
+        await state.set_state(TemplateCorrectionStates.input)
+        await _show_template_errors(message, [str(exc)])
+        return
+    preview = parsed.build_item(item_id=stable_id)
+    await state.set_state(TemplateConfirmationStates.create)
+    await message.answer(
+        f"{ADMIN_HEADER}\n\n👀 <b>Предпросмотр новой карточки:</b>"
+        f"\n\n{format_item_card(preview)}\n\n"
+        f"<b>Технический ID:</b> {preview.id}\n\nСохранить позицию?",
+        reply_markup=build_admin_confirm_keyboard(action="fc"),
+    )
+
+
+@router.message(FullEditItemStates.input)
+@router.message(TemplateCreateItemStates.input)
+@router.message(TemplateCorrectionStates.input)
+async def item_template_receive(
+    message: Message,
+    state: FSMContext,
+    auth_service: AuthService,
+    admin_service: AdminService,
+) -> None:
+    await _process_item_template(
+        message,
+        state,
+        auth_service,
+        admin_service,
+    )
+
+
+@router.callback_query(AdminCancelCallback.filter(F.action == "r"))
+async def item_template_retry(
+    callback: CallbackQuery,
+    state: FSMContext,
+    auth_service: AuthService,
+) -> None:
+    """Show the rejected text again instead of losing administrator work."""
+
+    if not await require_admin_callback(callback, auth_service):
+        return
+    if await state.get_state() != TemplateCorrectionStates.input.state:
+        return
+    data = await state.get_data()
+    if isinstance(callback.message, Message):
+        await _show_full_template_input(
+            callback.message,
+            data.get("raw_template") or empty_item_template(),
+            creating=data.get("template_mode") == "create",
+        )
+
+
+@router.callback_query(AdminConfirmCallback.filter(F.action == "fu"))
+async def item_full_edit_confirm(
+    callback: CallbackQuery,
+    state: FSMContext,
+    auth_service: AuthService,
+    admin_service: AdminService,
+) -> None:
+    """Apply a fully validated update after a fresh permission check."""
+
+    if not await require_admin_callback(callback, auth_service):
+        return
+    if await state.get_state() != TemplateConfirmationStates.edit.state:
+        return
+    data = await state.get_data()
+    parsed = ParsedItemUpdate.model_validate(data["pending_update"])
+    try:
+        await admin_service.update_item(
+            actor_from_user(callback.from_user),
+            data["category_id"],
+            data.get("subcategory_id"),
+            data["item_id"],
+            **parsed.item_changes(),
+        )
+    except Exception:
+        logger.exception("Could not update item from full template")
+        if isinstance(callback.message, Message):
+            await callback.message.answer("⚠️ Не удалось сохранить изменения")
+        return
+    await state.clear()
+    if isinstance(callback.message, Message):
+        await callback.message.answer("✅ Изменения сохранены")
+        await show_item_editor(
+            callback.message,
+            admin_service,
+            data["category_id"],
+            data.get("subcategory_id"),
+            data["item_id"],
+        )
+
+
+@router.callback_query(AdminConfirmCallback.filter(F.action == "fc"))
+async def item_template_create_confirm(
+    callback: CallbackQuery,
+    state: FSMContext,
+    auth_service: AuthService,
+    admin_service: AdminService,
+) -> None:
+    """Create a template item only after validation and confirmation."""
+
+    if not await require_admin_callback(callback, auth_service):
+        return
+    if await state.get_state() != TemplateConfirmationStates.create.state:
+        return
+    data = await state.get_data()
+    parsed = ParsedItemUpdate.model_validate(data["pending_update"])
+    try:
+        catalog = await admin_service.get_catalog()
+        items = AdminService._items(
+            catalog,
+            data["category_id"],
+            data.get("subcategory_id"),
+        )
+        stable_id = generate_stable_id(
+            parsed.name,
+            {item.id for item in items},
+            MAX_STABLE_ID_LENGTH,
+        )
+        item = parsed.build_item(item_id=stable_id)
+        await admin_service.create_item(
+            actor_from_user(callback.from_user),
+            data["category_id"],
+            data.get("subcategory_id"),
+            item,
+        )
+    except Exception:
+        logger.exception("Could not create item from full template")
+        if isinstance(callback.message, Message):
+            await callback.message.answer("⚠️ Не удалось сохранить изменения")
+        return
+    await state.clear()
+    if isinstance(callback.message, Message):
+        await edit_or_send_text(
+            callback.message,
+            f"{ADMIN_HEADER}\n\n✅ Позиция создана\n\n"
+            f"{format_item_card(item)}\n\nДобавить фотографию?",
+            build_created_item_keyboard(
+                data["category_id"],
+                data.get("subcategory_id"),
+                item.id,
+            ),
+        )
+
+
 @router.callback_query(
     AdminItemCallback.filter(
         F.action.in_({"en", "es", "ed", "ei", "ef", "ep", "et"})
@@ -753,19 +1191,35 @@ async def item_edit_start(
     callback_data: AdminItemCallback,
     state: FSMContext,
     auth_service: AuthService,
+    admin_service: AdminService,
 ) -> None:
     if not await require_admin_callback(callback, auth_service):
         return
     fields = {
-        "en": ("name", "Введите новое название:"),
-        "es": ("short_description", "Введите краткое описание или -:"),
-        "ed": ("description", "Введите полное описание или -:"),
-        "ei": ("ingredients", "Введите строки: название | количество | единица"),
-        "ef": ("fields", "Введите строки: ключ | значение"),
-        "ep": ("steps", "Введите шаги, по одному на строку, или -:"),
-        "et": ("tags", "Введите теги через запятую или -:"),
+        "en": ("name", "Текущее название"),
+        "es": ("short_description", "Текущее краткое описание"),
+        "ed": ("description", "Текущее полное описание"),
+        "ei": ("ingredients", "Текущий состав"),
+        "ef": ("fields", "Текущие характеристики"),
+        "ep": ("steps", "Текущее приготовление"),
+        "et": ("tags", "Текущие теги"),
     }
-    field, prompt = fields[callback_data.action]
+    field, label = fields[callback_data.action]
+    catalog = await admin_service.get_catalog()
+    try:
+        item = _item_from_catalog(
+            catalog,
+            callback_data.category_id,
+            _sub_id(callback_data.subcategory_id),
+            callback_data.item_id,
+        )
+    except ObjectChangedError:
+        if isinstance(callback.message, Message):
+            await callback.message.answer(
+                "Позиция уже удалена или перемещена."
+            )
+        return
+    current_text = _serialize_item_field(item, field)
     await state.set_state(EditItemStates.value)
     await state.set_data(
         {
@@ -778,8 +1232,12 @@ async def item_edit_start(
     if isinstance(callback.message, Message):
         await edit_or_send_text(
             callback.message,
-            f"{ADMIN_HEADER}\n\n{prompt}",
-            build_admin_wizard_keyboard(False),
+            f"{ADMIN_HEADER}\n\n<b>{label}:</b>",
+        )
+        await _send_copyable_text(
+            callback.message,
+            current_text,
+            placeholder="Новое значение",
         )
 
 

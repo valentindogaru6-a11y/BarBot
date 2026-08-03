@@ -51,6 +51,23 @@ class EditItemStates(StatesGroup):
     confirm = State()
 
 
+class FullEditItemStates(StatesGroup):
+    input = State()
+
+
+class TemplateCreateItemStates(StatesGroup):
+    input = State()
+
+
+class TemplateCorrectionStates(StatesGroup):
+    input = State()
+
+
+class TemplateConfirmationStates(StatesGroup):
+    edit = State()
+    create = State()
+
+
 class ReplacePhotoStates(StatesGroup):
     photo = State()
     confirm = State()

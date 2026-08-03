@@ -1194,16 +1194,6 @@
       "items": []
     },
     {
-      "id": "semi_finished",
-      "name": "Полуфабрикаты",
-      "emoji": "🧪",
-      "description": null,
-      "sort_order": 20,
-      "is_active": true,
-      "subcategories": [],
-      "items": []
-    },
-    {
       "id": "signature_tea",
       "name": "Фирменные чаи",
       "emoji": "🫖",
@@ -1232,6 +1222,36 @@
       "is_active": true,
       "subcategories": [],
       "items": []
+    },
+    {
+      "id": "polufabrikaty_p_f",
+      "name": "Полуфабрикаты П/Ф",
+      "emoji": "🥫",
+      "description": "Манго маракуя п/ф",
+      "sort_order": 2,
+      "is_active": true,
+      "subcategories": [],
+      "items": [
+        {
+          "id": "mango_marakuya_p_f",
+          "name": "Манго маракуя П/Ф",
+          "short_description": "250 манго пюре\n250 маракуя пюре\n500 сахара \n500 воды горячей",
+          "description": "Перебить",
+          "photo_file_id": "AgACAgIAAxkBAAP6anCeKlPrrvPCApRBzjKmczPnfPwAAtseaxt4oYBL_HMUZE4pQZkBAAMCAAN4AAM9BA",
+          "ingredients": [],
+          "fields": {},
+          "steps": [
+            "Перебить"
+          ],
+          "tags": [
+            "пф",
+            "п/ф",
+            "полуфабрикаты"
+          ],
+          "sort_order": 1,
+          "is_active": true
+        }
+      ]
     }
   ]
 }

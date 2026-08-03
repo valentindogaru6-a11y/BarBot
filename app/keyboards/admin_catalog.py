@@ -381,6 +381,7 @@ def build_admin_item_actions(
     sub_id = subcategory_id or "_"
     builder = InlineKeyboardBuilder()
     actions = (
+        ("📝 Редактировать карточку целиком", "ea"),
         ("✏️ Название", "en"),
         ("📝 Краткое описание", "es"),
         ("📄 Полное описание", "ed"),
@@ -411,6 +412,69 @@ def build_admin_item_actions(
             action="l",
             category_id=category_id,
             subcategory_id=sub_id,
+        ),
+    )
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def build_admin_item_creation_modes(
+    category_id: str,
+    subcategory_id: str | None,
+) -> InlineKeyboardMarkup:
+    """Choose between the existing wizard and full-template creation."""
+
+    sub_id = subcategory_id or "_"
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text="🧩 Пошаговое создание",
+        callback_data=AdminItemCallback(
+            action="w",
+            category_id=category_id,
+            subcategory_id=sub_id,
+        ),
+    )
+    builder.button(
+        text="📝 Создать по шаблону",
+        callback_data=AdminItemCallback(
+            action="k",
+            category_id=category_id,
+            subcategory_id=sub_id,
+        ),
+    )
+    builder.button(
+        text="❌ Отмена",
+        callback_data=AdminPanelCallback(action="o"),
+    )
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def build_created_item_keyboard(
+    category_id: str,
+    subcategory_id: str | None,
+    item_id: str,
+) -> InlineKeyboardMarkup:
+    """Offer the optional photo step after template-based creation."""
+
+    sub_id = subcategory_id or "_"
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text="🖼 Добавить фото",
+        callback_data=AdminItemCallback(
+            action="rp",
+            category_id=category_id,
+            subcategory_id=sub_id,
+            item_id=item_id,
+        ),
+    )
+    builder.button(
+        text="⏭ Завершить без фото",
+        callback_data=AdminItemCallback(
+            action="o",
+            category_id=category_id,
+            subcategory_id=sub_id,
+            item_id=item_id,
         ),
     )
     builder.adjust(1)

@@ -1,6 +1,10 @@
 """Common administrator keyboards."""
 
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import (
+    CopyTextButton,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+)
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.keyboards.admin_callbacks import (
@@ -109,6 +113,39 @@ def build_admin_item_missing_keyboard() -> InlineKeyboardMarkup:
     builder.button(
         text="🛠 Админ-панель",
         callback_data=AdminPanelCallback(action="o"),
+    )
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def build_admin_text_input_keyboard(text: str) -> InlineKeyboardMarkup:
+    """Build copy/cancel controls without exceeding Telegram copy limits."""
+
+    builder = InlineKeyboardBuilder()
+    if 1 <= len(text) <= 256:
+        builder.button(
+            text="📋 Скопировать текст",
+            copy_text=CopyTextButton(text=text),
+        )
+    builder.button(
+        text="❌ Отмена",
+        callback_data=AdminCancelCallback(action="x"),
+    )
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def build_admin_template_error_keyboard() -> InlineKeyboardMarkup:
+    """Offer a retry that preserves the submitted template in FSM data."""
+
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text="🔄 Исправить шаблон",
+        callback_data=AdminCancelCallback(action="r"),
+    )
+    builder.button(
+        text="❌ Отмена",
+        callback_data=AdminCancelCallback(action="x"),
     )
     builder.adjust(1)
     return builder.as_markup()

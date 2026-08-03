@@ -86,6 +86,31 @@ async def handle_admin_command(
     )
 
 
+@router.message(Command("cancel"))
+async def handle_admin_cancel_command(
+    message: Message,
+    state: FSMContext,
+    auth_service: AuthService,
+) -> None:
+    """Cancel any active administrator FSM without treating it as input."""
+
+    current_state = await state.get_state()
+    if current_state is None:
+        return
+    if not await require_admin_message(message, auth_service):
+        return
+    await state.clear()
+    if current_state.startswith("UserPickerStates:"):
+        await message.answer(
+            "Выбор пользователя отменён.",
+            reply_markup=ReplyKeyboardRemove(),
+        )
+    await message.answer(
+        "❌ Действие отменено",
+        reply_markup=build_admin_panel_keyboard(),
+    )
+
+
 @router.callback_query(AdminPanelCallback.filter())
 async def handle_admin_panel(
     callback: CallbackQuery,
