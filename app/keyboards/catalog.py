@@ -51,6 +51,8 @@ def _add_pagination_row(
     category_id: str = "_",
     subcategory_id: str = "_",
 ) -> None:
+    if total_pages <= 1:
+        return
     buttons: list[InlineKeyboardButton] = []
     if page > 0:
         buttons.append(

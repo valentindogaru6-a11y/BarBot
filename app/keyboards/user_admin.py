@@ -136,34 +136,35 @@ def build_users_list_keyboard(
             ),
         )
     builder.adjust(1)
-    page_buttons = []
-    if page > 0:
+    if total_pages > 1:
+        page_buttons = []
+        if page > 0:
+            page_buttons.append(
+                InlineKeyboardButton(
+                    text="◀️",
+                    callback_data=UserListCallback(
+                        role=role,
+                        page=page - 1,
+                    ).pack(),
+                )
+            )
         page_buttons.append(
             InlineKeyboardButton(
-                text="◀️",
-                callback_data=UserListCallback(
-                    role=role,
-                    page=page - 1,
-                ).pack(),
+                text=f"{page + 1}/{total_pages}",
+                callback_data=UserListCallback(role=role, page=page).pack(),
             )
         )
-    page_buttons.append(
-        InlineKeyboardButton(
-            text=f"{page + 1}/{total_pages}",
-            callback_data=UserListCallback(role=role, page=page).pack(),
-        )
-    )
-    if page < total_pages - 1:
-        page_buttons.append(
-            InlineKeyboardButton(
-                text="▶️",
-                callback_data=UserListCallback(
-                    role=role,
-                    page=page + 1,
-                ).pack(),
+        if page < total_pages - 1:
+            page_buttons.append(
+                InlineKeyboardButton(
+                    text="▶️",
+                    callback_data=UserListCallback(
+                        role=role,
+                        page=page + 1,
+                    ).pack(),
+                )
             )
-        )
-    builder.row(*page_buttons)
+        builder.row(*page_buttons)
     builder.button(
         text="⬅️ К управлению пользователями",
         callback_data=UserAdminCallback(action="menu"),

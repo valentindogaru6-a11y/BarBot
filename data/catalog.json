@@ -162,7 +162,7 @@
                 }
               ],
               "fields": {
-                "garnish": "Требуется уточнение",
+                "garnish": "Марка Лысого Хуястого, сублемированная малина.",
                 "glassware": "Шале",
                 "ice": "Без льда",
                 "method": "Dry Shake → Shake"
@@ -221,7 +221,7 @@
                 }
               ],
               "fields": {
-                "garnish": "Требуется уточнение",
+                "garnish": "Марка Саши Грей",
                 "glassware": "Рокс",
                 "ice": "Ледяная глыба",
                 "method": "Dry Shake → Shake"
@@ -1189,6 +1189,154 @@
           "sort_order": 40,
           "is_active": true,
           "items": []
+        },
+        {
+          "id": "shots",
+          "name": "Шоты",
+          "emoji": "🥃",
+          "description": "Короткие слоистые коктейли для подачи одним шотом.",
+          "sort_order": 50,
+          "is_active": true,
+          "items": [
+            {
+              "id": "b_52",
+              "name": "B-52",
+              "short_description": "Сливочно-кофейный слоистый шот с цитрусовым верхним слоем.",
+              "description": "Черновая базовая рецептура по открытым профессиональным барным источникам. При необходимости адаптируйте объём и бренды под стандарты заведения.",
+              "photo_file_id": "AgACAgIAAxkBAAIBXWpw21I0w4I-ZArKYqCwGPAJQ1IFAAIBHmsbeKGIS-f5JtZ6mFqZAQADAgADeQADPQQ",
+              "ingredients": [
+                {
+                  "name": "Кофейный ликёр Kahlúa",
+                  "amount": 20,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Ирландский сливочный ликёр",
+                  "amount": 20,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Апельсиновый ликёр Triple Sec",
+                  "amount": 20,
+                  "unit": "мл"
+                }
+              ],
+              "fields": {
+                "glassware": "Шот / стопка",
+                "method": "Layer",
+                "garnish": "Долька апельсина — опционально"
+              },
+              "steps": [
+                "Налить кофейный ликёр в охлаждённый шот.",
+                "По барной ложке аккуратно уложить слой сливочного ликёра.",
+                "По барной ложке добавить верхний слой апельсинового ликёра.",
+                "Подать сразу, сохранив чёткие слои."
+              ],
+              "tags": [
+                "шот",
+                "слоистый",
+                "кофейный",
+                "сливочный",
+                "B-52"
+              ],
+              "sort_order": 10,
+              "is_active": true
+            },
+            {
+              "id": "green_mexican",
+              "name": "Green Mexican",
+              "short_description": "Кисло-сладкий тропический шот с банановым ликёром и текилой.",
+              "description": "Черновая базовая рецептура по открытым профессиональным барным источникам. При необходимости адаптируйте объём и бренды под стандарты заведения.",
+              "photo_file_id": "AgACAgIAAxkBAAIBUWpw2vjWCR-fN-hb7zjXShSKWuFwAAL-HWsbeKGISxCDZlVhcdPuAQADAgADeQADPQQ",
+              "ingredients": [
+                {
+                  "name": "Ликёр Pisang Ambon",
+                  "amount": 20,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Лимонный фреш",
+                  "amount": 10,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Текила Blanco",
+                  "amount": 20,
+                  "unit": "мл"
+                }
+              ],
+              "fields": {
+                "glassware": "Шот / стопка",
+                "method": "Layer",
+                "garnish": "Долька апельсина — опционально"
+              },
+              "steps": [
+                "Налить Pisang Ambon в охлаждённый шот.",
+                "По барной ложке аккуратно добавить лимонный фреш вторым слоем.",
+                "По барной ложке уложить верхний слой текилы.",
+                "Подать сразу, пока слои не смешались."
+              ],
+              "tags": [
+                "шот",
+                "слоистый",
+                "текила",
+                "Pisang Ambon",
+                "цитрусовый"
+              ],
+              "sort_order": 20,
+              "is_active": true
+            },
+            {
+              "id": "hiroshima",
+              "name": "Hiroshima",
+              "short_description": "Крепкий анисово-сливочный шот с абсентом и эффектом гренадина.",
+              "description": "Черновая базовая рецептура по открытым профессиональным барным источникам. При необходимости адаптируйте объём и бренды под стандарты заведения.",
+              "photo_file_id": "AgACAgIAAxkBAAIBY2pw257fEh6lobyPxyj_Ss8TxK6TAAIDHmsbeKGISxTxy1eqbSxrAQADAgADeQADPQQ",
+              "ingredients": [
+                {
+                  "name": "Самбука",
+                  "amount": 20,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Ирландский сливочный ликёр",
+                  "amount": 20,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Абсент",
+                  "amount": 20,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Гренадин",
+                  "amount": "2–3",
+                  "unit": "капли"
+                }
+              ],
+              "fields": {
+                "glassware": "Шот / стопка",
+                "method": "Layer",
+                "garnish": "Долька апельсина — опционально"
+              },
+              "steps": [
+                "Налить самбуку в охлаждённый шот.",
+                "По барной ложке аккуратно уложить слой сливочного ликёра.",
+                "По барной ложке добавить верхний слой абсента.",
+                "Капнуть гренадин в центр, чтобы он прошёл через слои.",
+                "Подать сразу."
+              ],
+              "tags": [
+                "шот",
+                "слоистый",
+                "самбука",
+                "абсент",
+                "гренадин"
+              ],
+              "sort_order": 30,
+              "is_active": true
+            }
+          ]
         }
       ],
       "items": []
@@ -1207,10 +1355,639 @@
       "id": "coffee",
       "name": "Кофейная карта",
       "emoji": "☕",
-      "description": null,
+      "description": "Кофейная классика, молочные напитки, какао, матча и особые рецепты.",
       "sort_order": 40,
       "is_active": true,
-      "subcategories": [],
+      "subcategories": [
+        {
+          "id": "coffee_classics",
+          "name": "Кофейная классика",
+          "emoji": "☕",
+          "description": "Классические кофейные напитки.",
+          "sort_order": 10,
+          "is_active": true,
+          "items": [
+            {
+              "id": "amerikano",
+              "name": "Американо",
+              "short_description": "Классический кофейный напиток.",
+              "description": "Состав перенесён из технологической карты № 00720 от 07.12.2023.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Кофе зерновой",
+                  "amount": 10,
+                  "unit": "г"
+                },
+                {
+                  "name": "Сахар в стиках",
+                  "amount": 10,
+                  "unit": "г"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "00720",
+                "tech_card_date": "07.12.2023"
+              },
+              "steps": [],
+              "tags": [
+                "кофе",
+                "классика"
+              ],
+              "sort_order": 10,
+              "is_active": true
+            },
+            {
+              "id": "espresso",
+              "name": "Эспрессо",
+              "short_description": "Классический кофейный напиток.",
+              "description": "Состав перенесён из технологической карты № 00719 от 07.12.2023.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Кофе зерновой",
+                  "amount": 10,
+                  "unit": "г"
+                },
+                {
+                  "name": "Сахар в стиках",
+                  "amount": 5,
+                  "unit": "г"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "00719",
+                "tech_card_date": "07.12.2023"
+              },
+              "steps": [],
+              "tags": [
+                "кофе",
+                "классика"
+              ],
+              "sort_order": 20,
+              "is_active": true
+            }
+          ]
+        },
+        {
+          "id": "coffee_milk",
+          "name": "Кофе с молоком",
+          "emoji": "🥛",
+          "description": "Кофейные напитки на обычном или альтернативном молоке.",
+          "sort_order": 20,
+          "is_active": true,
+          "items": [
+            {
+              "id": "amerikano_s",
+              "name": "Американо с молоком",
+              "short_description": "Кофейный напиток с молоком.",
+              "description": "Состав перенесён из технологической карты № 00721 от 07.12.2023.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Кофе зерновой",
+                  "amount": 10,
+                  "unit": "г"
+                },
+                {
+                  "name": "Молоко",
+                  "amount": 50,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Сахар в стиках",
+                  "amount": 10,
+                  "unit": "г"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "00721",
+                "tech_card_date": "07.12.2023"
+              },
+              "steps": [],
+              "tags": [
+                "кофе",
+                "молочный"
+              ],
+              "sort_order": 10,
+              "is_active": true
+            },
+            {
+              "id": "kapuchino",
+              "name": "Капучино",
+              "short_description": "Кофейный напиток с молоком.",
+              "description": "Состав перенесён из технологической карты № 00722 от 07.12.2023.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Кофе зерновой",
+                  "amount": 10,
+                  "unit": "г"
+                },
+                {
+                  "name": "Молоко",
+                  "amount": 200,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Сахар в стиках",
+                  "amount": 10,
+                  "unit": "г"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "00722",
+                "tech_card_date": "07.12.2023"
+              },
+              "steps": [],
+              "tags": [
+                "кофе",
+                "молочный"
+              ],
+              "sort_order": 20,
+              "is_active": true
+            },
+            {
+              "id": "kapuchino_na",
+              "name": "Капучино на альтернативном молоке",
+              "short_description": "Кофейный напиток с молоком.",
+              "description": "Состав перенесён из технологической карты № 00833 от 07.12.2023.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Кофе зерновой",
+                  "amount": 10,
+                  "unit": "г"
+                },
+                {
+                  "name": "Альтернативное молоко",
+                  "amount": 200,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Сахар в стиках",
+                  "amount": 10,
+                  "unit": "г"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "00833",
+                "tech_card_date": "07.12.2023"
+              },
+              "steps": [],
+              "tags": [
+                "кофе",
+                "молочный",
+                "альтернативное молоко"
+              ],
+              "sort_order": 30,
+              "is_active": true
+            },
+            {
+              "id": "latte",
+              "name": "Латте",
+              "short_description": "Кофейный напиток с молоком.",
+              "description": "Состав перенесён из технологической карты № 00724 от 07.12.2023.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Кофе зерновой",
+                  "amount": 10,
+                  "unit": "г"
+                },
+                {
+                  "name": "Молоко",
+                  "amount": 200,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Сахар в стиках",
+                  "amount": 10,
+                  "unit": "г"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "00724",
+                "tech_card_date": "07.12.2023"
+              },
+              "steps": [],
+              "tags": [
+                "кофе",
+                "молочный"
+              ],
+              "sort_order": 40,
+              "is_active": true
+            },
+            {
+              "id": "latte_na",
+              "name": "Латте на альтернативном молоке",
+              "short_description": "Кофейный напиток с молоком.",
+              "description": "Состав перенесён из технологической карты № 00832 от 07.12.2023.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Кофе зерновой",
+                  "amount": 10,
+                  "unit": "г"
+                },
+                {
+                  "name": "Альтернативное молоко",
+                  "amount": 200,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Сахар в стиках",
+                  "amount": 10,
+                  "unit": "г"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "00832",
+                "tech_card_date": "07.12.2023"
+              },
+              "steps": [],
+              "tags": [
+                "кофе",
+                "молочный",
+                "альтернативное молоко"
+              ],
+              "sort_order": 50,
+              "is_active": true
+            },
+            {
+              "id": "raf",
+              "name": "Раф",
+              "short_description": "Кофейный напиток с молоком.",
+              "description": "Состав перенесён из технологической карты № 00727 от 07.12.2023.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Сливки",
+                  "amount": 60,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Молоко",
+                  "amount": 75,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Кофе зерновой",
+                  "amount": 10,
+                  "unit": "г"
+                },
+                {
+                  "name": "Сахарный сироп п/ф",
+                  "amount": 10,
+                  "unit": "мл"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "00727",
+                "tech_card_date": "07.12.2023"
+              },
+              "steps": [],
+              "tags": [
+                "кофе",
+                "молочный"
+              ],
+              "sort_order": 60,
+              "is_active": true
+            },
+            {
+              "id": "flet_uayt",
+              "name": "Флэт уайт",
+              "short_description": "Кофейный напиток с молоком.",
+              "description": "Состав перенесён из технологической карты № 00723 от 07.12.2023.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Кофе зерновой",
+                  "amount": 18,
+                  "unit": "г"
+                },
+                {
+                  "name": "Молоко",
+                  "amount": 150,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Сахар в стиках",
+                  "amount": 10,
+                  "unit": "г"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "00723",
+                "tech_card_date": "07.12.2023"
+              },
+              "steps": [],
+              "tags": [
+                "кофе",
+                "молочный"
+              ],
+              "sort_order": 70,
+              "is_active": true
+            },
+            {
+              "id": "flet_uayt_na",
+              "name": "Флэт уайт на альтернативном молоке",
+              "short_description": "Кофейный напиток с молоком.",
+              "description": "Состав перенесён из технологической карты № 00725 от 07.12.2023.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Кофе зерновой",
+                  "amount": 18,
+                  "unit": "г"
+                },
+                {
+                  "name": "Альтернативное молоко",
+                  "amount": 150,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Сахар в стиках",
+                  "amount": 10,
+                  "unit": "г"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "00725",
+                "tech_card_date": "07.12.2023"
+              },
+              "steps": [],
+              "tags": [
+                "кофе",
+                "молочный",
+                "альтернативное молоко"
+              ],
+              "sort_order": 80,
+              "is_active": true
+            }
+          ]
+        },
+        {
+          "id": "cocoa_matcha",
+          "name": "Какао и матча",
+          "emoji": "🍵",
+          "description": "Горячие напитки на основе какао и матча.",
+          "sort_order": 30,
+          "is_active": true,
+          "items": [
+            {
+              "id": "kakao",
+              "name": "Какао",
+              "short_description": "Горячий напиток на основе какао.",
+              "description": "Состав перенесён из технологической карты № 00726 от 07.12.2023.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Какао",
+                  "amount": 5,
+                  "unit": "г"
+                },
+                {
+                  "name": "Молоко",
+                  "amount": 150,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Сахарный сироп п/ф",
+                  "amount": 20,
+                  "unit": "мл"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "00726",
+                "tech_card_date": "07.12.2023",
+                "yield": "170 мл"
+              },
+              "steps": [],
+              "tags": [
+                "какао"
+              ],
+              "sort_order": 10,
+              "is_active": true
+            },
+            {
+              "id": "kakao_s",
+              "name": "Какао с маршмеллоу",
+              "short_description": "Горячий напиток на основе какао.",
+              "description": "Состав перенесён из технологической карты № 02108 от 05.03.2024.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Какао",
+                  "amount": 8,
+                  "unit": "г"
+                },
+                {
+                  "name": "Молоко",
+                  "amount": 190,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Маршмеллоу (бар)",
+                  "amount": 25,
+                  "unit": "г"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "02108",
+                "tech_card_date": "05.03.2024",
+                "yield": "280 мл"
+              },
+              "steps": [],
+              "tags": [
+                "какао",
+                "маршмеллоу"
+              ],
+              "sort_order": 20,
+              "is_active": true
+            },
+            {
+              "id": "kakao_s_2",
+              "name": "Какао с маршмеллоу на альтернативном молоке",
+              "short_description": "Горячий напиток на основе какао.",
+              "description": "Состав перенесён из технологической карты № 02139 от 14.03.2024.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Какао",
+                  "amount": 8,
+                  "unit": "г"
+                },
+                {
+                  "name": "Альтернативное молоко",
+                  "amount": 190,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Маршмеллоу (бар)",
+                  "amount": 25,
+                  "unit": "г"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "02139",
+                "tech_card_date": "14.03.2024",
+                "yield": "280 мл"
+              },
+              "steps": [],
+              "tags": [
+                "какао",
+                "альтернативное молоко",
+                "маршмеллоу"
+              ],
+              "sort_order": 30,
+              "is_active": true
+            },
+            {
+              "id": "kakao_na",
+              "name": "Какао на альтернативном молоке",
+              "short_description": "Горячий напиток на основе какао.",
+              "description": "Состав перенесён из технологической карты № 01811 от 12.01.2024.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Какао",
+                  "amount": 5,
+                  "unit": "г"
+                },
+                {
+                  "name": "Альтернативное молоко",
+                  "amount": 180,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Сахарный сироп п/ф",
+                  "amount": 15,
+                  "unit": "мл"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "01811",
+                "tech_card_date": "12.01.2024",
+                "yield": "200 мл"
+              },
+              "steps": [],
+              "tags": [
+                "какао",
+                "альтернативное молоко"
+              ],
+              "sort_order": 40,
+              "is_active": true
+            },
+            {
+              "id": "matcha_kapuchino",
+              "name": "Матча-капучино",
+              "short_description": "Горячий напиток на основе матча.",
+              "description": "Состав перенесён из технологической карты № 00729 от 07.12.2023.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Матча",
+                  "amount": 5,
+                  "unit": "г"
+                },
+                {
+                  "name": "Молоко",
+                  "amount": 200,
+                  "unit": "мл"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "00729",
+                "tech_card_date": "07.12.2023"
+              },
+              "steps": [],
+              "tags": [
+                "матча"
+              ],
+              "sort_order": 50,
+              "is_active": true
+            },
+            {
+              "id": "matcha_na",
+              "name": "Матча на альтернативном молоке",
+              "short_description": "Горячий напиток на основе матча.",
+              "description": "Состав перенесён из технологической карты № 00730 от 07.12.2023.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Матча",
+                  "amount": 5,
+                  "unit": "г"
+                },
+                {
+                  "name": "Альтернативное молоко",
+                  "amount": 200,
+                  "unit": "мл"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "00730",
+                "tech_card_date": "07.12.2023"
+              },
+              "steps": [],
+              "tags": [
+                "матча",
+                "альтернативное молоко"
+              ],
+              "sort_order": 60,
+              "is_active": true
+            }
+          ]
+        },
+        {
+          "id": "coffee_special",
+          "name": "Особые кофейные напитки",
+          "emoji": "🍊",
+          "description": "Необычные кофейные сочетания.",
+          "sort_order": 40,
+          "is_active": true,
+          "items": [
+            {
+              "id": "bumble_bee",
+              "name": "Bumble Bee (оранж-кофе)",
+              "short_description": "Кофейный напиток с цитрусовым акцентом.",
+              "description": "Состав перенесён из технологической карты № 00728 от 07.12.2023.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Кофе зерновой",
+                  "amount": 10,
+                  "unit": "г"
+                },
+                {
+                  "name": "Сок в ассортименте",
+                  "amount": 160,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Сироп",
+                  "amount": 20,
+                  "unit": "мл"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "00728",
+                "tech_card_date": "07.12.2023",
+                "yield": "190 мл"
+              },
+              "steps": [],
+              "tags": [
+                "кофе",
+                "цитрусовый",
+                "апельсин"
+              ],
+              "sort_order": 10,
+              "is_active": true
+            }
+          ]
+        }
+      ],
       "items": []
     },
     {
@@ -1225,33 +2002,1108 @@
     },
     {
       "id": "polufabrikaty_p_f",
-      "name": "Полуфабрикаты П/Ф",
-      "emoji": "🥫",
-      "description": "Манго маракуя п/ф",
+      "name": "Полуфабрикаты",
+      "emoji": "🧪",
+      "description": "Барные заготовки: пюре, фреши, сиропы, лимонадные основы, настойки и смеси.",
       "sort_order": 2,
       "is_active": true,
-      "subcategories": [],
-      "items": [
+      "subcategories": [
         {
-          "id": "mango_marakuya_p_f",
-          "name": "Манго маракуя П/Ф",
-          "short_description": "250 манго пюре\n250 маракуя пюре\n500 сахара \n500 воды горячей",
-          "description": "Перебить",
-          "photo_file_id": "AgACAgIAAxkBAAP6anCeKlPrrvPCApRBzjKmczPnfPwAAtseaxt4oYBL_HMUZE4pQZkBAAMCAAN4AAM9BA",
-          "ingredients": [],
-          "fields": {},
-          "steps": [
-            "Перебить"
-          ],
-          "tags": [
-            "пф",
-            "п/ф",
-            "полуфабрикаты"
-          ],
-          "sort_order": 1,
-          "is_active": true
+          "id": "purees_bases",
+          "name": "Пюре и фруктовые основы",
+          "emoji": "🍓",
+          "description": "Фруктовые и ягодные заготовки.",
+          "sort_order": 10,
+          "is_active": true,
+          "items": [
+            {
+              "id": "mango_marakuya_p_f",
+              "name": "Пюре манго–маракуйя",
+              "short_description": "Фруктовая или ягодная заготовка для бара.",
+              "description": "Состав перенесён из технологической карты № 00597 от 15.03.2024. Расчётный выход: 1000 г.",
+              "photo_file_id": "AgACAgIAAxkBAAP6anCeKlPrrvPCApRBzjKmczPnfPwAAtseaxt4oYBL_HMUZE4pQZkBAAMCAAN4AAM9BA",
+              "ingredients": [
+                {
+                  "name": "Пюре манго",
+                  "amount": 250,
+                  "unit": "г"
+                },
+                {
+                  "name": "Пюре маракуйя",
+                  "amount": 250,
+                  "unit": "г"
+                },
+                {
+                  "name": "Сахар",
+                  "amount": 500,
+                  "unit": "г"
+                },
+                {
+                  "name": "Вода",
+                  "amount": 500,
+                  "unit": "мл"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "00597",
+                "tech_card_date": "15.03.2024",
+                "yield": "1000 г"
+              },
+              "steps": [
+                "Перебить"
+              ],
+              "tags": [
+                "пф",
+                "п/ф",
+                "полуфабрикаты",
+                "маракуя",
+                "манго",
+                "полуфабрикат",
+                "пюре",
+                "маракуйя"
+              ],
+              "sort_order": 10,
+              "is_active": true
+            },
+            {
+              "id": "malina_vinograd",
+              "name": "Малина–виноград П/Ф",
+              "short_description": "300кипятка\n300 сахара\n0,5 малины \n0,260 винограда",
+              "description": null,
+              "photo_file_id": "AgACAgIAAxkBAAIBKGpwx2TAonaqr6UIFEgQwmB5zFwZAAKZHWsbeKGISx1I_pXdKGD8AQADAgADeAADPQQ",
+              "ingredients": [],
+              "fields": {},
+              "steps": [
+                "Перебить в блендере"
+              ],
+              "tags": [
+                "Малина",
+                "виноград",
+                "пф",
+                "п/ф",
+                "полуфабрикат"
+              ],
+              "sort_order": 30,
+              "is_active": true
+            },
+            {
+              "id": "yagodnyy_p_f",
+              "name": "Ягодная основа для чая",
+              "short_description": "250 смородины \n250 клубники \n250 сахара",
+              "description": null,
+              "photo_file_id": "AgACAgIAAxkBAAIBMmpwyYYcMLp_pS8RT09Iv-JHrL6tAAKmHWsbeKGISykgXVqfTMoPAQADAgADeAADPQQ",
+              "ingredients": [],
+              "fields": {},
+              "steps": [
+                "Перебить в блендере"
+              ],
+              "tags": [
+                "П/Ф чай",
+                "ягодный чай",
+                "ягодный пф",
+                "п/ф",
+                "полуфабрикат"
+              ],
+              "sort_order": 40,
+              "is_active": true
+            },
+            {
+              "id": "klubnichnoe_pyure",
+              "name": "Клубничное пюре",
+              "short_description": "Фруктовая или ягодная заготовка для бара.",
+              "description": "Состав перенесён из технологической карты № 00594 от 01.03.2025. Расчётный выход: 1500 г.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Ягоды с/м",
+                  "amount": 600,
+                  "unit": "г"
+                },
+                {
+                  "name": "Сахар",
+                  "amount": 500,
+                  "unit": "г"
+                },
+                {
+                  "name": "Вода",
+                  "amount": 400,
+                  "unit": "мл"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "00594",
+                "tech_card_date": "01.03.2025",
+                "yield": "1500 г"
+              },
+              "steps": [],
+              "tags": [
+                "п/ф",
+                "полуфабрикат",
+                "пюре"
+              ],
+              "sort_order": 50,
+              "is_active": true
+            },
+            {
+              "id": "oblepikhovoe_pyure",
+              "name": "Облепиховое пюре",
+              "short_description": "Фруктовая или ягодная заготовка для бара.",
+              "description": "Состав перенесён из технологической карты № 00593 от 04.12.2023. Расчётный выход: 1000 г.",
+              "photo_file_id": "AgACAgIAAxkBAAIBfWpw4OUVHXIGpHKb2gfNL79J83aHAAJPHmsbeKGISzbqRtmvSv3KAQADAgADeAADPQQ",
+              "ingredients": [
+                {
+                  "name": "Облепиха с/м",
+                  "amount": 700,
+                  "unit": "г"
+                },
+                {
+                  "name": "Сахар",
+                  "amount": 300,
+                  "unit": "г"
+                },
+                {
+                  "name": "Вода",
+                  "amount": 300,
+                  "unit": "мл"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "00593",
+                "tech_card_date": "04.12.2023",
+                "yield": "1000 г"
+              },
+              "steps": [],
+              "tags": [
+                "п/ф",
+                "полуфабрикат",
+                "пюре"
+              ],
+              "sort_order": 60,
+              "is_active": true
+            },
+            {
+              "id": "yagodnoe_pyure",
+              "name": "Ягодное пюре",
+              "short_description": "Фруктовая или ягодная заготовка для бара.",
+              "description": "Состав перенесён из технологической карты № 00595 от 04.12.2023. Расчётный выход: 1000 г.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Ягоды (клубника) с/м",
+                  "amount": 250,
+                  "unit": "г"
+                },
+                {
+                  "name": "Ягоды (смородина) с/м",
+                  "amount": 250,
+                  "unit": "г"
+                },
+                {
+                  "name": "Сахар",
+                  "amount": 500,
+                  "unit": "г"
+                },
+                {
+                  "name": "Вода",
+                  "amount": 500,
+                  "unit": "мл"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "00595",
+                "tech_card_date": "04.12.2023",
+                "yield": "1000 г"
+              },
+              "steps": [],
+              "tags": [
+                "п/ф",
+                "полуфабрикат",
+                "пюре"
+              ],
+              "sort_order": 70,
+              "is_active": true
+            },
+            {
+              "id": "pyure_kivi",
+              "name": "Пюре киви",
+              "short_description": "Фруктовая или ягодная заготовка для бара.",
+              "description": "Состав перенесён из технологической карты № 30865 от 14.03.2025. Расчётный выход: 400 г.",
+              "photo_file_id": "AgACAgIAAxkBAAIBIGpwxihV32-LIHCn3ywNHENmIcSwAAKVHWsbeKGIS4dB-gQjar1dAQADAgADeAADPQQ",
+              "ingredients": [
+                {
+                  "name": "Киви п\\ф",
+                  "amount": 500,
+                  "unit": "г"
+                },
+                {
+                  "name": "Сахар",
+                  "amount": 500,
+                  "unit": "г"
+                },
+                {
+                  "name": "Вода",
+                  "amount": 375,
+                  "unit": "мл"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "30865",
+                "tech_card_date": "14.03.2025",
+                "yield": "400 г"
+              },
+              "steps": [],
+              "tags": [
+                "п/ф",
+                "полуфабрикат",
+                "пюре"
+              ],
+              "sort_order": 90,
+              "is_active": true
+            }
+          ]
+        },
+        {
+          "id": "fresh_juices",
+          "name": "Фреши и соковые заготовки",
+          "emoji": "🍋",
+          "description": "Свежие соковые и фруктовые заготовки.",
+          "sort_order": 20,
+          "is_active": true,
+          "items": [
+            {
+              "id": "apelsinovyy_fresh",
+              "name": "Апельсиновый фреш",
+              "short_description": "Свежая соковая или фруктовая заготовка.",
+              "description": "Состав перенесён из технологической карты № 00840 от 08.12.2023. Расчётный выход: 250 мл.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Апельсин",
+                  "amount": 600,
+                  "unit": "г"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "00840",
+                "tech_card_date": "08.12.2023",
+                "yield": "250 мл"
+              },
+              "steps": [],
+              "tags": [
+                "п/ф",
+                "полуфабрикат",
+                "фреш"
+              ],
+              "sort_order": 10,
+              "is_active": true
+            },
+            {
+              "id": "greypfrut_fresh",
+              "name": "Грейпфрутовый фреш",
+              "short_description": "Свежая соковая или фруктовая заготовка.",
+              "description": "Состав перенесён из технологической карты № 00603 от 04.12.2023. Расчётный выход: 500 мл.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Грейпфрут",
+                  "amount": 900,
+                  "unit": "г"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "00603",
+                "tech_card_date": "04.12.2023",
+                "yield": "500 мл"
+              },
+              "steps": [],
+              "tags": [
+                "п/ф",
+                "полуфабрикат",
+                "фреш"
+              ],
+              "sort_order": 20,
+              "is_active": true
+            },
+            {
+              "id": "laymovyy_fresh",
+              "name": "Лаймовый фреш",
+              "short_description": "Свежая соковая или фруктовая заготовка.",
+              "description": "Состав перенесён из технологической карты № 00602 от 04.12.2023. Расчётный выход: 500 мл.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Лайм",
+                  "amount": 700,
+                  "unit": "г"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "00602",
+                "tech_card_date": "04.12.2023",
+                "yield": "500 мл"
+              },
+              "steps": [],
+              "tags": [
+                "п/ф",
+                "полуфабрикат",
+                "фреш"
+              ],
+              "sort_order": 30,
+              "is_active": true
+            },
+            {
+              "id": "limonnyy_fresh",
+              "name": "Лимонный фреш",
+              "short_description": "Свежая соковая или фруктовая заготовка.",
+              "description": "Состав перенесён из технологической карты № 00596 от 17.02.2024. Расчётный выход: 1000 мл.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Лимон",
+                  "amount": 600,
+                  "unit": "г"
+                },
+                {
+                  "name": "Лимонная кислота",
+                  "amount": 50,
+                  "unit": "г"
+                },
+                {
+                  "name": "Вода",
+                  "amount": 900,
+                  "unit": "мл"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "00596",
+                "tech_card_date": "17.02.2024",
+                "yield": "1000 мл"
+              },
+              "steps": [],
+              "tags": [
+                "п/ф",
+                "полуфабрикат",
+                "фреш"
+              ],
+              "sort_order": 40,
+              "is_active": true
+            },
+            {
+              "id": "morkovnyy_fresh",
+              "name": "Морковный фреш",
+              "short_description": "Свежая соковая или фруктовая заготовка.",
+              "description": "Состав перенесён из технологической карты № 00838 от 03.07.2024. Расчётный выход: 250 мл.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Морковь зачищ",
+                  "amount": 640,
+                  "unit": "г"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "00838",
+                "tech_card_date": "03.07.2024",
+                "yield": "250 мл"
+              },
+              "steps": [],
+              "tags": [
+                "п/ф",
+                "полуфабрикат",
+                "фреш"
+              ],
+              "sort_order": 50,
+              "is_active": true
+            },
+            {
+              "id": "seldereevyy_fresh",
+              "name": "Сельдереевый фреш",
+              "short_description": "Свежая соковая или фруктовая заготовка.",
+              "description": "Состав перенесён из технологической карты № 00839 от 03.07.2024. Расчётный выход: 250 мл.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Сельдерей стебель",
+                  "amount": 480,
+                  "unit": "г"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "00839",
+                "tech_card_date": "03.07.2024",
+                "yield": "250 мл"
+              },
+              "steps": [],
+              "tags": [
+                "п/ф",
+                "полуфабрикат",
+                "фреш"
+              ],
+              "sort_order": 60,
+              "is_active": true
+            },
+            {
+              "id": "yablochnyy_fresh",
+              "name": "Яблочный фреш",
+              "short_description": "Свежая соковая или фруктовая заготовка.",
+              "description": "Состав перенесён из технологической карты № 00841 от 03.07.2024. Расчётный выход: 250 мл.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Яблоки",
+                  "amount": 485,
+                  "unit": "г"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "00841",
+                "tech_card_date": "03.07.2024",
+                "yield": "250 мл"
+              },
+              "steps": [],
+              "tags": [
+                "п/ф",
+                "полуфабрикат",
+                "фреш"
+              ],
+              "sort_order": 70,
+              "is_active": true
+            },
+            {
+              "id": "imbirnyy_fresh",
+              "name": "Имбирный фреш",
+              "short_description": "Свежая соковая или фруктовая заготовка.",
+              "description": "Состав перенесён из технологической карты № 30866 от 14.03.2025. Расчётный выход: 250 г.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Имбирь корень",
+                  "amount": 100,
+                  "unit": "г"
+                },
+                {
+                  "name": "Вода",
+                  "amount": 200,
+                  "unit": "мл"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "30866",
+                "tech_card_date": "14.03.2025",
+                "yield": "250 г"
+              },
+              "steps": [],
+              "tags": [
+                "п/ф",
+                "полуфабрикат",
+                "фреш"
+              ],
+              "sort_order": 80,
+              "is_active": true
+            },
+            {
+              "id": "ogurechnyy_fresh",
+              "name": "Огуречный фреш",
+              "short_description": "Свежая соковая или фруктовая заготовка.",
+              "description": "Состав перенесён из технологической карты № 30868 от 14.03.2025. Расчётный выход: 250 мл.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Огурец свежий",
+                  "amount": 290,
+                  "unit": "г"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "30868",
+                "tech_card_date": "14.03.2025",
+                "yield": "250 мл"
+              },
+              "steps": [],
+              "tags": [
+                "п/ф",
+                "полуфабрикат",
+                "фреш"
+              ],
+              "sort_order": 90,
+              "is_active": true
+            }
+          ]
+        },
+        {
+          "id": "syrups_cordials",
+          "name": "Сиропы и кордиалы",
+          "emoji": "🧴",
+          "description": "Сиропы и кордиалы для напитков.",
+          "sort_order": 30,
+          "is_active": true,
+          "items": [
+            {
+              "id": "vanilnyy_sirop",
+              "name": "Ванильный сироп",
+              "short_description": "Сироп или кордиал для напитков.",
+              "description": "Состав перенесён из технологической карты № 01751 от 04.01.2024. Расчётный выход: 1000 мл.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Сахар",
+                  "amount": 800,
+                  "unit": "г"
+                },
+                {
+                  "name": "Вода",
+                  "amount": 1000,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Сахар ванильный",
+                  "amount": 20,
+                  "unit": "г"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "01751",
+                "tech_card_date": "04.01.2024",
+                "yield": "1000 мл"
+              },
+              "steps": [],
+              "tags": [
+                "п/ф",
+                "полуфабрикат",
+                "сироп"
+              ],
+              "sort_order": 10,
+              "is_active": true
+            },
+            {
+              "id": "greypfrut_kordial",
+              "name": "Грейпфрутовый кордиал",
+              "short_description": "Сироп или кордиал для напитков.",
+              "description": "Состав перенесён из технологической карты № 00611 от 04.12.2023. Расчётный выход: 700 мл.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Фреш грейпфрут п/ф",
+                  "amount": 500,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Сахар",
+                  "amount": 500,
+                  "unit": "г"
+                },
+                {
+                  "name": "Вода",
+                  "amount": 500,
+                  "unit": "мл"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "00611",
+                "tech_card_date": "04.12.2023",
+                "yield": "700 мл"
+              },
+              "steps": [],
+              "tags": [
+                "п/ф",
+                "полуфабрикат",
+                "сироп"
+              ],
+              "sort_order": 20,
+              "is_active": true
+            },
+            {
+              "id": "sakharnyy_sirop",
+              "name": "Сахарный сироп",
+              "short_description": "Сироп или кордиал для напитков.",
+              "description": "Состав перенесён из технологической карты № 00551 от 04.12.2023. Расчётный выход: 500 мл.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Сахар",
+                  "amount": 500,
+                  "unit": "г"
+                },
+                {
+                  "name": "Вода",
+                  "amount": 500,
+                  "unit": "мл"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "00551",
+                "tech_card_date": "04.12.2023",
+                "yield": "500 мл"
+              },
+              "steps": [],
+              "tags": [
+                "п/ф",
+                "полуфабрикат",
+                "сироп"
+              ],
+              "sort_order": 30,
+              "is_active": true
+            },
+            {
+              "id": "sirop_gibiskusa",
+              "name": "Сироп гибискуса",
+              "short_description": "Сироп или кордиал для напитков.",
+              "description": "Состав перенесён из технологической карты № 30863 от 14.03.2025. Расчётный выход: 1500 мл.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Чай каркаде",
+                  "amount": 100,
+                  "unit": "г"
+                },
+                {
+                  "name": "Сахар",
+                  "amount": 2000,
+                  "unit": "г"
+                },
+                {
+                  "name": "Вода",
+                  "amount": 1000,
+                  "unit": "мл"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "30863",
+                "tech_card_date": "14.03.2025",
+                "yield": "1500 мл"
+              },
+              "steps": [],
+              "tags": [
+                "п/ф",
+                "полуфабрикат",
+                "сироп"
+              ],
+              "sort_order": 40,
+              "is_active": true
+            }
+          ]
+        },
+        {
+          "id": "lemonade_bases",
+          "name": "Лимонадные и напиточные основы",
+          "emoji": "🥤",
+          "description": "Основы для лимонадов и безалкогольных напитков.",
+          "sort_order": 40,
+          "is_active": true,
+          "items": [
+            {
+              "id": "polunichno",
+              "name": "Клубнично-яблочный компот",
+              "short_description": "1,5 кг клубники \n1,5кг смородины \n2кг яблок \n1,5 кг сахара \n4 кулера воды",
+              "description": null,
+              "photo_file_id": "AgACAgIAAxkBAAIBOmpwyvPPjcp6CVszyqJmUaEvMUmkAAKpHWsbeKGIS7oqbJ29Bm2EAQADAgADeQADPQQ",
+              "ingredients": [],
+              "fields": {},
+              "steps": [
+                "Измельчить яблоки и смешать с ягодами в кастрюле, засыпать сахар и залить воду, варить час после закипания."
+              ],
+              "tags": [
+                "Компот",
+                "п/ф",
+                "полуфабрикат"
+              ],
+              "sort_order": 10,
+              "is_active": true
+            },
+            {
+              "id": "limonadnaya",
+              "name": "Лимонадная основа №2",
+              "short_description": "Основа для лимонадов и безалкогольных напитков.",
+              "description": "Состав перенесён из технологической карты № 01810 от 12.01.2024. Расчётный выход: 1000 мл.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Лимон",
+                  "amount": 150,
+                  "unit": "г"
+                },
+                {
+                  "name": "Апельсин",
+                  "amount": 150,
+                  "unit": "г"
+                },
+                {
+                  "name": "Сахар",
+                  "amount": 100,
+                  "unit": "г"
+                },
+                {
+                  "name": "Мята зачищ",
+                  "amount": 5,
+                  "unit": "г"
+                },
+                {
+                  "name": "Вода",
+                  "amount": 1100,
+                  "unit": "мл"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "01810",
+                "tech_card_date": "12.01.2024",
+                "yield": "1000 мл"
+              },
+              "steps": [],
+              "tags": [
+                "п/ф",
+                "полуфабрикат",
+                "напиточная основа"
+              ],
+              "sort_order": 20,
+              "is_active": true
+            },
+            {
+              "id": "bazilikovaya",
+              "name": "Базиликовая лимонадная основа",
+              "short_description": "Основа для лимонадов и безалкогольных напитков.",
+              "description": "Состав перенесён из технологической карты № 30246 от 06.07.2024. Расчётный выход: 700 мл.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Базилик зачищ",
+                  "amount": 100,
+                  "unit": "г"
+                },
+                {
+                  "name": "Лимон",
+                  "amount": 75,
+                  "unit": "г"
+                },
+                {
+                  "name": "Сахар",
+                  "amount": 75,
+                  "unit": "г"
+                },
+                {
+                  "name": "Вода",
+                  "amount": 500,
+                  "unit": "мл"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "30246",
+                "tech_card_date": "06.07.2024",
+                "yield": "700 мл"
+              },
+              "steps": [],
+              "tags": [
+                "п/ф",
+                "полуфабрикат",
+                "напиточная основа"
+              ],
+              "sort_order": 30,
+              "is_active": true
+            },
+            {
+              "id": "limonadnaya_osnova",
+              "name": "Лимонадная основа",
+              "short_description": "Основа для лимонадов и безалкогольных напитков.",
+              "description": "Состав перенесён из технологической карты № 00591 от 04.12.2023. Расчётный выход: 18000 мл.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Лимон",
+                  "amount": 8000,
+                  "unit": "г"
+                },
+                {
+                  "name": "Сахар",
+                  "amount": 2500,
+                  "unit": "г"
+                },
+                {
+                  "name": "Вода",
+                  "amount": 20000,
+                  "unit": "мл"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "00591",
+                "tech_card_date": "04.12.2023",
+                "yield": "18000 мл"
+              },
+              "steps": [],
+              "tags": [
+                "п/ф",
+                "полуфабрикат",
+                "напиточная основа"
+              ],
+              "sort_order": 40,
+              "is_active": true
+            },
+            {
+              "id": "yagodnyy_mors",
+              "name": "Ягодный морс",
+              "short_description": "Основа для лимонадов и безалкогольных напитков.",
+              "description": "Состав перенесён из технологической карты № 00592 от 04.12.2023. Расчётный выход: 10000 мл.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Ягоды с/м",
+                  "amount": 5000,
+                  "unit": "г"
+                },
+                {
+                  "name": "Сахар",
+                  "amount": 3000,
+                  "unit": "г"
+                },
+                {
+                  "name": "Вода",
+                  "amount": 10000,
+                  "unit": "мл"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "00592",
+                "tech_card_date": "04.12.2023",
+                "yield": "10000 мл"
+              },
+              "steps": [],
+              "tags": [
+                "п/ф",
+                "полуфабрикат",
+                "напиточная основа"
+              ],
+              "sort_order": 50,
+              "is_active": true
+            },
+            {
+              "id": "osnova_iz",
+              "name": "Основа из чёрного чая",
+              "short_description": "Основа для лимонадов и безалкогольных напитков.",
+              "description": "Состав перенесён из технологической карты № 00590 от 04.12.2023. Расчётный выход: 1000 мл.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Чай пакетированый",
+                  "amount": 5,
+                  "unit": "шт."
+                },
+                {
+                  "name": "Вода",
+                  "amount": 1000,
+                  "unit": "мл"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "00590",
+                "tech_card_date": "04.12.2023",
+                "yield": "1000 мл"
+              },
+              "steps": [],
+              "tags": [
+                "п/ф",
+                "полуфабрикат",
+                "напиточная основа"
+              ],
+              "sort_order": 60,
+              "is_active": true
+            }
+          ]
+        },
+        {
+          "id": "infusions_mixes",
+          "name": "Настойки, пены и смеси",
+          "emoji": "🧪",
+          "description": "Настойки и другие барные заготовки.",
+          "sort_order": 50,
+          "is_active": true,
+          "items": [
+            {
+              "id": "nastoyka_absolut",
+              "name": "Настойка Absolut Vanilla с анчаном",
+              "short_description": "Барная заготовка для приготовления напитков.",
+              "description": "Состав перенесён из технологической карты № 02154 от 05.03.2024. Расчётный выход: 1000 мл.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Водка Абсолют Ваниль",
+                  "amount": 1000,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Чай рассыпной (анчан)",
+                  "amount": 10,
+                  "unit": "г"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "02154",
+                "tech_card_date": "05.03.2024",
+                "yield": "1000 мл"
+              },
+              "steps": [],
+              "tags": [
+                "п/ф",
+                "полуфабрикат",
+                "барная заготовка"
+              ],
+              "sort_order": 10,
+              "is_active": true
+            },
+            {
+              "id": "gin_na",
+              "name": "Джин на карамельном попкорне",
+              "short_description": "Барная заготовка для приготовления напитков.",
+              "description": "Состав перенесён из технологической карты № 01750 от 28.12.2023. Расчётный выход: 200 г.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Джин Гордонс",
+                  "amount": 300,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Попкорн карамельный",
+                  "amount": 150,
+                  "unit": "г"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "01750",
+                "tech_card_date": "28.12.2023",
+                "yield": "200 г"
+              },
+              "steps": [],
+              "tags": [
+                "п/ф",
+                "полуфабрикат",
+                "барная заготовка"
+              ],
+              "sort_order": 20,
+              "is_active": true
+            },
+            {
+              "id": "gin_na_listyakh",
+              "name": "Джин на листьях лайма",
+              "short_description": "Барная заготовка для приготовления напитков.",
+              "description": "Состав перенесён из технологической карты № 01894 от 25.01.2024. Расчётный выход: 900 г.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Джин Гордонс",
+                  "amount": 1000,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Лист лайма",
+                  "amount": 100,
+                  "unit": "г"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "01894",
+                "tech_card_date": "25.01.2024",
+                "yield": "900 г"
+              },
+              "steps": [],
+              "tags": [
+                "п/ф",
+                "полуфабрикат",
+                "барная заготовка"
+              ],
+              "sort_order": 30,
+              "is_active": true
+            },
+            {
+              "id": "kokosovaya_pena",
+              "name": "Кокосовая пена",
+              "short_description": "Барная заготовка для приготовления напитков.",
+              "description": "Состав перенесён из технологической карты № 02001 от 13.06.2024. Расчётный выход: 500 мл.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Фреш лимон п/ф",
+                  "amount": 175,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Сахарный сироп п/ф",
+                  "amount": 125,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Сироп",
+                  "amount": 50,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Яйца куриные",
+                  "amount": 2,
+                  "unit": "шт."
+                },
+                {
+                  "name": "Балончик д/сифона 8гр сливки",
+                  "amount": 2,
+                  "unit": "шт."
+                },
+                {
+                  "name": "Желатин",
+                  "amount": 10,
+                  "unit": "г"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "02001",
+                "tech_card_date": "13.06.2024",
+                "yield": "500 мл"
+              },
+              "steps": [],
+              "tags": [
+                "п/ф",
+                "полуфабрикат",
+                "барная заготовка"
+              ],
+              "sort_order": 40,
+              "is_active": true
+            },
+            {
+              "id": "smes_spetsiy",
+              "name": "Смесь специй",
+              "short_description": "Барная заготовка для приготовления напитков.",
+              "description": "Состав перенесён из технологической карты № 01370 от 04.12.2023. Расчётный выход: 8 г.",
+              "photo_file_id": null,
+              "ingredients": [
+                {
+                  "name": "Корица палочки",
+                  "amount": 4,
+                  "unit": "г"
+                },
+                {
+                  "name": "Гвоздика",
+                  "amount": 2,
+                  "unit": "г"
+                },
+                {
+                  "name": "Бадьян",
+                  "amount": 2,
+                  "unit": "г"
+                }
+              ],
+              "fields": {
+                "tech_card_number": "01370",
+                "tech_card_date": "04.12.2023",
+                "yield": "8 г"
+              },
+              "steps": [],
+              "tags": [
+                "п/ф",
+                "полуфабрикат",
+                "барная заготовка"
+              ],
+              "sort_order": 50,
+              "is_active": true
+            }
+          ]
         }
-      ]
+      ],
+      "items": []
     }
   ]
 }

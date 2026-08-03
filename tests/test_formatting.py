@@ -72,6 +72,9 @@ def test_formats_known_and_unknown_fields_universally() -> None:
         name="Поля",
         fields={
             "serving_temperature": "16–18 °C",
+            "tech_card_number": "00720",
+            "tech_card_date": "07.12.2023",
+            "yield": "190 мл",
             "roast_profile": "Светлая",
             "is_decaf": False,
             "details": {"origin": "Эфиопия"},
@@ -81,6 +84,9 @@ def test_formats_known_and_unknown_fields_universally() -> None:
     card = format_item_card(item)
 
     assert "• Температура подачи: 16–18 °C" in card
+    assert "• № техкарты: 00720" in card
+    assert "• Дата техкарты: 07.12.2023" in card
+    assert "• Выход: 190 мл" in card
     assert "• Roast profile: Светлая" in card
     assert "• Is decaf: Нет" in card
     assert '• Details: {&quot;origin&quot;: &quot;Эфиопия&quot;}' in card

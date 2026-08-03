@@ -26,8 +26,8 @@ def _all_items(catalog: Catalog):
 
 def test_imported_catalog_counts(imported_catalog: Catalog) -> None:
     assert len(imported_catalog.categories) == 5
-    assert len(imported_catalog.categories[0].subcategories) == 4
-    assert len(list(_all_items(imported_catalog))) == 24
+    assert len(imported_catalog.categories[0].subcategories) == 5
+    assert len(list(_all_items(imported_catalog))) == 77
     counts = {
         subcategory.id: len(subcategory.items)
         for subcategory in imported_catalog.categories[0].subcategories
@@ -37,35 +37,49 @@ def test_imported_catalog_counts(imported_catalog: Catalog) -> None:
         "classic": 8,
         "non_alcoholic": 1,
         "methods": 0,
+        "shots": 3,
     }
 
 
-def test_new_empty_categories_are_present_once(
+def test_spreadsheet_categories_are_grouped_once(
     imported_catalog: Catalog,
 ) -> None:
-    expected = {
-        "semi_finished": ("Полуфабрикаты", "🧪", 20),
-        "signature_tea": ("Фирменные чаи", "🫖", 30),
-        "coffee": ("Кофейная карта", "☕", 40),
-        "wine": ("Винная карта", "🍷", 50),
-    }
     by_id = {category.id: category for category in imported_catalog.categories}
 
     assert len(by_id) == len(imported_catalog.categories)
-    for category_id, (name, emoji, sort_order) in expected.items():
-        category = by_id[category_id]
-        assert (category.name, category.emoji, category.sort_order) == (
-            name,
-            emoji,
-            sort_order,
-        )
-        assert category.description is None
-        assert category.is_active
-        assert category.subcategories == []
-        assert category.items == []
+    assert (by_id["coffee"].name, by_id["coffee"].emoji) == (
+        "Кофейная карта",
+        "☕",
+    )
+    assert {
+        subcategory.id: len(subcategory.items)
+        for subcategory in by_id["coffee"].subcategories
+    } == {
+        "coffee_classics": 2,
+        "coffee_milk": 8,
+        "cocoa_matcha": 6,
+        "coffee_special": 1,
+    }
+    assert (
+        by_id["polufabrikaty_p_f"].name,
+        by_id["polufabrikaty_p_f"].emoji,
+    ) == ("Полуфабрикаты", "🧪")
+    assert {
+        subcategory.id: len(subcategory.items)
+        for subcategory in by_id["polufabrikaty_p_f"].subcategories
+    } == {
+        "purees_bases": 9,
+        "fresh_juices": 9,
+        "syrups_cordials": 4,
+        "lemonade_bases": 6,
+        "infusions_mixes": 5,
+    }
+    for category_id in ("signature_tea", "wine"):
+        assert by_id[category_id].items == []
+        assert by_id[category_id].subcategories == []
 
 
-def test_existing_cocktail_category_is_byte_semantically_unchanged(
+def test_existing_cocktail_data_is_semantically_unchanged_before_shots(
     imported_catalog: Catalog,
 ) -> None:
     cocktail = next(
@@ -73,8 +87,14 @@ def test_existing_cocktail_category_is_byte_semantically_unchanged(
         for category in imported_catalog.categories
         if category.id == "cocktails"
     )
+    cocktail_data = cocktail.model_dump(mode="json")
+    cocktail_data["subcategories"] = [
+        subcategory
+        for subcategory in cocktail_data["subcategories"]
+        if subcategory["id"] != "shots"
+    ]
     payload = json.dumps(
-        cocktail.model_dump(mode="json"),
+        cocktail_data,
         ensure_ascii=False,
         sort_keys=True,
         separators=(",", ":"),
@@ -156,6 +176,7 @@ def test_existing_imported_ids_remain_unchanged(
         ],
         "non_alcoholic": ["berry-bloom-na"],
         "methods": [],
+        "shots": ["b_52", "green_mexican", "hiroshima"],
     }
 
 
@@ -166,29 +187,126 @@ def test_demo_item_was_removed(imported_catalog: Catalog) -> None:
     assert all("тестов" not in item.name.casefold() for item in _all_items(imported_catalog))
 
 
-def test_all_imported_items_have_empty_steps(
+def test_xls_import_preserves_manual_steps_without_inventing_new_ones(
     imported_catalog: Catalog,
 ) -> None:
-    assert all(not item.steps for item in _all_items(imported_catalog))
+    xls_items = [
+        item
+        for item in _all_items(imported_catalog)
+        if "tech_card_number" in item.fields
+    ]
+    items_with_steps = [item.id for item in xls_items if item.steps]
+
+    assert len(xls_items) == 46
+    assert items_with_steps == ["mango_marakuya_p_f"]
 
 
 def test_imported_ingredient_count(imported_catalog: Catalog) -> None:
     assert sum(
         len(item.ingredients)
         for item in _all_items(imported_catalog)
-    ) == 118
+    ) == 249
+
+
+def test_shot_cards_have_complete_draft_recipes(
+    imported_catalog: Catalog,
+) -> None:
+    cocktails = next(
+        category
+        for category in imported_catalog.categories
+        if category.id == "cocktails"
+    )
+    shots = next(
+        subcategory
+        for subcategory in cocktails.subcategories
+        if subcategory.id == "shots"
+    )
+
+    assert (shots.name, shots.emoji, shots.sort_order) == ("Шоты", "🥃", 50)
+    assert [item.name for item in shots.items] == [
+        "B-52",
+        "Green Mexican",
+        "Hiroshima",
+    ]
+    assert all(item.ingredients for item in shots.items)
+    assert all(item.steps for item in shots.items)
+    assert all(item.fields["method"] == "Layer" for item in shots.items)
+    assert all(item.photo_file_id is None for item in shots.items)
+
+
+def test_xls_cards_have_source_metadata_and_ingredients(
+    imported_catalog: Catalog,
+) -> None:
+    xls_items = [
+        item
+        for item in _all_items(imported_catalog)
+        if "tech_card_number" in item.fields
+    ]
+
+    assert len(xls_items) == 46
+    assert all(item.fields["tech_card_number"] for item in xls_items)
+    assert all(item.fields["tech_card_date"] for item in xls_items)
+    assert all(item.ingredients for item in xls_items)
+
+    strawberry = next(
+        item for item in xls_items if item.name == "Клубничное пюре"
+    )
+    assert strawberry.fields == {
+        "tech_card_number": "00594",
+        "tech_card_date": "01.03.2025",
+        "yield": "1500 г",
+    }
+    assert [(entry.name, entry.amount, entry.unit) for entry in strawberry.ingredients] == [
+        ("Ягоды с/м", 600, "г"),
+        ("Сахар", 500, "г"),
+        ("Вода", 400, "мл"),
+    ]
+
+    corrected_units = {
+        item.fields["tech_card_number"]: item.fields["yield"]
+        for item in xls_items
+        if item.fields["tech_card_number"] in {"00611", "02154", "30246"}
+    }
+    assert corrected_units == {
+        "00611": "700 мл",
+        "02154": "1000 мл",
+        "30246": "700 мл",
+    }
+
+
+def test_existing_semifinished_ids_are_preserved(
+    imported_catalog: Catalog,
+) -> None:
+    category = next(
+        category
+        for category in imported_catalog.categories
+        if category.id == "polufabrikaty_p_f"
+    )
+    ids = {
+        item.id
+        for subcategory in category.subcategories
+        for item in subcategory.items
+    }
+
+    assert {
+        "mango_marakuya_p_f",
+        "kivi_ogurets_p_f",
+        "malina_vinograd",
+        "yagodnyy_p_f",
+        "polunichno",
+    } <= ids
 
 
 def test_all_imported_item_callbacks_fit_telegram_limit(
     imported_catalog: Catalog,
 ) -> None:
-    category = imported_catalog.categories[0]
     callbacks = [
         ItemCallback(
             category_id=category.id,
             subcategory_id=subcategory.id,
             item_id=item.id,
         ).pack()
+        for category in imported_catalog.categories
         for subcategory in category.subcategories
         for item in subcategory.items
     ]

@@ -21,15 +21,15 @@ def test_loads_repository_catalog_successfully() -> None:
     assert catalog.version == 1
     assert [category.id for category in catalog.categories] == [
         "cocktails",
-        "semi_finished",
         "signature_tea",
         "coffee",
         "wine",
+        "polufabrikaty_p_f",
     ]
     assert [
         subcategory.id
         for subcategory in catalog.categories[0].subcategories
-    ] == ["signature", "classic", "non_alcoholic", "methods"]
+    ] == ["signature", "classic", "non_alcoholic", "methods", "shots"]
 
 
 def test_missing_file_has_clear_error(tmp_path: Path) -> None:

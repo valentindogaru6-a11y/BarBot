@@ -20,6 +20,9 @@ FIELD_LABELS = {
     "cup": "Чашка",
     "coffee_weight": "Вес кофе",
     "temperature": "Температура",
+    "tech_card_number": "№ техкарты",
+    "tech_card_date": "Дата техкарты",
+    "yield": "Выход",
 }
 
 
