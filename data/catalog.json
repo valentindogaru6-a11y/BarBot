@@ -20,14 +20,35 @@
             {
               "id": "gin-tonic-yuzu",
               "name": "Джин-тоник юдзу",
+              "short_description": null,
               "description": null,
-              "photo_file_id": null,
+              "photo_file_id": "AgACAgIAAxkBAAMtamu02oORkt5X4ApazgkF8CNEw6UAAgkeaxtKP1hL7aU3YG5gJMcBAAMCAAN5AAM9BA",
               "ingredients": [
-                {"name": "Джин Whitley Neill (клубника-юдзу)", "amount": 45, "unit": "мл"},
-                {"name": "Monin пюре юдзу", "amount": 10, "unit": "мл"},
-                {"name": "Monin сироп маракуйя", "amount": 10, "unit": "мл"},
-                {"name": "Monin Rancho-Lime", "amount": 30, "unit": "мл"},
-                {"name": "Швепс тоник ПЭТ", "amount": 120, "unit": "мл"}
+                {
+                  "name": "Джин Whitley Neill (клубника-юдзу)",
+                  "amount": 45,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Monin пюре юдзу",
+                  "amount": 10,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Monin сироп маракуйя",
+                  "amount": 10,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Monin Rancho-Lime",
+                  "amount": 30,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Швепс тоник ПЭТ",
+                  "amount": 120,
+                  "unit": "мл"
+                }
               ],
               "fields": {
                 "garnish": "Закрученная цедра грейпфрута и слайс лайма",
@@ -36,22 +57,51 @@
                 "method": "Build"
               },
               "steps": [],
-              "tags": ["авторский", "джин", "цитрусовый"],
+              "tags": [
+                "авторский",
+                "джин",
+                "цитрусовый"
+              ],
               "sort_order": 10,
               "is_active": true
             },
             {
               "id": "kamanin-tigress",
               "name": "Каманинская тигрица",
+              "short_description": null,
               "description": "Нежный, ароматный и игривый коктейль с клубникой, грушей и травами. Лёгкий, но с характером.",
-              "photo_file_id": null,
+              "photo_file_id": "AgACAgIAAxkBAAMxamu1A9XrQi1fYxAgD3qcokQ5Pl8AAgoeaxtKP1hLZjv28e12EJMBAAMCAAN5AAM9BA",
               "ingredients": [
-                {"name": "Джин Finsbury (клубника)", "amount": 45, "unit": "мл"},
-                {"name": "Monin Rancho-Lime", "amount": 20, "unit": "мл"},
-                {"name": "Monin сироп груша", "amount": 25, "unit": "мл"},
-                {"name": "Мята/базилик", "amount": 5, "unit": "г"},
-                {"name": "Easy Foam", "amount": 1, "unit": "dash"},
-                {"name": "Тоник ПЭТ", "amount": 250, "unit": "мл"}
+                {
+                  "name": "Джин Finsbury (клубника)",
+                  "amount": 45,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Monin Rancho-Lime",
+                  "amount": 20,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Monin сироп груша",
+                  "amount": 25,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Мята/базилик",
+                  "amount": 5,
+                  "unit": "г"
+                },
+                {
+                  "name": "Easy Foam",
+                  "amount": 1,
+                  "unit": "dash"
+                },
+                {
+                  "name": "Тоник ПЭТ",
+                  "amount": 250,
+                  "unit": "мл"
+                }
               ],
               "fields": {
                 "garnish": "Розовая сладкая вата — 15 г, на ободок бокала",
@@ -60,23 +110,56 @@
                 "method": "Dry Shake → Shake"
               },
               "steps": [],
-              "tags": ["авторский", "джин", "ягодный"],
+              "tags": [
+                "авторский",
+                "джин",
+                "ягодный"
+              ],
               "sort_order": 20,
               "is_active": true
             },
             {
               "id": "pornstar-girl",
               "name": "Pornstar Girl",
+              "short_description": null,
               "description": "Тропическая классика с ванилью, маракуйей и игристым настроением. Яркий вкус, который хочется повторить.",
-              "photo_file_id": null,
+              "photo_file_id": "AgACAgIAAxkBAAM1amu1Lqaiu4rE9mihbzJi7XWsVyQAAgseaxtKP1hLtX1wj1HfuUYBAAMCAAN5AAM9BA",
               "ingredients": [
-                {"name": "Водка Absolut Vanilla", "amount": 50, "unit": "мл"},
-                {"name": "Monin сироп маракуйя", "amount": 10, "unit": "мл"},
-                {"name": "Пюре манго-маракуйя п/ф", "amount": 20, "unit": "мл"},
-                {"name": "Monin Rancho-Lime", "amount": 20, "unit": "мл"},
-                {"name": "Angostura", "amount": 1, "unit": "dash"},
-                {"name": "Easy Foam", "amount": 1, "unit": "dash"},
-                {"name": "Просекко фризанте", "amount": 50, "unit": "мл"}
+                {
+                  "name": "Водка Absolut Vanilla",
+                  "amount": 50,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Monin сироп маракуйя",
+                  "amount": 10,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Пюре манго-маракуйя п/ф",
+                  "amount": 20,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Monin Rancho-Lime",
+                  "amount": 20,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Angostura",
+                  "amount": 1,
+                  "unit": "dash"
+                },
+                {
+                  "name": "Easy Foam",
+                  "amount": 1,
+                  "unit": "dash"
+                },
+                {
+                  "name": "Просекко фризанте",
+                  "amount": 50,
+                  "unit": "мл"
+                }
               ],
               "fields": {
                 "garnish": "Требуется уточнение",
@@ -85,23 +168,57 @@
                 "method": "Dry Shake → Shake"
               },
               "steps": [],
-              "tags": ["авторский", "водка", "игристое", "тропический"],
+              "tags": [
+                "авторский",
+                "водка",
+                "игристое",
+                "тропический"
+              ],
               "sort_order": 30,
               "is_active": true
             },
             {
               "id": "pornstar-boy",
               "name": "Pornstar Boy",
+              "short_description": null,
               "description": "Более насыщенная версия Pornstar с нотами виски — сладость тропиков встречает благородную крепость.",
-              "photo_file_id": null,
+              "photo_file_id": "AgACAgIAAxkBAAM5amu1T78VqMKV8PPebnlouuSVkigAAgweaxtKP1hLIE_d8k-dHJQBAAMCAAN5AAM9BA",
               "ingredients": [
-                {"name": "Виски Bankhall", "amount": 20, "unit": "мл"},
-                {"name": "Водка Absolut Vanilla", "amount": 25, "unit": "мл"},
-                {"name": "Monin сироп маракуйя", "amount": 10, "unit": "мл"},
-                {"name": "Пюре манго-маракуйя п/ф", "amount": 20, "unit": "мл"},
-                {"name": "Monin Rancho-Lime", "amount": 20, "unit": "мл"},
-                {"name": "Angostura", "amount": 1, "unit": "dash"},
-                {"name": "Easy Foam", "amount": 1, "unit": "dash"}
+                {
+                  "name": "Виски Bankhall",
+                  "amount": 20,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Водка Absolut Vanilla",
+                  "amount": 25,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Monin сироп маракуйя",
+                  "amount": 10,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Пюре манго-маракуйя п/ф",
+                  "amount": 20,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Monin Rancho-Lime",
+                  "amount": 20,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Angostura",
+                  "amount": 1,
+                  "unit": "dash"
+                },
+                {
+                  "name": "Easy Foam",
+                  "amount": 1,
+                  "unit": "dash"
+                }
               ],
               "fields": {
                 "garnish": "Требуется уточнение",
@@ -110,22 +227,52 @@
                 "method": "Dry Shake → Shake"
               },
               "steps": [],
-              "tags": ["авторский", "виски", "водка", "тропический"],
+              "tags": [
+                "авторский",
+                "виски",
+                "водка",
+                "тропический"
+              ],
               "sort_order": 40,
               "is_active": true
             },
             {
               "id": "pornstar-strawb",
               "name": "Pornstar Strawberry",
+              "short_description": null,
               "description": "Сочная клубника, ваниль и воздушная текстура создают настоящий десерт в бокале.",
-              "photo_file_id": null,
+              "photo_file_id": "AgACAgIAAxkBAAM9amu1fH5fIkIC4C29q6yR68uKunEAAg0eaxtKP1hLbGKiTtAS2PMBAAMCAAN5AAM9BA",
               "ingredients": [
-                {"name": "Водка Absolut Vanilla", "amount": 40, "unit": "мл"},
-                {"name": "Вермут Martini Bianco (сладкий)", "amount": 20, "unit": "мл"},
-                {"name": "Monin сироп клубника", "amount": 25, "unit": "мл"},
-                {"name": "Сахарный сироп", "amount": 10, "unit": "мл"},
-                {"name": "Фреш лимона", "amount": 20, "unit": "мл"},
-                {"name": "Easy Foam", "amount": 1, "unit": "dash"}
+                {
+                  "name": "Водка Absolut Vanilla",
+                  "amount": 40,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Вермут Martini Bianco (сладкий)",
+                  "amount": 20,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Monin сироп клубника",
+                  "amount": 25,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Сахарный сироп",
+                  "amount": 10,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Фреш лимона",
+                  "amount": 20,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Easy Foam",
+                  "amount": 1,
+                  "unit": "dash"
+                }
               ],
               "fields": {
                 "garnish": "Пудра малины",
@@ -134,21 +281,46 @@
                 "method": "Dry Shake → Shake"
               },
               "steps": [],
-              "tags": ["авторский", "водка", "ягодный"],
+              "tags": [
+                "авторский",
+                "водка",
+                "ягодный"
+              ],
               "sort_order": 50,
               "is_active": true
             },
             {
               "id": "cryptocurrency",
               "name": "Криптовалютчик",
+              "short_description": null,
               "description": "Экзотический баланс юдзу, лемонграсса и писко — риск оправдан каждым глотком.",
-              "photo_file_id": null,
+              "photo_file_id": "AgACAgIAAxkBAANBamu1q1quXINi8mMgkRM_1pWupp4AAg8eaxtKP1hL8hlpAqbjZwQBAAMCAAN5AAM9BA",
               "ingredients": [
-                {"name": "Бренди писко", "amount": 45, "unit": "мл"},
-                {"name": "Monin пюре юдзу", "amount": 15, "unit": "мл"},
-                {"name": "Monin сироп лемонграсс", "amount": 15, "unit": "мл"},
-                {"name": "Фреш лимона", "amount": 15, "unit": "мл"},
-                {"name": "Easy Foam", "amount": 1, "unit": "dash"}
+                {
+                  "name": "Бренди писко",
+                  "amount": 45,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Monin пюре юдзу",
+                  "amount": 15,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Monin сироп лемонграсс",
+                  "amount": 15,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Фреш лимона",
+                  "amount": 15,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Easy Foam",
+                  "amount": 1,
+                  "unit": "dash"
+                }
               ],
               "fields": {
                 "garnish": "Три розовых цветка на ободке бокала, на прищепке",
@@ -157,23 +329,57 @@
                 "method": "Dry Shake → Shake"
               },
               "steps": [],
-              "tags": ["авторский", "писко", "цитрусовый", "тропический"],
+              "tags": [
+                "авторский",
+                "писко",
+                "цитрусовый",
+                "тропический"
+              ],
               "sort_order": 60,
               "is_active": true
             },
             {
               "id": "kiss-me",
               "name": "Kiss Me",
+              "short_description": null,
               "description": "Согревающий виски с орехово-карамельными оттенками и нежной пенкой.",
-              "photo_file_id": null,
+              "photo_file_id": "AgACAgIAAxkBAAMjamuwSiARkNfqH9fr0_56tVvfQXgAAvYdaxtKP1hLcK78M7XQY5MBAAMCAAN5AAM9BA",
               "ingredients": [
-                {"name": "Виски Pouges", "amount": 45, "unit": "мл"},
-                {"name": "Ликёр De Kyper (амаретто)", "amount": 15, "unit": "мл"},
-                {"name": "Фреш лимона", "amount": 15, "unit": "мл"},
-                {"name": "Сахарный сироп", "amount": 10, "unit": "мл"},
-                {"name": "Monin сироп орех", "amount": 10, "unit": "мл"},
-                {"name": "Monin сироп попкорн", "amount": 10, "unit": "мл"},
-                {"name": "Easy Foam", "amount": 1, "unit": "dash"}
+                {
+                  "name": "Виски Pouges",
+                  "amount": 45,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Ликёр De Kyper (амаретто)",
+                  "amount": 15,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Фреш лимона",
+                  "amount": 15,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Сахарный сироп",
+                  "amount": 10,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Monin сироп орех",
+                  "amount": 10,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Monin сироп попкорн",
+                  "amount": 10,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Easy Foam",
+                  "amount": 1,
+                  "unit": "dash"
+                }
               ],
               "fields": {
                 "garnish": "Миндальные хлопья и сублимированный какао",
@@ -182,21 +388,46 @@
                 "method": "Dry Shake → Shake"
               },
               "steps": [],
-              "tags": ["авторский", "виски", "цитрусовый"],
+              "tags": [
+                "авторский",
+                "виски",
+                "цитрусовый"
+              ],
               "sort_order": 70,
               "is_active": true
             },
             {
               "id": "kiwi-punch",
               "name": "Kiwi Punch",
+              "short_description": null,
               "description": "Яркий киви, зелёная дыня и освежающая кислинка — сочный тропический микс.",
-              "photo_file_id": null,
+              "photo_file_id": "AgACAgIAAxkBAANFamu14TqZ58ZjruKNMHotq5yBYK4AAhMeaxtKP1hLWYUgKrRsucQBAAMCAAN4AAM9BA",
               "ingredients": [
-                {"name": "Бренди писко", "amount": 40, "unit": "мл"},
-                {"name": "Monin сироп киви", "amount": 20, "unit": "мл"},
-                {"name": "Ликёр De Kyper (зелёная дыня)", "amount": 20, "unit": "мл"},
-                {"name": "Фреш лимона", "amount": 20, "unit": "мл"},
-                {"name": "Easy Foam", "amount": 1, "unit": "dash"}
+                {
+                  "name": "Бренди писко",
+                  "amount": 40,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Monin сироп киви",
+                  "amount": 20,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Ликёр De Kyper (зелёная дыня)",
+                  "amount": 20,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Фреш лимона",
+                  "amount": 20,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Easy Foam",
+                  "amount": 1,
+                  "unit": "dash"
+                }
               ],
               "fields": {
                 "garnish": "Чипс киви",
@@ -205,21 +436,47 @@
                 "method": "Dry Shake → Shake"
               },
               "steps": [],
-              "tags": ["авторский", "писко", "тропический", "цитрусовый"],
+              "tags": [
+                "авторский",
+                "писко",
+                "тропический",
+                "цитрусовый"
+              ],
               "sort_order": 80,
               "is_active": true
             },
             {
               "id": "black-hive",
               "name": "Black Hive",
+              "short_description": null,
               "description": "Медово-кофейный коктейль с глубоким характером и бархатным послевкусием.",
-              "photo_file_id": null,
+              "photo_file_id": "AgACAgIAAxkBAANJamu2AYBqLvqgnxud7j4sW0Fu9-kAAhgeaxtKP1hLhSOhqpn4FJEBAAMCAAN5AAM9BA",
               "ingredients": [
-                {"name": "Ликёр Джек Дениалс (медовый)", "amount": 40, "unit": "мл"},
-                {"name": "Ликёр Вехио Амаро", "amount": 10, "unit": "мл"},
-                {"name": "Ликёр De Kyper (кофейный)", "amount": 20, "unit": "мл"},
-                {"name": "Фреш лимона", "amount": 15, "unit": "мл"},
-                {"name": "Мёд", "amount": 7, "unit": "мл"}
+                {
+                  "name": "Ликёр Джек Дениалс (медовый)",
+                  "amount": 40,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Ликёр Вехио Амаро",
+                  "amount": 10,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Ликёр De Kyper (кофейный)",
+                  "amount": 20,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Фреш лимона",
+                  "amount": 15,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Мёд",
+                  "amount": 7,
+                  "unit": "мл"
+                }
               ],
               "fields": {
                 "garnish": "Медовая сота — 30 г",
@@ -228,22 +485,51 @@
                 "method": "Shake"
               },
               "steps": [],
-              "tags": ["авторский", "кофейный", "цитрусовый"],
+              "tags": [
+                "авторский",
+                "кофейный",
+                "цитрусовый"
+              ],
               "sort_order": 90,
               "is_active": true
             },
             {
               "id": "mango-sayer",
               "name": "Mango Sayer",
+              "short_description": null,
               "description": "Спелое манго, кокос и лёгкая цитрусовая свежесть — настоящий отпуск в бокале.",
-              "photo_file_id": null,
+              "photo_file_id": "AgACAgIAAxkBAANNamu2Ngy-5zhGKcwmz7za5mpQqtQAAhoeaxtKP1hLvcn2ll-eTXsBAAMCAAN5AAM9BA",
               "ingredients": [
-                {"name": "Водка Absolut Mango", "amount": 40, "unit": "мл"},
-                {"name": "Ликёр De Kyper (кокос)", "amount": 15, "unit": "мл"},
-                {"name": "Фреш лимона", "amount": 22, "unit": "мл"},
-                {"name": "ODK пюре манго", "amount": 22, "unit": "мл"},
-                {"name": "Сахарный сироп", "amount": 7, "unit": "мл"},
-                {"name": "Easy Foam", "amount": 1, "unit": "dash"}
+                {
+                  "name": "Водка Absolut Mango",
+                  "amount": 40,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Ликёр De Kyper (кокос)",
+                  "amount": 15,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Фреш лимона",
+                  "amount": 22,
+                  "unit": "мл"
+                },
+                {
+                  "name": "ODK пюре манго",
+                  "amount": 22,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Сахарный сироп",
+                  "amount": 7,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Easy Foam",
+                  "amount": 1,
+                  "unit": "dash"
+                }
               ],
               "fields": {
                 "garnish": "Цукат манго на шпажке",
@@ -252,21 +538,47 @@
                 "method": "Dry Shake → Shake"
               },
               "steps": [],
-              "tags": ["авторский", "водка", "тропический", "цитрусовый"],
+              "tags": [
+                "авторский",
+                "водка",
+                "тропический",
+                "цитрусовый"
+              ],
               "sort_order": 100,
               "is_active": true
             },
             {
               "id": "basil-smash",
               "name": "Basil Smash",
+              "short_description": null,
               "description": "Максимально свежий микс джина и ароматного базилика для любителей зелёных вкусов.",
-              "photo_file_id": null,
+              "photo_file_id": "AgACAgIAAxkBAANRamu2ZPBasI_myTql976tvJHueWQAAhseaxtKP1hLfhbndD3zuUEBAAMCAAN5AAM9BA",
               "ingredients": [
-                {"name": "Джин Finsbury Plata", "amount": 50, "unit": "мл"},
-                {"name": "Monin Rancho-Lime", "amount": 22, "unit": "мл"},
-                {"name": "Сахарный сироп", "amount": 15, "unit": "мл"},
-                {"name": "Базилик", "amount": 5, "unit": "г"},
-                {"name": "Monin сироп лемонграсс", "amount": 10, "unit": "мл"}
+                {
+                  "name": "Джин Finsbury Plata",
+                  "amount": 50,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Monin Rancho-Lime",
+                  "amount": 22,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Сахарный сироп",
+                  "amount": 15,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Базилик",
+                  "amount": 5,
+                  "unit": "г"
+                },
+                {
+                  "name": "Monin сироп лемонграсс",
+                  "amount": 10,
+                  "unit": "мл"
+                }
               ],
               "fields": {
                 "garnish": "Требуется уточнение",
@@ -275,21 +587,46 @@
                 "method": "Shake"
               },
               "steps": [],
-              "tags": ["авторский", "джин", "цитрусовый"],
+              "tags": [
+                "авторский",
+                "джин",
+                "цитрусовый"
+              ],
               "sort_order": 110,
               "is_active": true
             },
             {
               "id": "butterfly",
               "name": "Butterfly",
+              "short_description": null,
               "description": "Изящный цветочно-ягодный коктейль с лёгкой кислинкой и красивым ароматом.",
-              "photo_file_id": null,
+              "photo_file_id": "AgACAgIAAxkBAANVamu2kOvpAAELeSgejdlUzaWf3rSXAAIdHmsbSj9YSzA1LH3-CiuDAQADAgADeQADPQQ",
               "ingredients": [
-                {"name": "Ром Botafogo White", "amount": 50, "unit": "мл"},
-                {"name": "Ликёр De Kyper (крем де кассис)", "amount": 22, "unit": "мл"},
-                {"name": "Фреш лимона", "amount": 30, "unit": "мл"},
-                {"name": "Monin сироп бузина", "amount": 10, "unit": "мл"},
-                {"name": "Monin пюре юдзу", "amount": 10, "unit": "мл"}
+                {
+                  "name": "Ром Botafogo White",
+                  "amount": 50,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Ликёр De Kyper (крем де кассис)",
+                  "amount": 22,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Фреш лимона",
+                  "amount": 30,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Monin сироп бузина",
+                  "amount": 10,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Monin пюре юдзу",
+                  "amount": 10,
+                  "unit": "мл"
+                }
               ],
               "fields": {
                 "garnish": "Пудра малины",
@@ -298,22 +635,52 @@
                 "method": "Shake"
               },
               "steps": [],
-              "tags": ["авторский", "ром", "ягодный", "цитрусовый"],
+              "tags": [
+                "авторский",
+                "ром",
+                "ягодный",
+                "цитрусовый"
+              ],
               "sort_order": 120,
               "is_active": true
             },
             {
               "id": "allure",
               "name": "Allure",
+              "short_description": null,
               "description": "Нежный сливочно-шоколадный коктейль с десертным настроением.",
               "photo_file_id": null,
               "ingredients": [
-                {"name": "Ром Botafogo White", "amount": 30, "unit": "мл"},
-                {"name": "Сливки", "amount": 22, "unit": "мл"},
-                {"name": "Ликёр Бейлис", "amount": 22, "unit": "мл"},
-                {"name": "Ликёр De Kyper (амаретто)", "amount": 7, "unit": "мл"},
-                {"name": "Соус молочный шоколад п/ф", "amount": 30, "unit": "мл"},
-                {"name": "Easy Foam", "amount": 1, "unit": "dash"}
+                {
+                  "name": "Ром Botafogo White",
+                  "amount": 30,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Сливки",
+                  "amount": 22,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Ликёр Бейлис",
+                  "amount": 22,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Ликёр De Kyper (амаретто)",
+                  "amount": 7,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Соус молочный шоколад п/ф",
+                  "amount": 30,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Easy Foam",
+                  "amount": 1,
+                  "unit": "dash"
+                }
               ],
               "fields": {
                 "garnish": "Орех фундук — 6 г, шоколад — 3 г",
@@ -322,20 +689,41 @@
                 "method": "Dry Shake → Shake"
               },
               "steps": [],
-              "tags": ["авторский", "ром", "сливочный"],
+              "tags": [
+                "авторский",
+                "ром",
+                "сливочный"
+              ],
               "sort_order": 130,
               "is_active": true
             },
             {
               "id": "huddart-smoky",
               "name": "Huddart Smoky Street",
+              "short_description": null,
               "description": "Дымный, ягодный и необычный авторский коктейль с многослойным вкусом.",
-              "photo_file_id": null,
+              "photo_file_id": "AgACAgIAAxkBAANZamu3gvjQLcSq7UxYLDrP7OMc-cQAAiAeaxtKP1hLEzG3wHGksSYBAAMCAAN5AAM9BA",
               "ingredients": [
-                {"name": "Big Moustache", "amount": 50, "unit": "мл"},
-                {"name": "Вермут Martini Extra Dry (сухой)", "amount": 15, "unit": "мл"},
-                {"name": "Ликёр De Kyper (трипл-сек)", "amount": 15, "unit": "мл"},
-                {"name": "Кордиал черника (можно заменить кордиалом для чая Бери Редианс)", "amount": 25, "unit": "мл"}
+                {
+                  "name": "Big Moustache",
+                  "amount": 50,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Вермут Martini Extra Dry (сухой)",
+                  "amount": 15,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Ликёр De Kyper (трипл-сек)",
+                  "amount": 15,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Кордиал черника (можно заменить кордиалом для чая Бери Редианс)",
+                  "amount": 25,
+                  "unit": "мл"
+                }
               ],
               "fields": {
                 "garnish": "Голубика свежая — 8 г; крекер — 7 г; шоколад молочный — 1 г; сублимированная малина — 1 г; роза сушёная — 1 г",
@@ -344,21 +732,45 @@
                 "method": "Shake"
               },
               "steps": [],
-              "tags": ["авторский", "ягодный"],
+              "tags": [
+                "авторский",
+                "ягодный"
+              ],
               "sort_order": 140,
               "is_active": true
             },
             {
               "id": "ultimo-turno",
               "name": "Ultimo Turno",
+              "short_description": null,
               "description": "Элегантный, цветочный и слегка сладкий коктейль для неспешного вечера.",
               "photo_file_id": null,
               "ingredients": [
-                {"name": "Джин Finsbury Plata", "amount": 22, "unit": "мл"},
-                {"name": "Кордиал личи-жасмин", "amount": 22, "unit": "мл"},
-                {"name": "Вермут Martini Bianco (сладкий)", "amount": 15, "unit": "мл"},
-                {"name": "Персиковый ликёр", "amount": 15, "unit": "мл"},
-                {"name": "Сахарный сироп", "amount": 7, "unit": "мл"}
+                {
+                  "name": "Джин Finsbury Plata",
+                  "amount": 22,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Кордиал личи-жасмин",
+                  "amount": 22,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Вермут Martini Bianco (сладкий)",
+                  "amount": 15,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Персиковый ликёр",
+                  "amount": 15,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Сахарный сироп",
+                  "amount": 7,
+                  "unit": "мл"
+                }
               ],
               "fields": {
                 "garnish": "Пена личи — 30 г",
@@ -367,7 +779,10 @@
                 "method": "Stir"
               },
               "steps": [],
-              "tags": ["авторский", "джин"],
+              "tags": [
+                "авторский",
+                "джин"
+              ],
               "sort_order": 150,
               "is_active": true
             }
@@ -384,14 +799,35 @@
             {
               "id": "cosmopolitan",
               "name": "Cosmopolitan",
+              "short_description": null,
               "description": "Легендарная классика с идеальным балансом сладости и цитрусов.",
-              "photo_file_id": null,
+              "photo_file_id": "AgACAgIAAxkBAANhamu4aS1wY_bL451JGA9XH0AX9ScAAiMeaxtKP1hL9X6ZRbsGPBMBAAMCAAN5AAM9BA",
               "ingredients": [
-                {"name": "Водка Финляндия (клюква)", "amount": 50, "unit": "мл"},
-                {"name": "Ликёр De Kyper (трипл-сек)", "amount": 25, "unit": "мл"},
-                {"name": "Фреш лимона п/ф", "amount": 15, "unit": "мл"},
-                {"name": "Сок гранатовый", "amount": 30, "unit": "мл"},
-                {"name": "Лайм", "amount": 30, "unit": "мл"}
+                {
+                  "name": "Водка Финляндия (клюква)",
+                  "amount": 50,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Ликёр De Kyper (трипл-сек)",
+                  "amount": 25,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Фреш лимона п/ф",
+                  "amount": 15,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Сок гранатовый",
+                  "amount": 30,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Лайм",
+                  "amount": 30,
+                  "unit": "мл"
+                }
               ],
               "fields": {
                 "garnish": "Колечко лайма на ободке бокала",
@@ -400,20 +836,41 @@
                 "method": "Shake"
               },
               "steps": [],
-              "tags": ["классика", "водка", "цитрусовый"],
+              "tags": [
+                "классика",
+                "водка",
+                "цитрусовый"
+              ],
               "sort_order": 10,
               "is_active": true
             },
             {
               "id": "whiskey-sour",
               "name": "Whiskey Sour",
+              "short_description": null,
               "description": "Классический Whiskey Sour — насыщенный, свежий и идеально сбалансированный.",
-              "photo_file_id": null,
+              "photo_file_id": "AgACAgIAAxkBAANlamu4iahiEaZ4oPBzIannqCTEIXAAAiYeaxtKP1hLp1rL7YNmKPoBAAMCAAN5AAM9BA",
               "ingredients": [
-                {"name": "Виски Bankhall", "amount": 50, "unit": "мл"},
-                {"name": "Фреш лимона", "amount": 20, "unit": "мл"},
-                {"name": "Сахарный сироп", "amount": 20, "unit": "мл"},
-                {"name": "Easy Foam", "amount": 1, "unit": "мл"}
+                {
+                  "name": "Виски Bankhall",
+                  "amount": 50,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Фреш лимона",
+                  "amount": 20,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Сахарный сироп",
+                  "amount": 20,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Easy Foam",
+                  "amount": 1,
+                  "unit": "мл"
+                }
               ],
               "fields": {
                 "garnish": "Цедра апельсина",
@@ -422,20 +879,41 @@
                 "method": "Dry Shake → Shake"
               },
               "steps": [],
-              "tags": ["классика", "виски", "цитрусовый"],
+              "tags": [
+                "классика",
+                "виски",
+                "цитрусовый"
+              ],
               "sort_order": 20,
               "is_active": true
             },
             {
               "id": "gin-sour",
               "name": "Gin Sour",
+              "short_description": null,
               "description": "Освежающий джиновый сауэр с воздушной пенкой.",
-              "photo_file_id": null,
+              "photo_file_id": "AgACAgIAAxkBAAN-amu6aPjfKT_48vz1JE3wueQNe5sAAjgeaxtKP1hLCuczwdVamRUBAAMCAAN4AAM9BA",
               "ingredients": [
-                {"name": "Джин Finsbury Plata", "amount": 50, "unit": "мл"},
-                {"name": "Фреш лимона", "amount": 20, "unit": "мл"},
-                {"name": "Сахарный сироп", "amount": 20, "unit": "мл"},
-                {"name": "Easy Foam", "amount": 1, "unit": "мл"}
+                {
+                  "name": "Джин Finsbury Plata",
+                  "amount": 50,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Фреш лимона",
+                  "amount": 20,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Сахарный сироп",
+                  "amount": 20,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Easy Foam",
+                  "amount": 1,
+                  "unit": "мл"
+                }
               ],
               "fields": {
                 "garnish": "Требуется уточнение",
@@ -444,19 +922,36 @@
                 "method": "Dry Shake → Shake"
               },
               "steps": [],
-              "tags": ["классика", "джин", "цитрусовый"],
+              "tags": [
+                "классика",
+                "джин",
+                "цитрусовый"
+              ],
               "sort_order": 30,
               "is_active": true
             },
             {
               "id": "old-fashioned",
               "name": "Old Fashioned",
+              "short_description": null,
               "description": "Вневременная классика для ценителей чистого вкуса виски.",
-              "photo_file_id": null,
+              "photo_file_id": "AgACAgIAAxkBAANtamu4-_2VaWfxEfnYXkYQiy3JBWQAAi8eaxtKP1hLoRegLLWZiLcBAAMCAAN5AAM9BA",
               "ingredients": [
-                {"name": "Виски Bankhall", "amount": 60, "unit": "мл"},
-                {"name": "Сироп тростниковый сахар", "amount": 15, "unit": "мл"},
-                {"name": "Angostura", "amount": 1, "unit": "мл"}
+                {
+                  "name": "Виски Bankhall",
+                  "amount": 60,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Сироп тростниковый сахар",
+                  "amount": 15,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Angostura",
+                  "amount": 1,
+                  "unit": "мл"
+                }
               ],
               "fields": {
                 "garnish": "Цедра апельсина",
@@ -465,19 +960,35 @@
                 "method": "Stir"
               },
               "steps": [],
-              "tags": ["классика", "виски"],
+              "tags": [
+                "классика",
+                "виски"
+              ],
               "sort_order": 40,
               "is_active": true
             },
             {
               "id": "negroni",
               "name": "Negroni",
+              "short_description": null,
               "description": "Легендарный итальянский аперитив с горько-сладким характером.",
-              "photo_file_id": null,
+              "photo_file_id": "AgACAgIAAxkBAAN1amu5PFZeFQU_9MaH3Dn9VAgwnsoAAjMeaxtKP1hLF-v3WGOCwPQBAAMCAAN5AAM9BA",
               "ingredients": [
-                {"name": "Джин Finsbury Plata", "amount": 30, "unit": "мл"},
-                {"name": "Вермут Martini (красный сладкий)", "amount": 30, "unit": "мл"},
-                {"name": "Кампари", "amount": 30, "unit": "мл"}
+                {
+                  "name": "Джин Finsbury Plata",
+                  "amount": 30,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Вермут Martini (красный сладкий)",
+                  "amount": 30,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Кампари",
+                  "amount": 30,
+                  "unit": "мл"
+                }
               ],
               "fields": {
                 "garnish": "Цедра апельсина",
@@ -486,19 +997,35 @@
                 "method": "Stir"
               },
               "steps": [],
-              "tags": ["классика", "джин"],
+              "tags": [
+                "классика",
+                "джин"
+              ],
               "sort_order": 50,
               "is_active": true
             },
             {
               "id": "boulevardier",
               "name": "Boulevardier",
+              "short_description": null,
               "description": "Бархатный родственник Negroni на основе виски.",
-              "photo_file_id": null,
+              "photo_file_id": "AgACAgIAAxkBAAN5amu5uzIr-VSQBB3sp7lgTSN3fHIAAjYeaxtKP1hLh4FARRIFT8IBAAMCAAN4AAM9BA",
               "ingredients": [
-                {"name": "Виски Bankhall", "amount": 30, "unit": "мл"},
-                {"name": "Вермут Martini (красный сладкий)", "amount": 30, "unit": "мл"},
-                {"name": "Кампари", "amount": 30, "unit": "мл"}
+                {
+                  "name": "Виски Bankhall",
+                  "amount": 30,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Вермут Martini (красный сладкий)",
+                  "amount": 30,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Кампари",
+                  "amount": 30,
+                  "unit": "мл"
+                }
               ],
               "fields": {
                 "garnish": "Цедра апельсина",
@@ -507,20 +1034,40 @@
                 "method": "Stir"
               },
               "steps": [],
-              "tags": ["классика", "виски"],
+              "tags": [
+                "классика",
+                "виски"
+              ],
               "sort_order": 60,
               "is_active": true
             },
             {
               "id": "margarita",
               "name": "Margarita",
+              "short_description": null,
               "description": "Яркая цитрусовая классика с идеальным балансом кислого и сладкого.",
-              "photo_file_id": null,
+              "photo_file_id": "AgACAgIAAxkBAANxamu5HmFo-6MNotqmDtvyYLaLw4oAAjEeaxtKP1hL0gNzziRmZdEBAAMCAAN5AAM9BA",
               "ingredients": [
-                {"name": "Текила Ельхимадор Бьянко", "amount": 50, "unit": "мл"},
-                {"name": "Ликёр De Kyper (трипл-сек)", "amount": 25, "unit": "мл"},
-                {"name": "Monin Rancho-Lime", "amount": 30, "unit": "мл"},
-                {"name": "Сахарный сироп", "amount": 15, "unit": "мл"}
+                {
+                  "name": "Текила Ельхимадор Бьянко",
+                  "amount": 50,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Ликёр De Kyper (трипл-сек)",
+                  "amount": 25,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Monin Rancho-Lime",
+                  "amount": 30,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Сахарный сироп",
+                  "amount": 15,
+                  "unit": "мл"
+                }
               ],
               "fields": {
                 "garnish": "Колечко лайма, ободок бокала в соли",
@@ -529,19 +1076,36 @@
                 "method": "Shake"
               },
               "steps": [],
-              "tags": ["классика", "текила", "цитрусовый"],
+              "tags": [
+                "классика",
+                "текила",
+                "цитрусовый"
+              ],
               "sort_order": 70,
               "is_active": true
             },
             {
               "id": "aperol-spritz",
               "name": "Aperol Spritz",
+              "short_description": null,
               "description": "Лёгкий, игристый и невероятно летний коктейль.",
-              "photo_file_id": null,
+              "photo_file_id": "AgACAgIAAxkBAANpamu432YkKepRL-7e5ZZckGZDbAMAAiceaxtKP1hLorqC9yq7IQgBAAMCAAN5AAM9BA",
               "ingredients": [
-                {"name": "Апероль", "amount": 60, "unit": "мл"},
-                {"name": "Вода минеральная", "amount": 30, "unit": "мл"},
-                {"name": "Фризанте", "amount": 120, "unit": "мл"}
+                {
+                  "name": "Апероль",
+                  "amount": 60,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Вода минеральная",
+                  "amount": 30,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Фризанте",
+                  "amount": 120,
+                  "unit": "мл"
+                }
               ],
               "fields": {
                 "garnish": "Слайс апельсина",
@@ -550,7 +1114,10 @@
                 "method": "Build"
               },
               "steps": [],
-              "tags": ["классика", "игристое"],
+              "tags": [
+                "классика",
+                "игристое"
+              ],
               "sort_order": 80,
               "is_active": true
             }
@@ -567,14 +1134,35 @@
             {
               "id": "berry-bloom-na",
               "name": "Berry Bloom N/A",
+              "short_description": null,
               "description": "Безалкогольный фруктовый коктейль с ярким манго и цитрусами.",
               "photo_file_id": null,
               "ingredients": [
-                {"name": "Джин Whitley Neill N/A", "amount": 40, "unit": "мл"},
-                {"name": "Сок апельсиновый", "amount": 30, "unit": "мл"},
-                {"name": "Monin сироп персик", "amount": 25, "unit": "мл"},
-                {"name": "Фреш лимона", "amount": 35, "unit": "мл"},
-                {"name": "ODK пюре манго", "amount": 20, "unit": "мл"}
+                {
+                  "name": "Джин Whitley Neill N/A",
+                  "amount": 40,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Сок апельсиновый",
+                  "amount": 30,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Monin сироп персик",
+                  "amount": 25,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Фреш лимона",
+                  "amount": 35,
+                  "unit": "мл"
+                },
+                {
+                  "name": "ODK пюре манго",
+                  "amount": 20,
+                  "unit": "мл"
+                }
               ],
               "fields": {
                 "garnish": "Апельсиновая цедра на ободке бокала и цветок скабиозы — 1 шт.",
@@ -583,7 +1171,11 @@
                 "method": "Dry Shake → Shake"
               },
               "steps": [],
-              "tags": ["безалкогольный", "тропический", "цитрусовый"],
+              "tags": [
+                "безалкогольный",
+                "тропический",
+                "цитрусовый"
+              ],
               "sort_order": 10,
               "is_active": true
             }

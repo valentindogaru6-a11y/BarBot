@@ -117,7 +117,12 @@ def test_edits_category_name_without_changing_id(tmp_path: Path) -> None:
     )
 
     saved = asyncio.run(
-        service.update_category(ACTOR, "coffee", name="Кофейная карта")
+        service.update_category(
+            ACTOR,
+            "coffee",
+            name="Кофейная карта",
+            id="changed",
+        )
     )
 
     assert saved.categories[0].id == "coffee"
@@ -167,6 +172,36 @@ def test_creates_subcategory_and_rejects_duplicate_in_parent(
         )
 
 
+def test_edits_subcategory_name_without_changing_id(tmp_path: Path) -> None:
+    service, _, _ = _service(tmp_path)
+    asyncio.run(
+        service.create_category(
+            ACTOR,
+            Category(
+                id="coffee",
+                name="Кофе",
+                subcategories=[
+                    Subcategory(id="hot", name="Горячий кофе")
+                ],
+            ),
+        )
+    )
+
+    saved = asyncio.run(
+        service.update_subcategory(
+            ACTOR,
+            "coffee",
+            "hot",
+            name="Горячие напитки",
+            id="changed",
+        )
+    )
+
+    subcategory = saved.categories[0].subcategories[0]
+    assert subcategory.id == "hot"
+    assert subcategory.name == "Горячие напитки"
+
+
 def test_creates_and_edits_item_and_full_ingredients(tmp_path: Path) -> None:
     service, _, _ = _service(tmp_path)
     asyncio.run(
@@ -191,6 +226,7 @@ def test_creates_and_edits_item_and_full_ingredients(tmp_path: Path) -> None:
             None,
             "espresso",
             name="Двойной эспрессо",
+            id="changed",
             ingredients=[
                 {"name": "Кофе", "amount": 18, "unit": "г"},
                 {"name": "Вода", "amount": 36, "unit": "мл"},

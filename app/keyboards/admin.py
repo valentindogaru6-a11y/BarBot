@@ -91,3 +91,19 @@ def build_admin_back_keyboard() -> InlineKeyboardMarkup:
         callback_data=AdminPanelCallback(action="o"),
     )
     return builder.as_markup()
+
+
+def build_admin_item_missing_keyboard() -> InlineKeyboardMarkup:
+    """Offer safe navigation when an item changed before editor opening."""
+
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text="📚 Вернуться в каталог",
+        callback_data=MainCallback(action="catalog"),
+    )
+    builder.button(
+        text="🛠 Админ-панель",
+        callback_data=AdminPanelCallback(action="o"),
+    )
+    builder.adjust(1)
+    return builder.as_markup()

@@ -1,7 +1,6 @@
 """Administrator subcategory CRUD handlers."""
 
 import logging
-import re
 from html import escape
 
 from aiogram import F, Router
@@ -32,13 +31,17 @@ from app.keyboards.admin_catalog import (
     build_admin_subcategories_keyboard,
     build_admin_subcategory_actions,
 )
+from app.models.catalog_item import MAX_STABLE_ID_LENGTH
 from app.models.subcategory import Subcategory
 from app.services.admin_service import AdminService
 from app.services.auth_service import AuthService
+from app.services.stable_id import (
+    StableIdGenerationError,
+    generate_stable_id,
+)
 
 router = Router(name=__name__)
 logger = logging.getLogger(__name__)
-ID_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,17}$")
 
 
 def _text(category_id: str, subcategory: Subcategory) -> str:
@@ -158,33 +161,14 @@ async def subcategory_create_start(
 ) -> None:
     if not await require_admin_callback(callback, auth_service):
         return
-    await state.set_state(CreateSubcategoryStates.stable_id)
+    await state.set_state(CreateSubcategoryStates.name)
     await state.set_data({"category_id": callback_data.category_id})
     if isinstance(callback.message, Message):
         await edit_or_send_text(
             callback.message,
-            f"{ADMIN_HEADER}\n\nВведите стабильный ID подраздела:",
+            f"{ADMIN_HEADER}\n\nВведите название подраздела:",
             build_admin_cancel_keyboard(),
         )
-
-
-@router.message(CreateSubcategoryStates.stable_id)
-async def subcategory_create_id(
-    message: Message,
-    state: FSMContext,
-    auth_service: AuthService,
-) -> None:
-    if not await require_admin_message(message, auth_service):
-        return
-    value = (message.text or "").strip()
-    if not ID_PATTERN.fullmatch(value):
-        await message.answer(
-            "ID: 1–18 символов, начинается с буквы, только a-z, 0-9 и _."
-        )
-        return
-    await state.update_data(stable_id=value)
-    await state.set_state(CreateSubcategoryStates.name)
-    await message.answer("Введите название:", reply_markup=build_admin_cancel_keyboard())
 
 
 @router.message(CreateSubcategoryStates.name)
@@ -192,6 +176,7 @@ async def subcategory_create_name(
     message: Message,
     state: FSMContext,
     auth_service: AuthService,
+    admin_service: AdminService,
 ) -> None:
     if not await require_admin_message(message, auth_service):
         return
@@ -199,7 +184,19 @@ async def subcategory_create_name(
     if not value:
         await message.answer("Название не может быть пустым.")
         return
-    await state.update_data(name=value)
+    data = await state.get_data()
+    catalog = await admin_service.get_catalog()
+    category = AdminService._category(catalog, data["category_id"])
+    try:
+        stable_id = generate_stable_id(
+            value,
+            {entry.id for entry in category.subcategories},
+            MAX_STABLE_ID_LENGTH,
+        )
+    except StableIdGenerationError as exc:
+        await message.answer(str(exc))
+        return
+    await state.update_data(name=value, stable_id=stable_id)
     await state.set_state(CreateSubcategoryStates.emoji)
     await message.answer("Введите emoji или -:", reply_markup=build_admin_cancel_keyboard())
 
@@ -282,8 +279,18 @@ async def subcategory_create_confirm(
         return
     data = await state.get_data()
     try:
+        catalog = await admin_service.get_catalog()
+        category = AdminService._category(
+            catalog,
+            callback_data.category_id,
+        )
+        stable_id = generate_stable_id(
+            data["name"],
+            {entry.id for entry in category.subcategories},
+            MAX_STABLE_ID_LENGTH,
+        )
         subcategory = Subcategory(
-            id=data["stable_id"],
+            id=stable_id,
             name=data["name"],
             emoji=data.get("emoji"),
             description=data.get("description"),

@@ -7,6 +7,7 @@ from typing import TypeVar
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.keyboards.admin_callbacks import AdminItemCallback
 from app.keyboards.callbacks import (
     CategoryCallback,
     ItemCallback,
@@ -21,6 +22,7 @@ from app.models.subcategory import Subcategory
 from app.services.search_service import SearchResult
 
 PAGE_SIZE = 8
+ITEMS_SINGLE_PAGE_LIMIT = 90
 T = TypeVar("T")
 
 
@@ -167,9 +169,15 @@ def build_items_keyboard(
     page: int = 0,
     subcategory: Subcategory | None = None,
 ) -> InlineKeyboardMarkup:
-    """Build one item page for a category or subcategory."""
+    """Build an item list, paginating only above the safe button limit."""
 
-    page_items, safe_page, total_pages = paginate(items, page)
+    use_pagination = len(items) > ITEMS_SINGLE_PAGE_LIMIT
+    if use_pagination:
+        page_items, safe_page, total_pages = paginate(items, page)
+    else:
+        page_items = list(items)
+        safe_page = 0
+        total_pages = 1
     subcategory_id = subcategory.id if subcategory else "_"
     builder = InlineKeyboardBuilder()
     for item in page_items:
@@ -182,14 +190,15 @@ def build_items_keyboard(
             ),
         )
     builder.adjust(1)
-    _add_pagination_row(
-        builder,
-        section="items",
-        page=safe_page,
-        total_pages=total_pages,
-        category_id=category.id,
-        subcategory_id=subcategory_id,
-    )
+    if use_pagination:
+        _add_pagination_row(
+            builder,
+            section="items",
+            page=safe_page,
+            total_pages=total_pages,
+            category_id=category.id,
+            subcategory_id=subcategory_id,
+        )
     if subcategory is not None:
         back_text = "⬅️ К подкатегориям"
         back_callback = CategoryCallback(category_id=category.id).pack()
@@ -214,10 +223,25 @@ def build_items_keyboard(
 def build_item_keyboard(
     category_id: str,
     subcategory_id: str | None = None,
+    *,
+    item_id: str | None = None,
+    is_admin: bool = False,
 ) -> InlineKeyboardMarkup:
     """Build navigation shown below a regular item card."""
 
     builder = InlineKeyboardBuilder()
+    if is_admin and item_id is not None:
+        builder.row(
+            InlineKeyboardButton(
+                text="✏️ Редактировать карточку",
+                callback_data=AdminItemCallback(
+                    action="o",
+                    category_id=category_id,
+                    item_id=item_id,
+                    subcategory_id=subcategory_id or "_",
+                ).pack(),
+            )
+        )
     if subcategory_id is None:
         list_callback = CategoryCallback(category_id=category_id).pack()
     else:

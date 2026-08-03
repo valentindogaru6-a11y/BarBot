@@ -41,7 +41,11 @@ async def edit_or_send_text(
 ) -> None:
     """Edit a bot text message when possible, otherwise send a new one."""
 
-    if message.photo:
+    if (
+        message.photo
+        or message.from_user is None
+        or not message.from_user.is_bot
+    ):
         await message.answer(text, reply_markup=reply_markup)
         return
 

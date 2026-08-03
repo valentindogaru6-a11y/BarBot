@@ -5,6 +5,8 @@ from pathlib import Path
 
 from aiogram import F, Router
 from aiogram.exceptions import TelegramAPIError
+from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from app.handlers.common import (
@@ -26,6 +28,7 @@ from app.keyboards.catalog import (
     build_subcategories_keyboard,
 )
 from app.keyboards.main_menu import build_main_menu_keyboard
+from app.services.auth_service import AuthService
 from app.services.catalog_service import CatalogService
 from app.storage.json_storage import CatalogStorageError
 from app.utils.formatting import (
@@ -171,6 +174,8 @@ async def _show_item(
     category_id: str,
     item_id: str,
     subcategory_id: str | None = None,
+    *,
+    is_admin: bool = False,
 ) -> None:
     try:
         service = CatalogService(load_catalog(catalog_path))
@@ -215,7 +220,12 @@ async def _show_item(
         return
 
     card = format_item_card(item)
-    keyboard = build_item_keyboard(category.id, subcategory_id)
+    keyboard = build_item_keyboard(
+        category.id,
+        subcategory_id,
+        item_id=item.id,
+        is_admin=is_admin,
+    )
     if not item.photo_file_id:
         await edit_or_send_text(message, card, keyboard)
         return
@@ -239,6 +249,18 @@ async def _show_item(
             exc,
         )
         await edit_or_send_text(message, card, keyboard)
+
+
+@router.message(Command("catalog"))
+async def handle_catalog_command(
+    message: Message,
+    state: FSMContext,
+    catalog_path: Path,
+) -> None:
+    """Open the catalog from the Telegram commands menu."""
+
+    await state.clear()
+    await _show_catalog(message, catalog_path)
 
 
 @router.callback_query(MainCallback.filter(F.action == "catalog"))
@@ -359,6 +381,7 @@ async def handle_item(
     callback: CallbackQuery,
     callback_data: ItemCallback,
     catalog_path: Path,
+    auth_service: AuthService,
 ) -> None:
     """Show a universal item card."""
 
@@ -374,4 +397,5 @@ async def handle_item(
                 if callback_data.subcategory_id == "_"
                 else callback_data.subcategory_id
             ),
+            is_admin=auth_service.is_admin(callback.from_user.id),
         )

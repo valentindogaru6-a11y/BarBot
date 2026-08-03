@@ -1,7 +1,6 @@
 """Administrator category CRUD handlers."""
 
 import logging
-import re
 from html import escape
 
 from aiogram import F, Router
@@ -33,13 +32,17 @@ from app.keyboards.admin_catalog import (
     build_admin_categories_keyboard,
     build_admin_category_actions,
 )
+from app.models.catalog_item import MAX_STABLE_ID_LENGTH
 from app.models.category import Category
 from app.services.admin_service import AdminService, AdminServiceError
 from app.services.auth_service import AuthService
+from app.services.stable_id import (
+    StableIdGenerationError,
+    generate_stable_id,
+)
 
 router = Router(name=__name__)
 logger = logging.getLogger(__name__)
-ID_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,17}$")
 
 
 def _category_text(category: Category) -> str:
@@ -128,32 +131,13 @@ async def handle_category_create_start(
     if not await require_admin_callback(callback, auth_service):
         return
     await state.clear()
-    await state.set_state(CreateCategoryStates.stable_id)
+    await state.set_state(CreateCategoryStates.name)
     if isinstance(callback.message, Message):
         await edit_or_send_text(
             callback.message,
-            f"{ADMIN_HEADER}\n\nВведите стабильный ID раздела:",
+            f"{ADMIN_HEADER}\n\nВведите название раздела:",
             build_admin_cancel_keyboard(),
         )
-
-
-@router.message(CreateCategoryStates.stable_id)
-async def category_create_id(
-    message: Message,
-    state: FSMContext,
-    auth_service: AuthService,
-) -> None:
-    if not await require_admin_message(message, auth_service):
-        return
-    value = (message.text or "").strip()
-    if not ID_PATTERN.fullmatch(value):
-        await message.answer(
-            "ID: 1–18 символов, начинается с буквы, только a-z, 0-9 и _."
-        )
-        return
-    await state.update_data(stable_id=value)
-    await state.set_state(CreateCategoryStates.name)
-    await message.answer("Введите название:", reply_markup=build_admin_cancel_keyboard())
 
 
 @router.message(CreateCategoryStates.name)
@@ -161,6 +145,7 @@ async def category_create_name(
     message: Message,
     state: FSMContext,
     auth_service: AuthService,
+    admin_service: AdminService,
 ) -> None:
     if not await require_admin_message(message, auth_service):
         return
@@ -168,7 +153,17 @@ async def category_create_name(
     if not value:
         await message.answer("Название не может быть пустым.")
         return
-    await state.update_data(name=value)
+    catalog = await admin_service.get_catalog()
+    try:
+        stable_id = generate_stable_id(
+            value,
+            {category.id for category in catalog.categories},
+            MAX_STABLE_ID_LENGTH,
+        )
+    except StableIdGenerationError as exc:
+        await message.answer(str(exc))
+        return
+    await state.update_data(name=value, stable_id=stable_id)
     await state.set_state(CreateCategoryStates.emoji)
     await message.answer("Введите emoji или -:", reply_markup=build_admin_cancel_keyboard())
 
@@ -247,8 +242,14 @@ async def category_create_confirm(
         return
     data = await state.get_data()
     try:
+        catalog = await admin_service.get_catalog()
+        stable_id = generate_stable_id(
+            data["name"],
+            {category.id for category in catalog.categories},
+            MAX_STABLE_ID_LENGTH,
+        )
         category = Category(
-            id=data["stable_id"],
+            id=stable_id,
             name=data["name"],
             emoji=data.get("emoji"),
             description=data.get("description"),
@@ -258,7 +259,12 @@ async def category_create_confirm(
             actor_from_user(callback.from_user),
             category,
         )
-    except (AdminServiceError, ValidationError, KeyError):
+    except (
+        AdminServiceError,
+        StableIdGenerationError,
+        ValidationError,
+        KeyError,
+    ):
         logger.exception("Could not create category")
         if isinstance(callback.message, Message):
             await callback.message.answer("⚠️ Не удалось сохранить изменения")

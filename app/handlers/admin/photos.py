@@ -12,7 +12,7 @@ from app.handlers.admin.common import (
     require_admin_callback,
     require_admin_message,
 )
-from app.handlers.admin.items import _show_item, _sub_id
+from app.handlers.admin.items import _sub_id, show_item_editor
 from app.handlers.admin.states import CreateItemStates, ReplacePhotoStates
 from app.handlers.common import edit_or_send_text
 from app.keyboards.admin import (
@@ -99,7 +99,7 @@ async def replace_photo_confirm(
     await state.clear()
     if isinstance(callback.message, Message):
         await callback.message.answer("✅ Изменения сохранены")
-        await _show_item(
+        await show_item_editor(
             callback.message,
             admin_service,
             data["category_id"],
@@ -152,7 +152,7 @@ async def delete_photo_confirm(
             await callback.message.answer("⚠️ Не удалось сохранить изменения")
         return
     if isinstance(callback.message, Message):
-        await _show_item(
+        await show_item_editor(
             callback.message,
             admin_service,
             callback_data.category_id,

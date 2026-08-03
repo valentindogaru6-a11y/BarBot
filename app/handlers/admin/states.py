@@ -4,7 +4,6 @@ from aiogram.fsm.state import State, StatesGroup
 
 
 class CreateCategoryStates(StatesGroup):
-    stable_id = State()
     name = State()
     emoji = State()
     description = State()
@@ -17,7 +16,6 @@ class EditCategoryStates(StatesGroup):
 
 
 class CreateSubcategoryStates(StatesGroup):
-    stable_id = State()
     name = State()
     emoji = State()
     description = State()
@@ -30,7 +28,6 @@ class EditSubcategoryStates(StatesGroup):
 
 
 class CreateItemStates(StatesGroup):
-    stable_id = State()
     name = State()
     short_description = State()
     description = State()

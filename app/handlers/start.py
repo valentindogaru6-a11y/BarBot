@@ -17,8 +17,18 @@ router = Router(name=__name__)
 logger = logging.getLogger(__name__)
 
 WELCOME_TEXT = (
-    "<b>BarBot</b>\n\n"
-    "Справочник для сотрудников бара. Выберите нужный раздел:"
+    "🍸 <b>BarBot</b>\n\n"
+    "Быстрый справочник для команды бара. Здесь можно открыть "
+    "технологические карты и найти позицию по названию, ингредиенту "
+    "или тегу.\n\n"
+    "Выберите действие:"
+)
+HELP_TEXT = (
+    "<b>Помощь</b>\n\n"
+    "Используйте inline-кнопки под сообщениями для всей навигации.\n\n"
+    "📚 <b>Каталог</b> — категории, разделы и карточки позиций.\n"
+    "🔍 <b>Поиск</b> — поиск по названию, ингредиенту или тегу.\n\n"
+    "Основные команды также доступны через встроенное меню Telegram."
 )
 
 
@@ -46,6 +56,29 @@ async def handle_myid(message: Message) -> None:
 
     if message.from_user is not None:
         await message.answer(f"Ваш Telegram ID: <code>{message.from_user.id}</code>")
+
+
+@router.message(Command("help"))
+async def handle_help(
+    message: Message,
+    state: FSMContext,
+    auth_service: AuthService,
+) -> None:
+    """Show concise usage help and the role-aware main menu."""
+
+    await state.clear()
+    user = message.from_user
+    is_admin = bool(user and auth_service.is_admin(user.id))
+    text = HELP_TEXT
+    if is_admin:
+        text += (
+            "\n\n🛠 <b>Управление каталогом</b> доступно "
+            "администраторам."
+        )
+    await message.answer(
+        text,
+        reply_markup=build_main_menu_keyboard(is_admin=is_admin),
+    )
 
 
 @router.callback_query(MainCallback.filter(F.action == "home"))

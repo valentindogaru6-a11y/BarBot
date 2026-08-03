@@ -38,11 +38,17 @@ def test_imported_catalog_counts(imported_catalog: Catalog) -> None:
     }
 
 
-def test_every_imported_item_has_no_photo(imported_catalog: Catalog) -> None:
-    assert all(
-        item.photo_file_id is None
+def test_imported_catalog_keeps_existing_photos(
+    imported_catalog: Catalog,
+) -> None:
+    photo_ids = [
+        item.photo_file_id
         for item in _all_items(imported_catalog)
-    )
+        if item.photo_file_id is not None
+    ]
+
+    assert photo_ids
+    assert all(photo_id.strip() for photo_id in photo_ids)
 
 
 def test_all_catalog_ids_are_globally_unique(
@@ -61,6 +67,47 @@ def test_all_catalog_ids_are_globally_unique(
         )
 
     assert len(ids) == len(set(ids))
+
+
+def test_existing_imported_ids_remain_unchanged(
+    imported_catalog: Catalog,
+) -> None:
+    category = imported_catalog.categories[0]
+    assert category.id == "cocktails"
+    assert {
+        subcategory.id: [item.id for item in subcategory.items]
+        for subcategory in category.subcategories
+    } == {
+        "signature": [
+            "gin-tonic-yuzu",
+            "kamanin-tigress",
+            "pornstar-girl",
+            "pornstar-boy",
+            "pornstar-strawb",
+            "cryptocurrency",
+            "kiss-me",
+            "kiwi-punch",
+            "black-hive",
+            "mango-sayer",
+            "basil-smash",
+            "butterfly",
+            "allure",
+            "huddart-smoky",
+            "ultimo-turno",
+        ],
+        "classic": [
+            "cosmopolitan",
+            "whiskey-sour",
+            "gin-sour",
+            "old-fashioned",
+            "negroni",
+            "boulevardier",
+            "margarita",
+            "aperol-spritz",
+        ],
+        "non_alcoholic": ["berry-bloom-na"],
+        "methods": [],
+    }
 
 
 def test_demo_item_was_removed(imported_catalog: Catalog) -> None:

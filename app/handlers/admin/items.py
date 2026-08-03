@@ -1,7 +1,6 @@
 """Administrator item creation, editing, moving, and deletion."""
 
 import logging
-import re
 from html import escape
 
 from aiogram import F, Router
@@ -22,6 +21,7 @@ from app.handlers.admin.states import (
 from app.handlers.common import edit_or_send_text
 from app.keyboards.admin import (
     build_admin_confirm_keyboard,
+    build_admin_item_missing_keyboard,
     build_admin_wizard_keyboard,
 )
 from app.keyboards.admin_callbacks import (
@@ -36,21 +36,25 @@ from app.keyboards.admin_catalog import (
     build_admin_items_keyboard,
     build_admin_placement_keyboard,
 )
-from app.models.catalog_item import CatalogItem
+from app.models.catalog_item import CatalogItem, MAX_STABLE_ID_LENGTH
 from app.services.admin_service import (
     AdminInputError,
     AdminService,
+    ObjectChangedError,
     parse_fields,
     parse_ingredients,
     parse_steps,
     parse_tags,
 )
 from app.services.auth_service import AuthService
+from app.services.stable_id import (
+    StableIdGenerationError,
+    generate_stable_id,
+)
 from app.utils.formatting import format_item_card
 
 router = Router(name=__name__)
 logger = logging.getLogger(__name__)
-ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_-]{0,17}$")
 
 
 def _sub_id(value: str) -> str | None:
@@ -66,8 +70,6 @@ def _item_from_catalog(
     items = AdminService._items(catalog, category_id, subcategory_id)
     item = next((entry for entry in items if entry.id == item_id), None)
     if item is None:
-        from app.services.admin_service import ObjectChangedError
-
         raise ObjectChangedError("Позиция уже удалена или изменена")
     return item
 
@@ -84,25 +86,36 @@ def _item_admin_text(item: CatalogItem) -> str:
     )
 
 
-async def _show_item(
+async def show_item_editor(
     message: Message,
     service: AdminService,
     category_id: str,
     subcategory_id: str | None,
     item_id: str,
-) -> None:
+) -> bool:
     catalog = await service.get_catalog()
-    item = _item_from_catalog(
-        catalog,
-        category_id,
-        subcategory_id,
-        item_id,
-    )
+    try:
+        item = _item_from_catalog(
+            catalog,
+            category_id,
+            subcategory_id,
+            item_id,
+        )
+    except ObjectChangedError:
+        await edit_or_send_text(
+            message,
+            f"{ADMIN_HEADER}\n\n"
+            "Позиция была удалена или перемещена и больше недоступна "
+            "по этой ссылке.",
+            build_admin_item_missing_keyboard(),
+        )
+        return False
     await edit_or_send_text(
         message,
         _item_admin_text(item),
         build_admin_item_actions(category_id, subcategory_id, item),
     )
+    return True
 
 
 async def _show_items(
@@ -202,7 +215,7 @@ async def item_open(
     if not await require_admin_callback(callback, auth_service):
         return
     if isinstance(callback.message, Message):
-        await _show_item(
+        await show_item_editor(
             callback.message,
             admin_service,
             callback_data.category_id,
@@ -257,7 +270,7 @@ async def item_toggle(
             callback_data.item_id,
         )
         if isinstance(callback.message, Message):
-            await _show_item(
+            await show_item_editor(
                 callback.message,
                 admin_service,
                 callback_data.category_id,
@@ -331,7 +344,7 @@ async def item_create_start(
 ) -> None:
     if not await require_admin_callback(callback, auth_service):
         return
-    await state.set_state(CreateItemStates.stable_id)
+    await state.set_state(CreateItemStates.name)
     await state.set_data(
         {
             "category_id": callback_data.category_id,
@@ -341,28 +354,9 @@ async def item_create_start(
     if isinstance(callback.message, Message):
         await edit_or_send_text(
             callback.message,
-            f"{ADMIN_HEADER}\n\nВведите стабильный ID позиции:",
+            f"{ADMIN_HEADER}\n\nВведите название позиции:",
             build_admin_wizard_keyboard(False),
         )
-
-
-@router.message(CreateItemStates.stable_id)
-async def create_item_id(
-    message: Message,
-    state: FSMContext,
-    auth_service: AuthService,
-) -> None:
-    if not await require_admin_message(message, auth_service):
-        return
-    value = (message.text or "").strip()
-    if not ID_PATTERN.fullmatch(value):
-        await message.answer(
-            "ID: 1–18 символов, lowercase ASCII, цифры, _ и -."
-        )
-        return
-    await state.update_data(stable_id=value)
-    await state.set_state(CreateItemStates.name)
-    await message.answer("Введите название:", reply_markup=build_admin_wizard_keyboard())
 
 
 @router.message(CreateItemStates.name)
@@ -370,6 +364,7 @@ async def create_item_name(
     message: Message,
     state: FSMContext,
     auth_service: AuthService,
+    admin_service: AdminService,
 ) -> None:
     if not await require_admin_message(message, auth_service):
         return
@@ -377,7 +372,23 @@ async def create_item_name(
     if not value:
         await message.answer("Название не может быть пустым.")
         return
-    await state.update_data(name=value)
+    data = await state.get_data()
+    catalog = await admin_service.get_catalog()
+    items = AdminService._items(
+        catalog,
+        data["category_id"],
+        data.get("subcategory_id"),
+    )
+    try:
+        stable_id = generate_stable_id(
+            value,
+            {item.id for item in items},
+            MAX_STABLE_ID_LENGTH,
+        )
+    except StableIdGenerationError as exc:
+        await message.answer(str(exc))
+        return
+    await state.update_data(name=value, stable_id=stable_id)
     await state.set_state(CreateItemStates.short_description)
     await message.answer(
         "Введите краткое описание или -:",
@@ -658,6 +669,7 @@ async def create_item_active(
     await state.set_state(CreateItemStates.confirm)
     await message.answer(
         f"{ADMIN_HEADER}\n\n👀 Предпросмотр:\n\n{format_item_card(item)}\n\n"
+        f"<b>Технический ID:</b> {item.id}\n\n"
         "Сохранить позицию?",
         reply_markup=build_admin_confirm_keyboard(
             action="sv",
@@ -694,7 +706,18 @@ async def create_item_save(
         return
     data = await state.get_data()
     try:
-        item = _build_item(data)
+        catalog = await admin_service.get_catalog()
+        items = AdminService._items(
+            catalog,
+            data["category_id"],
+            data.get("subcategory_id"),
+        )
+        stable_id = generate_stable_id(
+            data["name"],
+            {item.id for item in items},
+            MAX_STABLE_ID_LENGTH,
+        )
+        item = _build_item({**data, "stable_id": stable_id})
         await admin_service.create_item(
             actor_from_user(callback.from_user),
             data["category_id"],
@@ -828,7 +851,7 @@ async def _save_item_field(
         return
     await state.clear()
     await message.answer("✅ Изменения сохранены")
-    await _show_item(
+    await show_item_editor(
         message,
         admin_service,
         data["category_id"],
@@ -862,7 +885,7 @@ async def item_edit_confirm(
         return
     await state.clear()
     if isinstance(callback.message, Message):
-        await _show_item(
+        await show_item_editor(
             callback.message,
             admin_service,
             data["category_id"],
@@ -977,7 +1000,7 @@ async def item_move_confirm(
         return
     await state.clear()
     if isinstance(callback.message, Message):
-        await _show_item(
+        await show_item_editor(
             callback.message,
             admin_service,
             data["target_category_id"],

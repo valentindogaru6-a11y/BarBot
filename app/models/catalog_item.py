@@ -5,12 +5,13 @@ from typing import Annotated, Any
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 NonEmptyString = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+MAX_STABLE_ID_LENGTH = 18
 StableId = Annotated[
     str,
     StringConstraints(
         strip_whitespace=True,
         min_length=1,
-        max_length=18,
+        max_length=MAX_STABLE_ID_LENGTH,
         pattern=r"^[a-z0-9][a-z0-9_-]*$",
     ),
 ]

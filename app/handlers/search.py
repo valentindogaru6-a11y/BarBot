@@ -49,6 +49,17 @@ async def _start_search(message: Message, state: FSMContext) -> None:
     )
 
 
+@router.message(Command("search"))
+async def handle_search_command(
+    message: Message,
+    state: FSMContext,
+) -> None:
+    """Open search from the Telegram commands menu."""
+
+    await state.clear()
+    await _start_search(message, state)
+
+
 @router.callback_query(MainCallback.filter(F.action == "search"))
 async def handle_search_start(
     callback: CallbackQuery,
