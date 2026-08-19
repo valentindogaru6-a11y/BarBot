@@ -18,6 +18,7 @@ from app.keyboards.user_callbacks import (
     UserViewCallback,
 )
 from app.models.user import Role, UserRecord
+from app.utils.button_labels import user_button_label
 
 ROLE_LABELS = {
     Role.SUPER_ADMIN: "👑 Super Admin",
@@ -113,11 +114,6 @@ def build_user_cancel_keyboard() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def _user_label(user: UserRecord, role: Role) -> str:
-    username = f" @{user.username}" if user.username else ""
-    return f"{user.display_name}{username} · {ROLE_LABELS[role]}"[:64]
-
-
 def build_users_list_keyboard(
     users: list[tuple[UserRecord, Role]],
     *,
@@ -126,9 +122,9 @@ def build_users_list_keyboard(
     total_pages: int,
 ) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    for user, effective_role in users:
+    for user, _effective_role in users:
         builder.button(
-            text=_user_label(user, effective_role),
+            text=user_button_label(user.display_name, user.username),
             callback_data=UserViewCallback(
                 user_id=user.telegram_user_id,
                 role=role,

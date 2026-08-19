@@ -155,7 +155,7 @@ async def _show_subcategory(
         return
 
     items = service.get_active_items(category.id, subcategory.id)
-    text = format_subcategory_heading(subcategory)
+    text = format_subcategory_heading(subcategory, category)
     text += "\n\nВыберите позицию:"
     if not items:
         text += "\nВ этом разделе пока нет активных позиций."

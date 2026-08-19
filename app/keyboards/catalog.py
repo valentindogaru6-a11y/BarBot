@@ -20,6 +20,12 @@ from app.models.catalog_item import CatalogItem
 from app.models.category import Category
 from app.models.subcategory import Subcategory
 from app.services.search_service import SearchResult
+from app.utils.button_labels import (
+    category_button_label,
+    item_button_labels,
+    search_result_button_labels,
+    subcategory_button_label,
+)
 
 PAGE_SIZE = 8
 ITEMS_SINGLE_PAGE_LIMIT = 90
@@ -103,9 +109,8 @@ def build_categories_keyboard(
     page_items, safe_page, total_pages = paginate(categories, page)
     builder = InlineKeyboardBuilder()
     for category in page_items:
-        emoji = f"{category.emoji.strip()} " if category.emoji else ""
         builder.button(
-            text=f"{emoji}{category.name}",
+            text=category_button_label(category.name, category.emoji),
             callback_data=CategoryCallback(category_id=category.id),
         )
     builder.adjust(1)
@@ -134,9 +139,11 @@ def build_subcategories_keyboard(
     page_items, safe_page, total_pages = paginate(subcategories, page)
     builder = InlineKeyboardBuilder()
     for subcategory in page_items:
-        emoji = f"{subcategory.emoji.strip()} " if subcategory.emoji else ""
         builder.button(
-            text=f"{emoji}{subcategory.name}",
+            text=subcategory_button_label(
+                subcategory.name,
+                subcategory.emoji,
+            ),
             callback_data=SubcategoryCallback(
                 category_id=category.id,
                 subcategory_id=subcategory.id,
@@ -182,9 +189,10 @@ def build_items_keyboard(
         total_pages = 1
     subcategory_id = subcategory.id if subcategory else "_"
     builder = InlineKeyboardBuilder()
-    for item in page_items:
+    labels = item_button_labels([item.name for item in page_items])
+    for item, label in zip(page_items, labels, strict=True):
         builder.button(
-            text=item.name,
+            text=label,
             callback_data=ItemCallback(
                 category_id=category.id,
                 item_id=item.id,
@@ -272,23 +280,10 @@ def build_search_results_keyboard(
     """Build search-result buttons with category context."""
 
     builder = InlineKeyboardBuilder()
-    for result in results:
-        category_prefix = (
-            f"{result.category.emoji} " if result.category.emoji else ""
-        )
-        section_text = f"{category_prefix}{result.category.name}"
-        if result.subcategory is not None:
-            subcategory_prefix = (
-                f"{result.subcategory.emoji} "
-                if result.subcategory.emoji
-                else ""
-            )
-            section_text += (
-                f" / {subcategory_prefix}{result.subcategory.name}"
-            )
-        button_text = f"{section_text} · {result.item.name}"
+    labels = search_result_button_labels(results)
+    for result, label in zip(results, labels, strict=True):
         builder.button(
-            text=button_text[:64],
+            text=label,
             callback_data=ItemCallback(
                 category_id=result.category.id,
                 item_id=result.item.id,

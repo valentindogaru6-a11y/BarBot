@@ -16,12 +16,7 @@ from app.keyboards.catalog import paginate
 from app.models.catalog_item import CatalogItem
 from app.models.category import Category
 from app.models.subcategory import Subcategory
-
-
-def _label(name: str, is_active: bool, emoji: str | None = None) -> str:
-    prefix = f"{emoji} " if emoji else ""
-    hidden = "" if is_active else " [скрыто]"
-    return f"{prefix}{name}{hidden}"
+from app.utils.button_labels import admin_entity_button_labels
 
 
 def _add_filters(
@@ -113,9 +108,15 @@ def build_admin_categories_keyboard(
 ) -> InlineKeyboardMarkup:
     page_items, safe_page, total_pages = paginate(categories, page)
     builder = InlineKeyboardBuilder()
-    for category in page_items:
+    labels = admin_entity_button_labels(
+        [
+            (category.name, category.is_active, category.emoji)
+            for category in page_items
+        ]
+    )
+    for category, label in zip(page_items, labels, strict=True):
         builder.button(
-            text=_label(category.name, category.is_active, category.emoji),
+            text=label,
             callback_data=AdminCategoryCallback(
                 action="o",
                 category_id=category.id,
@@ -177,7 +178,13 @@ def build_admin_category_picker(
     target: str,
 ) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    for category in categories:
+    labels = admin_entity_button_labels(
+        [
+            (category.name, category.is_active, category.emoji)
+            for category in categories
+        ]
+    )
+    for category, label in zip(categories, labels, strict=True):
         if target == "s":
             callback = AdminSubcategoryCallback(
                 action="l",
@@ -195,7 +202,7 @@ def build_admin_category_picker(
                 category_id=category.id,
             )
         builder.button(
-            text=_label(category.name, category.is_active, category.emoji),
+            text=label,
             callback_data=callback,
         )
     builder.button(
@@ -214,13 +221,19 @@ def build_admin_subcategories_keyboard(
 ) -> InlineKeyboardMarkup:
     page_items, safe_page, total_pages = paginate(subcategories, page)
     builder = InlineKeyboardBuilder()
-    for subcategory in page_items:
-        builder.button(
-            text=_label(
+    labels = admin_entity_button_labels(
+        [
+            (
                 subcategory.name,
                 subcategory.is_active,
                 subcategory.emoji,
-            ),
+            )
+            for subcategory in page_items
+        ]
+    )
+    for subcategory, label in zip(page_items, labels, strict=True):
+        builder.button(
+            text=label,
             callback_data=AdminSubcategoryCallback(
                 action="o",
                 category_id=category.id,
@@ -300,13 +313,23 @@ def build_admin_placement_keyboard(
                 item_id=item_id,
             ),
         )
-    for subcategory in category.subcategories:
-        builder.button(
-            text=_label(
+    labels = admin_entity_button_labels(
+        [
+            (
                 subcategory.name,
                 subcategory.is_active,
                 subcategory.emoji,
-            ),
+            )
+            for subcategory in category.subcategories
+        ]
+    )
+    for subcategory, label in zip(
+        category.subcategories,
+        labels,
+        strict=True,
+    ):
+        builder.button(
+            text=label,
             callback_data=AdminItemCallback(
                 action=action,
                 category_id=category.id,
@@ -332,9 +355,12 @@ def build_admin_items_keyboard(
     page_items, safe_page, total_pages = paginate(items, page)
     sub_id = subcategory_id or "_"
     builder = InlineKeyboardBuilder()
-    for item in page_items:
+    labels = admin_entity_button_labels(
+        [(item.name, item.is_active, None) for item in page_items]
+    )
+    for item, label in zip(page_items, labels, strict=True):
         builder.button(
-            text=_label(item.name, item.is_active),
+            text=label,
             callback_data=AdminItemCallback(
                 action="o",
                 category_id=category_id,

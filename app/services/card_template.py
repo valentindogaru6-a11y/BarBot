@@ -28,6 +28,7 @@ SECTION_ORDER = (
     "fields",
     "steps",
     "tags",
+    "voice_aliases",
     "sort_order",
     "is_active",
 )
@@ -40,6 +41,7 @@ SECTION_TITLES = {
     "fields": "ХАРАКТЕРИСТИКИ",
     "steps": "ПРИГОТОВЛЕНИЕ",
     "tags": "ТЕГИ",
+    "voice_aliases": "ГОЛОСОВЫЕ АЛИАСЫ",
     "sort_order": "ПОРЯДОК",
     "is_active": "АКТИВНА",
 }
@@ -69,6 +71,7 @@ _EMPTY_PLACEHOLDERS = {
     "fields": "ключ | значение",
     "steps": "Один шаг на строку",
     "tags": "тег1, тег2",
+    "voice_aliases": "Один алиас на строку",
 }
 
 
@@ -92,6 +95,7 @@ class ParsedItemUpdate(BaseModel):
     fields: dict[str, str] = Field(default_factory=dict)
     steps: list[str] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
+    voice_aliases: list[str] = Field(default_factory=list)
     sort_order: int = 0
     is_active: bool = True
 
@@ -137,6 +141,7 @@ def serialize_item_template(item: CatalogItem) -> str:
     ) or "-"
     steps = "\n".join(item.steps) or "-"
     tags = ", ".join(item.tags) or "-"
+    voice_aliases = "\n".join(item.voice_aliases) or "-"
     active = "да" if item.is_active else "нет"
 
     return (
@@ -147,6 +152,7 @@ def serialize_item_template(item: CatalogItem) -> str:
         f"ХАРАКТЕРИСТИКИ:\n{fields}\n\n"
         f"ПРИГОТОВЛЕНИЕ:\n{steps}\n\n"
         f"ТЕГИ:\n{tags}\n\n"
+        f"ГОЛОСОВЫЕ АЛИАСЫ:\n{voice_aliases}\n\n"
         f"ПОРЯДОК:\n{item.sort_order}\n\n"
         f"АКТИВНА:\n{active}"
     )
@@ -163,6 +169,7 @@ def empty_item_template() -> str:
         "ХАРАКТЕРИСТИКИ:\nключ | значение\n\n"
         "ПРИГОТОВЛЕНИЕ:\nОдин шаг на строку\n\n"
         "ТЕГИ:\nтег1, тег2\n\n"
+        "ГОЛОСОВЫЕ АЛИАСЫ:\nОдин алиас на строку\n\n"
         "ПОРЯДОК:\n1\n\n"
         "АКТИВНА:\nда"
     )
@@ -291,6 +298,13 @@ def parse_item_template(text: str) -> ParsedItemUpdate:
         raw_tags = "-"
     values["steps"] = parse_steps(raw_steps)
     values["tags"] = parse_tags(raw_tags)
+    raw_voice_aliases = _section_text(sections.get("voice_aliases", []))
+    if (
+        raw_voice_aliases.casefold()
+        == _EMPTY_PLACEHOLDERS["voice_aliases"].casefold()
+    ):
+        raw_voice_aliases = "-"
+    values["voice_aliases"] = parse_steps(raw_voice_aliases)
 
     raw_sort_order = _section_text(sections.get("sort_order", []))
     try:

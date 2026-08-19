@@ -1,7 +1,13 @@
 """Tests for safe universal catalog formatting."""
 
 from app.models.catalog_item import CatalogItem
-from app.utils.formatting import format_item_card, humanize_field_name
+from app.models.category import Category
+from app.models.subcategory import Subcategory
+from app.utils.formatting import (
+    format_item_card,
+    format_subcategory_heading,
+    humanize_field_name,
+)
 
 
 def test_formats_complete_item_card() -> None:
@@ -91,3 +97,21 @@ def test_formats_known_and_unknown_fields_universally() -> None:
     assert "• Is decaf: Нет" in card
     assert '• Details: {&quot;origin&quot;: &quot;Эфиопия&quot;}' in card
     assert humanize_field_name("coffee_weight") == "Вес кофе"
+
+
+def test_subcategory_heading_shows_full_catalog_context() -> None:
+    category = Category(
+        id="semi",
+        name="Полуфабрикаты",
+        emoji="🧪",
+    )
+    subcategory = Subcategory(
+        id="puree",
+        name="Пюре и фруктовые основы",
+        emoji="🍓",
+    )
+
+    heading = format_subcategory_heading(subcategory, category)
+
+    assert "<b>🧪 Полуфабрикаты</b>" in heading
+    assert "↳ <b>🍓 Пюре и фруктовые основы</b>" in heading

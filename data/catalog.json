@@ -65,6 +65,7 @@
                 "джин",
                 "цитрусовый"
               ],
+              "voice_aliases": [],
               "sort_order": 10,
               "is_active": true
             },
@@ -121,6 +122,7 @@
                 "джин",
                 "ягодный"
               ],
+              "voice_aliases": [],
               "sort_order": 20,
               "is_active": true
             },
@@ -183,6 +185,7 @@
                 "игристое",
                 "тропический"
               ],
+              "voice_aliases": [],
               "sort_order": 30,
               "is_active": true
             },
@@ -245,6 +248,7 @@
                 "водка",
                 "тропический"
               ],
+              "voice_aliases": [],
               "sort_order": 40,
               "is_active": true
             },
@@ -301,6 +305,7 @@
                 "водка",
                 "ягодный"
               ],
+              "voice_aliases": [],
               "sort_order": 50,
               "is_active": true
             },
@@ -353,6 +358,7 @@
                 "цитрусовый",
                 "тропический"
               ],
+              "voice_aliases": [],
               "sort_order": 60,
               "is_active": true
             },
@@ -414,6 +420,7 @@
                 "виски",
                 "цитрусовый"
               ],
+              "voice_aliases": [],
               "sort_order": 70,
               "is_active": true
             },
@@ -466,6 +473,7 @@
                 "тропический",
                 "цитрусовый"
               ],
+              "voice_aliases": [],
               "sort_order": 80,
               "is_active": true
             },
@@ -517,12 +525,13 @@
                 "кофейный",
                 "цитрусовый"
               ],
+              "voice_aliases": [],
               "sort_order": 90,
               "is_active": true
             },
             {
               "id": "mango-sayer",
-              "name": "Mango Sayer",
+              "name": "Mango Sour",
               "short_description": null,
               "description": "Спелое манго, кокос и лёгкая цитрусовая свежесть — настоящий отпуск в бокале.",
               "photo_file_id": "AgACAgIAAxkBAANNamu2Ngy-5zhGKcwmz7za5mpQqtQAAhoeaxtKP1hLvcn2ll-eTXsBAAMCAAN5AAM9BA",
@@ -574,6 +583,7 @@
                 "тропический",
                 "цитрусовый"
               ],
+              "voice_aliases": [],
               "sort_order": 100,
               "is_active": true
             },
@@ -625,6 +635,7 @@
                 "джин",
                 "цитрусовый"
               ],
+              "voice_aliases": [],
               "sort_order": 110,
               "is_active": true
             },
@@ -677,6 +688,7 @@
                 "ягодный",
                 "цитрусовый"
               ],
+              "voice_aliases": [],
               "sort_order": 120,
               "is_active": true
             },
@@ -733,6 +745,7 @@
                 "ром",
                 "сливочный"
               ],
+              "voice_aliases": [],
               "sort_order": 130,
               "is_active": true
             },
@@ -778,6 +791,7 @@
                 "авторский",
                 "ягодный"
               ],
+              "voice_aliases": [],
               "sort_order": 140,
               "is_active": true
             },
@@ -828,6 +842,7 @@
                 "авторский",
                 "джин"
               ],
+              "voice_aliases": [],
               "sort_order": 150,
               "is_active": true
             }
@@ -889,6 +904,7 @@
                 "водка",
                 "цитрусовый"
               ],
+              "voice_aliases": [],
               "sort_order": 10,
               "is_active": true
             },
@@ -935,6 +951,7 @@
                 "виски",
                 "цитрусовый"
               ],
+              "voice_aliases": [],
               "sort_order": 20,
               "is_active": true
             },
@@ -981,6 +998,7 @@
                 "джин",
                 "цитрусовый"
               ],
+              "voice_aliases": [],
               "sort_order": 30,
               "is_active": true
             },
@@ -1021,6 +1039,7 @@
                 "классика",
                 "виски"
               ],
+              "voice_aliases": [],
               "sort_order": 40,
               "is_active": true
             },
@@ -1061,6 +1080,7 @@
                 "классика",
                 "джин"
               ],
+              "voice_aliases": [],
               "sort_order": 50,
               "is_active": true
             },
@@ -1101,6 +1121,7 @@
                 "классика",
                 "виски"
               ],
+              "voice_aliases": [],
               "sort_order": 60,
               "is_active": true
             },
@@ -1147,6 +1168,7 @@
                 "текила",
                 "цитрусовый"
               ],
+              "voice_aliases": [],
               "sort_order": 70,
               "is_active": true
             },
@@ -1187,6 +1209,7 @@
                 "классика",
                 "игристое"
               ],
+              "voice_aliases": [],
               "sort_order": 80,
               "is_active": true
             }
@@ -1249,6 +1272,7 @@
                 "сливочный",
                 "B-52"
               ],
+              "voice_aliases": [],
               "sort_order": 10,
               "is_active": true
             },
@@ -1301,6 +1325,7 @@
                 "Pisang Ambon",
                 "цитрусовый"
               ],
+              "voice_aliases": [],
               "sort_order": 20,
               "is_active": true
             },
@@ -1359,6 +1384,7 @@
                 "абсент",
                 "гренадин"
               ],
+              "voice_aliases": [],
               "sort_order": 30,
               "is_active": true
             },
@@ -1400,6 +1426,7 @@
                 "коктейли",
                 "шоты"
               ],
+              "voice_aliases": [],
               "sort_order": 40,
               "is_active": true
             },
@@ -1451,6 +1478,7 @@
                 "коктейли",
                 "шоты"
               ],
+              "voice_aliases": [],
               "sort_order": 50,
               "is_active": true
             }
@@ -1507,6 +1535,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 10,
               "is_active": true
             },
@@ -1563,6 +1592,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 20,
               "is_active": true
             },
@@ -1634,6 +1664,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 30,
               "is_active": true
             },
@@ -1665,6 +1696,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 40,
               "is_active": true
             },
@@ -1716,6 +1748,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 50,
               "is_active": true
             },
@@ -1782,6 +1815,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 60,
               "is_active": true
             },
@@ -1833,6 +1867,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 70,
               "is_active": true
             },
@@ -1894,6 +1929,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 80,
               "is_active": true
             },
@@ -1940,6 +1976,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 90,
               "is_active": true
             },
@@ -2001,6 +2038,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 100,
               "is_active": true
             },
@@ -2057,6 +2095,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 110,
               "is_active": true
             },
@@ -2108,6 +2147,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 120,
               "is_active": true
             },
@@ -2164,6 +2204,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 130,
               "is_active": true
             },
@@ -2225,6 +2266,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 140,
               "is_active": true
             },
@@ -2286,6 +2328,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 150,
               "is_active": true
             },
@@ -2342,6 +2385,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 160,
               "is_active": true
             },
@@ -2393,6 +2437,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 170,
               "is_active": true
             },
@@ -2454,6 +2499,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 180,
               "is_active": true
             },
@@ -2510,6 +2556,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 190,
               "is_active": true
             },
@@ -2556,6 +2603,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 200,
               "is_active": true
             },
@@ -2612,6 +2660,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 210,
               "is_active": true
             },
@@ -2663,6 +2712,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 220,
               "is_active": true
             },
@@ -2714,6 +2764,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 230,
               "is_active": true
             },
@@ -2765,6 +2816,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 240,
               "is_active": true
             },
@@ -2826,6 +2878,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 250,
               "is_active": true
             },
@@ -2877,6 +2930,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 260,
               "is_active": true
             },
@@ -2933,6 +2987,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 270,
               "is_active": true
             },
@@ -2989,6 +3044,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 280,
               "is_active": true
             },
@@ -3055,6 +3111,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 290,
               "is_active": true
             },
@@ -3116,6 +3173,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 300,
               "is_active": true
             },
@@ -3157,6 +3215,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 310,
               "is_active": true
             },
@@ -3213,6 +3272,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 320,
               "is_active": true
             },
@@ -3264,6 +3324,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 330,
               "is_active": true
             },
@@ -3320,6 +3381,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 340,
               "is_active": true
             },
@@ -3376,6 +3438,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 350,
               "is_active": true
             },
@@ -3427,6 +3490,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 360,
               "is_active": true
             },
@@ -3483,6 +3547,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 370,
               "is_active": true
             },
@@ -3544,6 +3609,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 380,
               "is_active": true
             },
@@ -3590,6 +3656,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 390,
               "is_active": true
             },
@@ -3651,6 +3718,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 400,
               "is_active": true
             },
@@ -3692,6 +3760,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 410,
               "is_active": true
             },
@@ -3718,6 +3787,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 420,
               "is_active": true
             },
@@ -3759,6 +3829,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 430,
               "is_active": true
             },
@@ -3810,6 +3881,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 440,
               "is_active": true
             },
@@ -3866,6 +3938,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 450,
               "is_active": true
             },
@@ -3902,6 +3975,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 460,
               "is_active": true
             },
@@ -3928,6 +4002,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 470,
               "is_active": true
             },
@@ -3954,6 +4029,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 480,
               "is_active": true
             },
@@ -4010,6 +4086,7 @@
                 "коктейли",
                 "старые фирменные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 490,
               "is_active": true
             }
@@ -4061,6 +4138,7 @@
                 "коктейли",
                 "старые классические коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 10,
               "is_active": true
             },
@@ -4107,6 +4185,7 @@
                 "коктейли",
                 "старые классические коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 20,
               "is_active": true
             },
@@ -4143,6 +4222,7 @@
                 "коктейли",
                 "старые классические коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 30,
               "is_active": true
             },
@@ -4184,6 +4264,7 @@
                 "коктейли",
                 "старые классические коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 40,
               "is_active": true
             },
@@ -4230,6 +4311,7 @@
                 "коктейли",
                 "старые классические коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 50,
               "is_active": true
             },
@@ -4286,6 +4368,7 @@
                 "коктейли",
                 "старые классические коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 60,
               "is_active": true
             },
@@ -4342,6 +4425,7 @@
                 "коктейли",
                 "старые классические коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 70,
               "is_active": true
             },
@@ -4388,6 +4472,7 @@
                 "коктейли",
                 "старые классические коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 80,
               "is_active": true
             },
@@ -4449,6 +4534,7 @@
                 "коктейли",
                 "старые классические коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 90,
               "is_active": true
             },
@@ -4505,6 +4591,7 @@
                 "коктейли",
                 "старые классические коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 100,
               "is_active": true
             },
@@ -4576,6 +4663,7 @@
                 "коктейли",
                 "старые классические коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 110,
               "is_active": true
             },
@@ -4642,6 +4730,7 @@
                 "коктейли",
                 "старые классические коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 120,
               "is_active": true
             },
@@ -4688,6 +4777,7 @@
                 "коктейли",
                 "старые классические коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 130,
               "is_active": true
             },
@@ -4719,6 +4809,7 @@
                 "коктейли",
                 "старые классические коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 140,
               "is_active": true
             },
@@ -4760,6 +4851,7 @@
                 "коктейли",
                 "старые классические коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 150,
               "is_active": true
             }
@@ -4821,6 +4913,7 @@
                 "тропический",
                 "цитрусовый"
               ],
+              "voice_aliases": [],
               "sort_order": 10,
               "is_active": true
             },
@@ -4867,6 +4960,7 @@
                 "коктейли",
                 "безалкогольные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 20,
               "is_active": true
             },
@@ -4908,6 +5002,7 @@
                 "коктейли",
                 "безалкогольные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 40,
               "is_active": true
             },
@@ -4949,6 +5044,7 @@
                 "коктейли",
                 "безалкогольные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 50,
               "is_active": true
             },
@@ -5000,6 +5096,7 @@
                 "коктейли",
                 "безалкогольные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 60,
               "is_active": true
             },
@@ -5051,6 +5148,7 @@
                 "коктейли",
                 "безалкогольные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 70,
               "is_active": true
             },
@@ -5102,6 +5200,7 @@
                 "коктейли",
                 "безалкогольные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 80,
               "is_active": true
             },
@@ -5143,6 +5242,7 @@
                 "коктейли",
                 "безалкогольные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 90,
               "is_active": true
             },
@@ -5169,6 +5269,7 @@
                 "коктейли",
                 "безалкогольные коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 100,
               "is_active": true
             }
@@ -5235,6 +5336,7 @@
                 "коктейли",
                 "горячие коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 10,
               "is_active": true
             },
@@ -5291,6 +5393,7 @@
                 "коктейли",
                 "горячие коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 20,
               "is_active": true
             },
@@ -5342,6 +5445,7 @@
                 "коктейли",
                 "горячие коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 30,
               "is_active": true
             },
@@ -5403,6 +5507,7 @@
                 "коктейли",
                 "горячие коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 40,
               "is_active": true
             },
@@ -5459,6 +5564,7 @@
                 "коктейли",
                 "горячие коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 50,
               "is_active": true
             },
@@ -5515,6 +5621,7 @@
                 "коктейли",
                 "горячие коктейли"
               ],
+              "voice_aliases": [],
               "sort_order": 60,
               "is_active": true
             },
@@ -5567,6 +5674,7 @@
                 "безалкогольный",
                 "глинтвейн"
               ],
+              "voice_aliases": [],
               "sort_order": 60,
               "is_active": true
             },
@@ -5619,6 +5727,7 @@
                 "безалкогольный",
                 "глинтвейн"
               ],
+              "voice_aliases": [],
               "sort_order": 70,
               "is_active": true
             }
@@ -5693,6 +5802,7 @@
           "tags": [
             "фирменные чаи"
           ],
+          "voice_aliases": [],
           "sort_order": 10,
           "is_active": true
         },
@@ -5743,6 +5853,7 @@
           "tags": [
             "фирменные чаи"
           ],
+          "voice_aliases": [],
           "sort_order": 20,
           "is_active": true
         },
@@ -5818,6 +5929,7 @@
           "tags": [
             "фирменные чаи"
           ],
+          "voice_aliases": [],
           "sort_order": 30,
           "is_active": true
         },
@@ -5868,6 +5980,7 @@
           "tags": [
             "фирменные чаи"
           ],
+          "voice_aliases": [],
           "sort_order": 40,
           "is_active": true
         },
@@ -5918,6 +6031,7 @@
           "tags": [
             "фирменные чаи"
           ],
+          "voice_aliases": [],
           "sort_order": 50,
           "is_active": true
         },
@@ -5958,6 +6072,7 @@
           "tags": [
             "фирменные чаи"
           ],
+          "voice_aliases": [],
           "sort_order": 60,
           "is_active": true
         },
@@ -6018,6 +6133,7 @@
           "tags": [
             "фирменные чаи"
           ],
+          "voice_aliases": [],
           "sort_order": 70,
           "is_active": true
         },
@@ -6063,6 +6179,7 @@
           "tags": [
             "фирменные чаи"
           ],
+          "voice_aliases": [],
           "sort_order": 80,
           "is_active": true
         },
@@ -6098,6 +6215,7 @@
           "tags": [
             "фирменные чаи"
           ],
+          "voice_aliases": [],
           "sort_order": 90,
           "is_active": true
         },
@@ -6148,6 +6266,7 @@
           "tags": [
             "фирменные чаи"
           ],
+          "voice_aliases": [],
           "sort_order": 100,
           "is_active": true
         }
@@ -6197,6 +6316,7 @@
                 "кофе",
                 "классика"
               ],
+              "voice_aliases": [],
               "sort_order": 10,
               "is_active": true
             },
@@ -6228,6 +6348,7 @@
                 "кофе",
                 "классика"
               ],
+              "voice_aliases": [],
               "sort_order": 20,
               "is_active": true
             }
@@ -6274,6 +6395,7 @@
                 "кофе",
                 "молочный"
               ],
+              "voice_aliases": [],
               "sort_order": 10,
               "is_active": true
             },
@@ -6310,6 +6432,7 @@
                 "кофе",
                 "молочный"
               ],
+              "voice_aliases": [],
               "sort_order": 20,
               "is_active": true
             },
@@ -6347,6 +6470,7 @@
                 "молочный",
                 "альтернативное молоко"
               ],
+              "voice_aliases": [],
               "sort_order": 30,
               "is_active": true
             },
@@ -6383,6 +6507,7 @@
                 "кофе",
                 "молочный"
               ],
+              "voice_aliases": [],
               "sort_order": 40,
               "is_active": true
             },
@@ -6420,6 +6545,7 @@
                 "молочный",
                 "альтернативное молоко"
               ],
+              "voice_aliases": [],
               "sort_order": 50,
               "is_active": true
             },
@@ -6461,6 +6587,7 @@
                 "кофе",
                 "молочный"
               ],
+              "voice_aliases": [],
               "sort_order": 60,
               "is_active": true
             },
@@ -6497,6 +6624,7 @@
                 "кофе",
                 "молочный"
               ],
+              "voice_aliases": [],
               "sort_order": 70,
               "is_active": true
             },
@@ -6534,6 +6662,7 @@
                 "молочный",
                 "альтернативное молоко"
               ],
+              "voice_aliases": [],
               "sort_order": 80,
               "is_active": true
             }
@@ -6574,6 +6703,7 @@
               "tags": [
                 "какао"
               ],
+              "voice_aliases": [],
               "sort_order": 10,
               "is_active": true
             },
@@ -6610,6 +6740,7 @@
                 "какао",
                 "маршмеллоу"
               ],
+              "voice_aliases": [],
               "sort_order": 20,
               "is_active": true
             },
@@ -6647,6 +6778,7 @@
                 "альтернативное молоко",
                 "маршмеллоу"
               ],
+              "voice_aliases": [],
               "sort_order": 30,
               "is_active": true
             },
@@ -6678,6 +6810,7 @@
                 "какао",
                 "альтернативное молоко"
               ],
+              "voice_aliases": [],
               "sort_order": 40,
               "is_active": true
             },
@@ -6708,6 +6841,7 @@
               "tags": [
                 "матча"
               ],
+              "voice_aliases": [],
               "sort_order": 50,
               "is_active": true
             },
@@ -6739,6 +6873,7 @@
                 "матча",
                 "альтернативное молоко"
               ],
+              "voice_aliases": [],
               "sort_order": 60,
               "is_active": true
             }
@@ -6781,6 +6916,7 @@
                 "цитрусовый",
                 "апельсин"
               ],
+              "voice_aliases": [],
               "sort_order": 10,
               "is_active": true
             },
@@ -6807,6 +6943,7 @@
                 "кофейная карта",
                 "особые кофейные напитки"
               ],
+              "voice_aliases": [],
               "sort_order": 20,
               "is_active": true
             },
@@ -6838,6 +6975,7 @@
                 "кофейная карта",
                 "особые кофейные напитки"
               ],
+              "voice_aliases": [],
               "sort_order": 30,
               "is_active": true
             },
@@ -6874,6 +7012,7 @@
                 "кофейная карта",
                 "особые кофейные напитки"
               ],
+              "voice_aliases": [],
               "sort_order": 40,
               "is_active": true
             },
@@ -6910,6 +7049,7 @@
                 "кофейная карта",
                 "особые кофейные напитки"
               ],
+              "voice_aliases": [],
               "sort_order": 50,
               "is_active": true
             },
@@ -6946,6 +7086,7 @@
                 "кофейная карта",
                 "особые кофейные напитки"
               ],
+              "voice_aliases": [],
               "sort_order": 60,
               "is_active": true
             }
@@ -6993,6 +7134,7 @@
                 "винная карта",
                 "белые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 10,
               "is_active": true
             },
@@ -7019,6 +7161,7 @@
                 "винная карта",
                 "белые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 20,
               "is_active": true
             },
@@ -7045,6 +7188,7 @@
                 "винная карта",
                 "белые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 30,
               "is_active": true
             },
@@ -7071,6 +7215,7 @@
                 "винная карта",
                 "белые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 40,
               "is_active": true
             },
@@ -7097,6 +7242,7 @@
                 "винная карта",
                 "белые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 50,
               "is_active": true
             },
@@ -7123,6 +7269,7 @@
                 "винная карта",
                 "белые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 60,
               "is_active": true
             },
@@ -7149,6 +7296,7 @@
                 "винная карта",
                 "белые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 70,
               "is_active": true
             },
@@ -7175,6 +7323,7 @@
                 "винная карта",
                 "белые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 80,
               "is_active": true
             },
@@ -7201,6 +7350,7 @@
                 "винная карта",
                 "белые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 90,
               "is_active": true
             },
@@ -7227,6 +7377,7 @@
                 "винная карта",
                 "белые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 100,
               "is_active": true
             },
@@ -7253,6 +7404,7 @@
                 "винная карта",
                 "белые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 110,
               "is_active": true
             },
@@ -7279,6 +7431,7 @@
                 "винная карта",
                 "белые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 120,
               "is_active": true
             },
@@ -7305,6 +7458,7 @@
                 "винная карта",
                 "белые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 130,
               "is_active": true
             },
@@ -7331,6 +7485,7 @@
                 "винная карта",
                 "белые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 140,
               "is_active": true
             },
@@ -7357,6 +7512,7 @@
                 "винная карта",
                 "белые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 150,
               "is_active": true
             },
@@ -7383,6 +7539,7 @@
                 "винная карта",
                 "белые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 160,
               "is_active": true
             },
@@ -7409,6 +7566,7 @@
                 "винная карта",
                 "белые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 170,
               "is_active": true
             },
@@ -7435,6 +7593,7 @@
                 "винная карта",
                 "белые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 180,
               "is_active": true
             },
@@ -7461,6 +7620,7 @@
                 "винная карта",
                 "белые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 190,
               "is_active": true
             },
@@ -7487,6 +7647,7 @@
                 "винная карта",
                 "белые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 200,
               "is_active": true
             },
@@ -7513,6 +7674,7 @@
                 "винная карта",
                 "белые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 210,
               "is_active": true
             },
@@ -7539,6 +7701,7 @@
                 "винная карта",
                 "белые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 220,
               "is_active": true
             },
@@ -7565,6 +7728,7 @@
                 "винная карта",
                 "белые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 230,
               "is_active": true
             },
@@ -7591,6 +7755,7 @@
                 "винная карта",
                 "белые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 240,
               "is_active": true
             },
@@ -7617,6 +7782,7 @@
                 "винная карта",
                 "белые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 250,
               "is_active": true
             },
@@ -7643,6 +7809,7 @@
                 "винная карта",
                 "белые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 260,
               "is_active": true
             },
@@ -7669,6 +7836,7 @@
                 "винная карта",
                 "белые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 270,
               "is_active": true
             },
@@ -7695,6 +7863,7 @@
                 "винная карта",
                 "белые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 280,
               "is_active": true
             },
@@ -7721,6 +7890,7 @@
                 "винная карта",
                 "белые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 290,
               "is_active": true
             },
@@ -7747,6 +7917,7 @@
                 "винная карта",
                 "белые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 300,
               "is_active": true
             },
@@ -7773,6 +7944,7 @@
                 "винная карта",
                 "белые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 310,
               "is_active": true
             },
@@ -7799,6 +7971,7 @@
                 "винная карта",
                 "белые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 320,
               "is_active": true
             },
@@ -7825,6 +7998,7 @@
                 "винная карта",
                 "белые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 330,
               "is_active": true
             },
@@ -7851,6 +8025,7 @@
                 "винная карта",
                 "белые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 340,
               "is_active": true
             },
@@ -7877,6 +8052,7 @@
                 "винная карта",
                 "белые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 350,
               "is_active": true
             }
@@ -7913,6 +8089,7 @@
                 "винная карта",
                 "розовые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 10,
               "is_active": true
             },
@@ -7939,6 +8116,7 @@
                 "винная карта",
                 "розовые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 20,
               "is_active": true
             },
@@ -7965,6 +8143,7 @@
                 "винная карта",
                 "розовые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 30,
               "is_active": true
             },
@@ -7991,6 +8170,7 @@
                 "винная карта",
                 "розовые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 40,
               "is_active": true
             },
@@ -8017,6 +8197,7 @@
                 "винная карта",
                 "розовые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 50,
               "is_active": true
             },
@@ -8043,6 +8224,7 @@
                 "винная карта",
                 "розовые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 60,
               "is_active": true
             },
@@ -8069,6 +8251,7 @@
                 "винная карта",
                 "розовые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 70,
               "is_active": true
             },
@@ -8095,6 +8278,7 @@
                 "винная карта",
                 "розовые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 80,
               "is_active": true
             }
@@ -8131,6 +8315,7 @@
                 "винная карта",
                 "игристые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 10,
               "is_active": true
             },
@@ -8157,6 +8342,7 @@
                 "винная карта",
                 "игристые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 20,
               "is_active": true
             },
@@ -8183,6 +8369,7 @@
                 "винная карта",
                 "игристые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 30,
               "is_active": true
             },
@@ -8209,6 +8396,7 @@
                 "винная карта",
                 "игристые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 40,
               "is_active": true
             },
@@ -8235,6 +8423,7 @@
                 "винная карта",
                 "игристые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 50,
               "is_active": true
             },
@@ -8261,6 +8450,7 @@
                 "винная карта",
                 "игристые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 60,
               "is_active": true
             },
@@ -8287,6 +8477,7 @@
                 "винная карта",
                 "игристые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 70,
               "is_active": true
             },
@@ -8313,6 +8504,7 @@
                 "винная карта",
                 "игристые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 80,
               "is_active": true
             },
@@ -8339,6 +8531,7 @@
                 "винная карта",
                 "игристые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 90,
               "is_active": true
             },
@@ -8365,6 +8558,7 @@
                 "винная карта",
                 "игристые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 100,
               "is_active": true
             },
@@ -8391,6 +8585,7 @@
                 "винная карта",
                 "игристые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 110,
               "is_active": true
             },
@@ -8417,6 +8612,7 @@
                 "винная карта",
                 "игристые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 120,
               "is_active": true
             },
@@ -8443,6 +8639,7 @@
                 "винная карта",
                 "игристые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 130,
               "is_active": true
             },
@@ -8469,6 +8666,7 @@
                 "винная карта",
                 "игристые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 140,
               "is_active": true
             },
@@ -8495,6 +8693,7 @@
                 "винная карта",
                 "игристые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 150,
               "is_active": true
             },
@@ -8521,6 +8720,7 @@
                 "винная карта",
                 "игристые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 160,
               "is_active": true
             },
@@ -8547,6 +8747,7 @@
                 "винная карта",
                 "игристые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 170,
               "is_active": true
             },
@@ -8573,6 +8774,7 @@
                 "винная карта",
                 "игристые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 180,
               "is_active": true
             },
@@ -8599,6 +8801,7 @@
                 "винная карта",
                 "игристые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 190,
               "is_active": true
             },
@@ -8625,6 +8828,7 @@
                 "винная карта",
                 "игристые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 200,
               "is_active": true
             },
@@ -8651,6 +8855,7 @@
                 "винная карта",
                 "игристые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 210,
               "is_active": true
             },
@@ -8677,6 +8882,7 @@
                 "винная карта",
                 "игристые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 220,
               "is_active": true
             },
@@ -8703,6 +8909,7 @@
                 "винная карта",
                 "игристые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 230,
               "is_active": true
             },
@@ -8729,6 +8936,7 @@
                 "винная карта",
                 "игристые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 240,
               "is_active": true
             },
@@ -8755,6 +8963,7 @@
                 "винная карта",
                 "игристые вина"
               ],
+              "voice_aliases": [],
               "sort_order": 250,
               "is_active": true
             }
@@ -8791,6 +9000,7 @@
                 "винная карта",
                 "красные вина"
               ],
+              "voice_aliases": [],
               "sort_order": 10,
               "is_active": true
             },
@@ -8817,6 +9027,7 @@
                 "винная карта",
                 "красные вина"
               ],
+              "voice_aliases": [],
               "sort_order": 20,
               "is_active": true
             },
@@ -8843,6 +9054,7 @@
                 "винная карта",
                 "красные вина"
               ],
+              "voice_aliases": [],
               "sort_order": 30,
               "is_active": true
             },
@@ -8869,6 +9081,7 @@
                 "винная карта",
                 "красные вина"
               ],
+              "voice_aliases": [],
               "sort_order": 40,
               "is_active": true
             },
@@ -8895,6 +9108,7 @@
                 "винная карта",
                 "красные вина"
               ],
+              "voice_aliases": [],
               "sort_order": 50,
               "is_active": true
             },
@@ -8921,6 +9135,7 @@
                 "винная карта",
                 "красные вина"
               ],
+              "voice_aliases": [],
               "sort_order": 60,
               "is_active": true
             },
@@ -8947,6 +9162,7 @@
                 "винная карта",
                 "красные вина"
               ],
+              "voice_aliases": [],
               "sort_order": 70,
               "is_active": true
             },
@@ -8973,6 +9189,7 @@
                 "винная карта",
                 "красные вина"
               ],
+              "voice_aliases": [],
               "sort_order": 80,
               "is_active": true
             },
@@ -8999,6 +9216,7 @@
                 "винная карта",
                 "красные вина"
               ],
+              "voice_aliases": [],
               "sort_order": 90,
               "is_active": true
             },
@@ -9025,6 +9243,7 @@
                 "винная карта",
                 "красные вина"
               ],
+              "voice_aliases": [],
               "sort_order": 100,
               "is_active": true
             },
@@ -9051,6 +9270,7 @@
                 "винная карта",
                 "красные вина"
               ],
+              "voice_aliases": [],
               "sort_order": 110,
               "is_active": true
             },
@@ -9077,6 +9297,7 @@
                 "винная карта",
                 "красные вина"
               ],
+              "voice_aliases": [],
               "sort_order": 120,
               "is_active": true
             },
@@ -9103,6 +9324,7 @@
                 "винная карта",
                 "красные вина"
               ],
+              "voice_aliases": [],
               "sort_order": 130,
               "is_active": true
             },
@@ -9129,6 +9351,7 @@
                 "винная карта",
                 "красные вина"
               ],
+              "voice_aliases": [],
               "sort_order": 140,
               "is_active": true
             },
@@ -9155,6 +9378,7 @@
                 "винная карта",
                 "красные вина"
               ],
+              "voice_aliases": [],
               "sort_order": 150,
               "is_active": true
             },
@@ -9181,6 +9405,7 @@
                 "винная карта",
                 "красные вина"
               ],
+              "voice_aliases": [],
               "sort_order": 160,
               "is_active": true
             },
@@ -9207,6 +9432,7 @@
                 "винная карта",
                 "красные вина"
               ],
+              "voice_aliases": [],
               "sort_order": 170,
               "is_active": true
             },
@@ -9233,6 +9459,7 @@
                 "винная карта",
                 "красные вина"
               ],
+              "voice_aliases": [],
               "sort_order": 180,
               "is_active": true
             },
@@ -9259,6 +9486,7 @@
                 "винная карта",
                 "красные вина"
               ],
+              "voice_aliases": [],
               "sort_order": 190,
               "is_active": true
             },
@@ -9285,6 +9513,7 @@
                 "винная карта",
                 "красные вина"
               ],
+              "voice_aliases": [],
               "sort_order": 200,
               "is_active": true
             },
@@ -9311,6 +9540,7 @@
                 "винная карта",
                 "красные вина"
               ],
+              "voice_aliases": [],
               "sort_order": 210,
               "is_active": true
             },
@@ -9337,6 +9567,7 @@
                 "винная карта",
                 "красные вина"
               ],
+              "voice_aliases": [],
               "sort_order": 220,
               "is_active": true
             },
@@ -9363,6 +9594,7 @@
                 "винная карта",
                 "красные вина"
               ],
+              "voice_aliases": [],
               "sort_order": 230,
               "is_active": true
             },
@@ -9389,6 +9621,7 @@
                 "винная карта",
                 "красные вина"
               ],
+              "voice_aliases": [],
               "sort_order": 240,
               "is_active": true
             },
@@ -9415,6 +9648,7 @@
                 "винная карта",
                 "красные вина"
               ],
+              "voice_aliases": [],
               "sort_order": 250,
               "is_active": true
             },
@@ -9441,6 +9675,7 @@
                 "винная карта",
                 "красные вина"
               ],
+              "voice_aliases": [],
               "sort_order": 260,
               "is_active": true
             },
@@ -9467,6 +9702,7 @@
                 "винная карта",
                 "красные вина"
               ],
+              "voice_aliases": [],
               "sort_order": 270,
               "is_active": true
             },
@@ -9493,6 +9729,7 @@
                 "винная карта",
                 "красные вина"
               ],
+              "voice_aliases": [],
               "sort_order": 280,
               "is_active": true
             },
@@ -9519,6 +9756,7 @@
                 "винная карта",
                 "красные вина"
               ],
+              "voice_aliases": [],
               "sort_order": 290,
               "is_active": true
             },
@@ -9545,6 +9783,7 @@
                 "винная карта",
                 "красные вина"
               ],
+              "voice_aliases": [],
               "sort_order": 300,
               "is_active": true
             },
@@ -9571,6 +9810,7 @@
                 "винная карта",
                 "красные вина"
               ],
+              "voice_aliases": [],
               "sort_order": 310,
               "is_active": true
             },
@@ -9597,6 +9837,7 @@
                 "винная карта",
                 "красные вина"
               ],
+              "voice_aliases": [],
               "sort_order": 320,
               "is_active": true
             }
@@ -9662,6 +9903,7 @@
                 "пюре",
                 "маракуйя"
               ],
+              "voice_aliases": [],
               "sort_order": 10,
               "is_active": true
             },
@@ -9703,6 +9945,7 @@
                 "п/ф",
                 "полуфабрикат"
               ],
+              "voice_aliases": [],
               "sort_order": 30,
               "is_active": true
             },
@@ -9740,6 +9983,7 @@
                 "п/ф",
                 "полуфабрикат"
               ],
+              "voice_aliases": [],
               "sort_order": 40,
               "is_active": true
             },
@@ -9777,6 +10021,7 @@
                 "полуфабрикат",
                 "пюре"
               ],
+              "voice_aliases": [],
               "sort_order": 50,
               "is_active": true
             },
@@ -9809,6 +10054,7 @@
                 "полуфабрикат",
                 "пюре"
               ],
+              "voice_aliases": [],
               "sort_order": 60,
               "is_active": true
             },
@@ -9851,6 +10097,7 @@
                 "полуфабрикат",
                 "пюре"
               ],
+              "voice_aliases": [],
               "sort_order": 70,
               "is_active": true
             },
@@ -9888,6 +10135,7 @@
                 "полуфабрикат",
                 "пюре"
               ],
+              "voice_aliases": [],
               "sort_order": 90,
               "is_active": true
             },
@@ -9915,6 +10163,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 80,
               "is_active": false
             },
@@ -9952,6 +10201,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 90,
               "is_active": true
             },
@@ -9989,6 +10239,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 100,
               "is_active": false
             },
@@ -10021,6 +10272,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 110,
               "is_active": true
             }
@@ -10058,6 +10310,7 @@
                 "полуфабрикат",
                 "фреш"
               ],
+              "voice_aliases": [],
               "sort_order": 10,
               "is_active": true
             },
@@ -10085,6 +10338,7 @@
                 "полуфабрикат",
                 "фреш"
               ],
+              "voice_aliases": [],
               "sort_order": 20,
               "is_active": true
             },
@@ -10112,6 +10366,7 @@
                 "полуфабрикат",
                 "фреш"
               ],
+              "voice_aliases": [],
               "sort_order": 30,
               "is_active": true
             },
@@ -10149,6 +10404,7 @@
                 "полуфабрикат",
                 "фреш"
               ],
+              "voice_aliases": [],
               "sort_order": 40,
               "is_active": true
             },
@@ -10176,6 +10432,7 @@
                 "полуфабрикат",
                 "фреш"
               ],
+              "voice_aliases": [],
               "sort_order": 50,
               "is_active": true
             },
@@ -10203,6 +10460,7 @@
                 "полуфабрикат",
                 "фреш"
               ],
+              "voice_aliases": [],
               "sort_order": 60,
               "is_active": true
             },
@@ -10230,6 +10488,7 @@
                 "полуфабрикат",
                 "фреш"
               ],
+              "voice_aliases": [],
               "sort_order": 70,
               "is_active": true
             },
@@ -10262,6 +10521,7 @@
                 "полуфабрикат",
                 "фреш"
               ],
+              "voice_aliases": [],
               "sort_order": 80,
               "is_active": true
             },
@@ -10289,6 +10549,7 @@
                 "полуфабрикат",
                 "фреш"
               ],
+              "voice_aliases": [],
               "sort_order": 90,
               "is_active": true
             },
@@ -10346,6 +10607,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 100,
               "is_active": true
             },
@@ -10373,6 +10635,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 110,
               "is_active": true
             }
@@ -10420,6 +10683,7 @@
                 "полуфабрикат",
                 "сироп"
               ],
+              "voice_aliases": [],
               "sort_order": 10,
               "is_active": true
             },
@@ -10457,6 +10721,7 @@
                 "полуфабрикат",
                 "сироп"
               ],
+              "voice_aliases": [],
               "sort_order": 20,
               "is_active": true
             },
@@ -10489,6 +10754,7 @@
                 "полуфабрикат",
                 "сироп"
               ],
+              "voice_aliases": [],
               "sort_order": 30,
               "is_active": true
             },
@@ -10526,6 +10792,7 @@
                 "полуфабрикат",
                 "сироп"
               ],
+              "voice_aliases": [],
               "sort_order": 40,
               "is_active": true
             },
@@ -10578,6 +10845,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 50,
               "is_active": true
             },
@@ -10640,6 +10908,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 60,
               "is_active": true
             },
@@ -10672,6 +10941,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 70,
               "is_active": true
             },
@@ -10704,6 +10974,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 80,
               "is_active": true
             },
@@ -10741,6 +11012,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 90,
               "is_active": true
             },
@@ -10783,6 +11055,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 100,
               "is_active": true
             },
@@ -10820,6 +11093,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 110,
               "is_active": true
             },
@@ -10852,6 +11126,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 120,
               "is_active": true
             }
@@ -10907,6 +11182,7 @@
                 "п/ф",
                 "полуфабрикат"
               ],
+              "voice_aliases": [],
               "sort_order": 10,
               "is_active": true
             },
@@ -10954,6 +11230,7 @@
                 "полуфабрикат",
                 "напиточная основа"
               ],
+              "voice_aliases": [],
               "sort_order": 20,
               "is_active": true
             },
@@ -10996,6 +11273,7 @@
                 "полуфабрикат",
                 "напиточная основа"
               ],
+              "voice_aliases": [],
               "sort_order": 30,
               "is_active": true
             },
@@ -11033,6 +11311,7 @@
                 "полуфабрикат",
                 "напиточная основа"
               ],
+              "voice_aliases": [],
               "sort_order": 40,
               "is_active": true
             },
@@ -11070,6 +11349,7 @@
                 "полуфабрикат",
                 "напиточная основа"
               ],
+              "voice_aliases": [],
               "sort_order": 50,
               "is_active": true
             },
@@ -11102,6 +11382,7 @@
                 "полуфабрикат",
                 "напиточная основа"
               ],
+              "voice_aliases": [],
               "sort_order": 60,
               "is_active": true
             },
@@ -11149,6 +11430,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 70,
               "is_active": true
             },
@@ -11216,6 +11498,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 80,
               "is_active": true
             },
@@ -11283,6 +11566,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 90,
               "is_active": true
             },
@@ -11340,6 +11624,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 100,
               "is_active": true
             },
@@ -11387,6 +11672,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 110,
               "is_active": true
             },
@@ -11444,6 +11730,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 120,
               "is_active": true
             },
@@ -11476,6 +11763,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 130,
               "is_active": true
             },
@@ -11508,6 +11796,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 140,
               "is_active": true
             }
@@ -11550,6 +11839,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 10,
               "is_active": true
             },
@@ -11582,6 +11872,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 20,
               "is_active": true
             },
@@ -11614,6 +11905,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 30,
               "is_active": true
             },
@@ -11661,6 +11953,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 40,
               "is_active": true
             },
@@ -11698,6 +11991,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 50,
               "is_active": true
             },
@@ -11750,6 +12044,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 60,
               "is_active": true
             },
@@ -11787,6 +12082,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 70,
               "is_active": true
             },
@@ -11839,6 +12135,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 80,
               "is_active": true
             },
@@ -11881,6 +12178,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 90,
               "is_active": true
             },
@@ -11913,6 +12211,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 100,
               "is_active": true
             },
@@ -11965,6 +12264,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 110,
               "is_active": true
             },
@@ -12007,6 +12307,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 120,
               "is_active": true
             },
@@ -12039,6 +12340,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 130,
               "is_active": true
             },
@@ -12081,6 +12383,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 140,
               "is_active": true
             },
@@ -12113,6 +12416,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 150,
               "is_active": true
             },
@@ -12160,6 +12464,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 160,
               "is_active": true
             },
@@ -12192,6 +12497,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 170,
               "is_active": true
             },
@@ -12239,6 +12545,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 180,
               "is_active": true
             },
@@ -12296,6 +12603,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 190,
               "is_active": true
             },
@@ -12328,6 +12636,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 200,
               "is_active": true
             },
@@ -12375,6 +12684,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 210,
               "is_active": true
             },
@@ -12422,6 +12732,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 220,
               "is_active": true
             },
@@ -12459,6 +12770,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 230,
               "is_active": true
             },
@@ -12506,6 +12818,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 240,
               "is_active": true
             }
@@ -12548,6 +12861,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 10,
               "is_active": true
             },
@@ -12580,6 +12894,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 20,
               "is_active": true
             },
@@ -12612,6 +12927,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 30,
               "is_active": true
             },
@@ -12644,6 +12960,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 40,
               "is_active": true
             },
@@ -12676,6 +12993,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 50,
               "is_active": true
             },
@@ -12708,6 +13026,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 60,
               "is_active": true
             },
@@ -12745,6 +13064,7 @@
                 "полуфабрикат",
                 "барная заготовка"
               ],
+              "voice_aliases": [],
               "sort_order": 70,
               "is_active": true
             }
@@ -12792,6 +13112,7 @@
                 "барный алкоголь",
                 "виски"
               ],
+              "voice_aliases": [],
               "sort_order": 10,
               "is_active": true
             },
@@ -12818,6 +13139,7 @@
                 "барный алкоголь",
                 "виски"
               ],
+              "voice_aliases": [],
               "sort_order": 20,
               "is_active": true
             },
@@ -12844,6 +13166,7 @@
                 "барный алкоголь",
                 "виски"
               ],
+              "voice_aliases": [],
               "sort_order": 30,
               "is_active": true
             },
@@ -12870,6 +13193,7 @@
                 "барный алкоголь",
                 "виски"
               ],
+              "voice_aliases": [],
               "sort_order": 40,
               "is_active": true
             },
@@ -12896,6 +13220,7 @@
                 "барный алкоголь",
                 "виски"
               ],
+              "voice_aliases": [],
               "sort_order": 50,
               "is_active": true
             },
@@ -12922,6 +13247,7 @@
                 "барный алкоголь",
                 "виски"
               ],
+              "voice_aliases": [],
               "sort_order": 60,
               "is_active": true
             },
@@ -12948,6 +13274,7 @@
                 "барный алкоголь",
                 "виски"
               ],
+              "voice_aliases": [],
               "sort_order": 70,
               "is_active": true
             },
@@ -12974,6 +13301,7 @@
                 "барный алкоголь",
                 "виски"
               ],
+              "voice_aliases": [],
               "sort_order": 80,
               "is_active": true
             },
@@ -13000,6 +13328,7 @@
                 "барный алкоголь",
                 "виски"
               ],
+              "voice_aliases": [],
               "sort_order": 90,
               "is_active": true
             },
@@ -13026,6 +13355,7 @@
                 "барный алкоголь",
                 "виски"
               ],
+              "voice_aliases": [],
               "sort_order": 100,
               "is_active": true
             },
@@ -13052,6 +13382,7 @@
                 "барный алкоголь",
                 "виски"
               ],
+              "voice_aliases": [],
               "sort_order": 110,
               "is_active": true
             },
@@ -13078,6 +13409,7 @@
                 "барный алкоголь",
                 "виски"
               ],
+              "voice_aliases": [],
               "sort_order": 120,
               "is_active": true
             },
@@ -13104,6 +13436,7 @@
                 "барный алкоголь",
                 "виски"
               ],
+              "voice_aliases": [],
               "sort_order": 130,
               "is_active": true
             },
@@ -13130,6 +13463,7 @@
                 "барный алкоголь",
                 "виски"
               ],
+              "voice_aliases": [],
               "sort_order": 140,
               "is_active": true
             },
@@ -13156,6 +13490,7 @@
                 "барный алкоголь",
                 "виски"
               ],
+              "voice_aliases": [],
               "sort_order": 150,
               "is_active": true
             },
@@ -13182,6 +13517,7 @@
                 "барный алкоголь",
                 "виски"
               ],
+              "voice_aliases": [],
               "sort_order": 160,
               "is_active": true
             },
@@ -13208,6 +13544,7 @@
                 "барный алкоголь",
                 "виски"
               ],
+              "voice_aliases": [],
               "sort_order": 170,
               "is_active": true
             },
@@ -13234,6 +13571,7 @@
                 "барный алкоголь",
                 "виски"
               ],
+              "voice_aliases": [],
               "sort_order": 180,
               "is_active": true
             },
@@ -13260,6 +13598,7 @@
                 "барный алкоголь",
                 "виски"
               ],
+              "voice_aliases": [],
               "sort_order": 190,
               "is_active": true
             },
@@ -13286,6 +13625,7 @@
                 "барный алкоголь",
                 "виски"
               ],
+              "voice_aliases": [],
               "sort_order": 200,
               "is_active": true
             },
@@ -13312,6 +13652,7 @@
                 "барный алкоголь",
                 "виски"
               ],
+              "voice_aliases": [],
               "sort_order": 210,
               "is_active": true
             },
@@ -13338,6 +13679,7 @@
                 "барный алкоголь",
                 "виски"
               ],
+              "voice_aliases": [],
               "sort_order": 220,
               "is_active": true
             },
@@ -13364,6 +13706,7 @@
                 "барный алкоголь",
                 "виски"
               ],
+              "voice_aliases": [],
               "sort_order": 230,
               "is_active": true
             },
@@ -13390,6 +13733,7 @@
                 "барный алкоголь",
                 "виски"
               ],
+              "voice_aliases": [],
               "sort_order": 240,
               "is_active": true
             },
@@ -13416,6 +13760,7 @@
                 "барный алкоголь",
                 "виски"
               ],
+              "voice_aliases": [],
               "sort_order": 250,
               "is_active": true
             }
@@ -13452,6 +13797,7 @@
                 "барный алкоголь",
                 "водка"
               ],
+              "voice_aliases": [],
               "sort_order": 10,
               "is_active": true
             },
@@ -13478,6 +13824,7 @@
                 "барный алкоголь",
                 "водка"
               ],
+              "voice_aliases": [],
               "sort_order": 20,
               "is_active": true
             },
@@ -13504,6 +13851,7 @@
                 "барный алкоголь",
                 "водка"
               ],
+              "voice_aliases": [],
               "sort_order": 30,
               "is_active": true
             },
@@ -13530,6 +13878,7 @@
                 "барный алкоголь",
                 "водка"
               ],
+              "voice_aliases": [],
               "sort_order": 40,
               "is_active": true
             },
@@ -13556,6 +13905,7 @@
                 "барный алкоголь",
                 "водка"
               ],
+              "voice_aliases": [],
               "sort_order": 50,
               "is_active": true
             },
@@ -13582,6 +13932,7 @@
                 "барный алкоголь",
                 "водка"
               ],
+              "voice_aliases": [],
               "sort_order": 60,
               "is_active": true
             },
@@ -13608,6 +13959,7 @@
                 "барный алкоголь",
                 "водка"
               ],
+              "voice_aliases": [],
               "sort_order": 70,
               "is_active": true
             },
@@ -13634,6 +13986,7 @@
                 "барный алкоголь",
                 "водка"
               ],
+              "voice_aliases": [],
               "sort_order": 80,
               "is_active": true
             },
@@ -13660,6 +14013,7 @@
                 "барный алкоголь",
                 "водка"
               ],
+              "voice_aliases": [],
               "sort_order": 90,
               "is_active": true
             }
@@ -13701,6 +14055,7 @@
                 "барный алкоголь",
                 "джин"
               ],
+              "voice_aliases": [],
               "sort_order": 10,
               "is_active": true
             },
@@ -13732,6 +14087,7 @@
                 "барный алкоголь",
                 "джин"
               ],
+              "voice_aliases": [],
               "sort_order": 20,
               "is_active": true
             },
@@ -13763,6 +14119,7 @@
                 "барный алкоголь",
                 "джин"
               ],
+              "voice_aliases": [],
               "sort_order": 30,
               "is_active": true
             },
@@ -13794,6 +14151,7 @@
                 "барный алкоголь",
                 "джин"
               ],
+              "voice_aliases": [],
               "sort_order": 40,
               "is_active": true
             },
@@ -13825,6 +14183,7 @@
                 "барный алкоголь",
                 "джин"
               ],
+              "voice_aliases": [],
               "sort_order": 50,
               "is_active": true
             },
@@ -13856,6 +14215,7 @@
                 "барный алкоголь",
                 "джин"
               ],
+              "voice_aliases": [],
               "sort_order": 60,
               "is_active": true
             },
@@ -13887,6 +14247,7 @@
                 "барный алкоголь",
                 "джин"
               ],
+              "voice_aliases": [],
               "sort_order": 70,
               "is_active": true
             },
@@ -13918,6 +14279,7 @@
                 "барный алкоголь",
                 "джин"
               ],
+              "voice_aliases": [],
               "sort_order": 80,
               "is_active": true
             },
@@ -13949,6 +14311,7 @@
                 "барный алкоголь",
                 "джин"
               ],
+              "voice_aliases": [],
               "sort_order": 90,
               "is_active": true
             },
@@ -13980,6 +14343,7 @@
                 "барный алкоголь",
                 "джин"
               ],
+              "voice_aliases": [],
               "sort_order": 100,
               "is_active": true
             }
@@ -14016,6 +14380,7 @@
                 "барный алкоголь",
                 "ром, текила и писко"
               ],
+              "voice_aliases": [],
               "sort_order": 10,
               "is_active": true
             },
@@ -14047,6 +14412,7 @@
                 "барный алкоголь",
                 "ром, текила и писко"
               ],
+              "voice_aliases": [],
               "sort_order": 20,
               "is_active": true
             },
@@ -14078,6 +14444,7 @@
                 "барный алкоголь",
                 "ром, текила и писко"
               ],
+              "voice_aliases": [],
               "sort_order": 30,
               "is_active": true
             },
@@ -14109,6 +14476,7 @@
                 "барный алкоголь",
                 "ром, текила и писко"
               ],
+              "voice_aliases": [],
               "sort_order": 40,
               "is_active": true
             },
@@ -14140,6 +14508,7 @@
                 "барный алкоголь",
                 "ром, текила и писко"
               ],
+              "voice_aliases": [],
               "sort_order": 50,
               "is_active": true
             },
@@ -14171,6 +14540,7 @@
                 "барный алкоголь",
                 "ром, текила и писко"
               ],
+              "voice_aliases": [],
               "sort_order": 60,
               "is_active": true
             },
@@ -14202,6 +14572,7 @@
                 "барный алкоголь",
                 "ром, текила и писко"
               ],
+              "voice_aliases": [],
               "sort_order": 70,
               "is_active": true
             },
@@ -14233,6 +14604,7 @@
                 "барный алкоголь",
                 "ром, текила и писко"
               ],
+              "voice_aliases": [],
               "sort_order": 80,
               "is_active": true
             },
@@ -14269,6 +14641,7 @@
                 "барный алкоголь",
                 "ром, текила и писко"
               ],
+              "voice_aliases": [],
               "sort_order": 90,
               "is_active": true
             },
@@ -14305,6 +14678,7 @@
                 "барный алкоголь",
                 "ром, текила и писко"
               ],
+              "voice_aliases": [],
               "sort_order": 100,
               "is_active": true
             },
@@ -14341,6 +14715,7 @@
                 "барный алкоголь",
                 "ром, текила и писко"
               ],
+              "voice_aliases": [],
               "sort_order": 110,
               "is_active": true
             },
@@ -14377,6 +14752,7 @@
                 "барный алкоголь",
                 "ром, текила и писко"
               ],
+              "voice_aliases": [],
               "sort_order": 120,
               "is_active": true
             },
@@ -14413,6 +14789,7 @@
                 "барный алкоголь",
                 "ром, текила и писко"
               ],
+              "voice_aliases": [],
               "sort_order": 130,
               "is_active": true
             },
@@ -14449,6 +14826,7 @@
                 "барный алкоголь",
                 "ром, текила и писко"
               ],
+              "voice_aliases": [],
               "sort_order": 140,
               "is_active": true
             },
@@ -14485,6 +14863,7 @@
                 "барный алкоголь",
                 "ром, текила и писко"
               ],
+              "voice_aliases": [],
               "sort_order": 150,
               "is_active": true
             }
@@ -14526,6 +14905,7 @@
                 "барный алкоголь",
                 "ликёры и вермуты"
               ],
+              "voice_aliases": [],
               "sort_order": 10,
               "is_active": true
             },
@@ -14557,6 +14937,7 @@
                 "барный алкоголь",
                 "ликёры и вермуты"
               ],
+              "voice_aliases": [],
               "sort_order": 20,
               "is_active": true
             },
@@ -14588,6 +14969,7 @@
                 "барный алкоголь",
                 "ликёры и вермуты"
               ],
+              "voice_aliases": [],
               "sort_order": 30,
               "is_active": true
             },
@@ -14614,6 +14996,7 @@
                 "барный алкоголь",
                 "ликёры и вермуты"
               ],
+              "voice_aliases": [],
               "sort_order": 40,
               "is_active": true
             },
@@ -14640,6 +15023,7 @@
                 "барный алкоголь",
                 "ликёры и вермуты"
               ],
+              "voice_aliases": [],
               "sort_order": 50,
               "is_active": true
             },
@@ -14666,6 +15050,7 @@
                 "барный алкоголь",
                 "ликёры и вермуты"
               ],
+              "voice_aliases": [],
               "sort_order": 60,
               "is_active": true
             },
@@ -14692,6 +15077,7 @@
                 "барный алкоголь",
                 "ликёры и вермуты"
               ],
+              "voice_aliases": [],
               "sort_order": 70,
               "is_active": true
             },
@@ -14723,6 +15109,7 @@
                 "барный алкоголь",
                 "ликёры и вермуты"
               ],
+              "voice_aliases": [],
               "sort_order": 80,
               "is_active": true
             },
@@ -14754,6 +15141,7 @@
                 "барный алкоголь",
                 "ликёры и вермуты"
               ],
+              "voice_aliases": [],
               "sort_order": 90,
               "is_active": true
             },
@@ -14780,6 +15168,7 @@
                 "барный алкоголь",
                 "ликёры и вермуты"
               ],
+              "voice_aliases": [],
               "sort_order": 100,
               "is_active": true
             },
@@ -14811,6 +15200,7 @@
                 "барный алкоголь",
                 "ликёры и вермуты"
               ],
+              "voice_aliases": [],
               "sort_order": 110,
               "is_active": true
             },
@@ -14837,6 +15227,7 @@
                 "барный алкоголь",
                 "ликёры и вермуты"
               ],
+              "voice_aliases": [],
               "sort_order": 120,
               "is_active": true
             },
@@ -14868,6 +15259,7 @@
                 "барный алкоголь",
                 "ликёры и вермуты"
               ],
+              "voice_aliases": [],
               "sort_order": 130,
               "is_active": true
             },
@@ -14899,6 +15291,7 @@
                 "барный алкоголь",
                 "ликёры и вермуты"
               ],
+              "voice_aliases": [],
               "sort_order": 140,
               "is_active": true
             },
@@ -14930,6 +15323,7 @@
                 "барный алкоголь",
                 "ликёры и вермуты"
               ],
+              "voice_aliases": [],
               "sort_order": 150,
               "is_active": true
             },
@@ -14956,6 +15350,7 @@
                 "барный алкоголь",
                 "ликёры и вермуты"
               ],
+              "voice_aliases": [],
               "sort_order": 160,
               "is_active": true
             },
@@ -14987,6 +15382,7 @@
                 "барный алкоголь",
                 "ликёры и вермуты"
               ],
+              "voice_aliases": [],
               "sort_order": 170,
               "is_active": true
             },
@@ -15018,6 +15414,7 @@
                 "барный алкоголь",
                 "ликёры и вермуты"
               ],
+              "voice_aliases": [],
               "sort_order": 180,
               "is_active": true
             },
@@ -15044,6 +15441,7 @@
                 "барный алкоголь",
                 "ликёры и вермуты"
               ],
+              "voice_aliases": [],
               "sort_order": 190,
               "is_active": true
             },
@@ -15070,6 +15468,7 @@
                 "барный алкоголь",
                 "ликёры и вермуты"
               ],
+              "voice_aliases": [],
               "sort_order": 200,
               "is_active": true
             },
@@ -15096,6 +15495,7 @@
                 "барный алкоголь",
                 "ликёры и вермуты"
               ],
+              "voice_aliases": [],
               "sort_order": 210,
               "is_active": true
             }
@@ -15132,6 +15532,7 @@
                 "барный алкоголь",
                 "бренди и коньяк"
               ],
+              "voice_aliases": [],
               "sort_order": 10,
               "is_active": true
             },
@@ -15158,6 +15559,7 @@
                 "барный алкоголь",
                 "бренди и коньяк"
               ],
+              "voice_aliases": [],
               "sort_order": 20,
               "is_active": true
             },
@@ -15184,6 +15586,7 @@
                 "барный алкоголь",
                 "бренди и коньяк"
               ],
+              "voice_aliases": [],
               "sort_order": 30,
               "is_active": true
             },
@@ -15210,6 +15613,7 @@
                 "барный алкоголь",
                 "бренди и коньяк"
               ],
+              "voice_aliases": [],
               "sort_order": 40,
               "is_active": true
             },
@@ -15236,6 +15640,7 @@
                 "барный алкоголь",
                 "бренди и коньяк"
               ],
+              "voice_aliases": [],
               "sort_order": 50,
               "is_active": true
             }
@@ -15272,6 +15677,7 @@
                 "барный алкоголь",
                 "настойки и лимончелло"
               ],
+              "voice_aliases": [],
               "sort_order": 10,
               "is_active": true
             },
@@ -15298,6 +15704,7 @@
                 "барный алкоголь",
                 "настойки и лимончелло"
               ],
+              "voice_aliases": [],
               "sort_order": 20,
               "is_active": true
             },
@@ -15324,6 +15731,7 @@
                 "барный алкоголь",
                 "настойки и лимончелло"
               ],
+              "voice_aliases": [],
               "sort_order": 30,
               "is_active": true
             },
@@ -15350,6 +15758,7 @@
                 "барный алкоголь",
                 "настойки и лимончелло"
               ],
+              "voice_aliases": [],
               "sort_order": 40,
               "is_active": true
             },
@@ -15376,6 +15785,7 @@
                 "барный алкоголь",
                 "настойки и лимончелло"
               ],
+              "voice_aliases": [],
               "sort_order": 50,
               "is_active": true
             },
@@ -15402,6 +15812,7 @@
                 "барный алкоголь",
                 "настойки и лимончелло"
               ],
+              "voice_aliases": [],
               "sort_order": 60,
               "is_active": true
             },
@@ -15428,6 +15839,7 @@
                 "барный алкоголь",
                 "настойки и лимончелло"
               ],
+              "voice_aliases": [],
               "sort_order": 70,
               "is_active": true
             },
@@ -15454,6 +15866,7 @@
                 "барный алкоголь",
                 "настойки и лимончелло"
               ],
+              "voice_aliases": [],
               "sort_order": 80,
               "is_active": true
             },
@@ -15480,6 +15893,7 @@
                 "барный алкоголь",
                 "настойки и лимончелло"
               ],
+              "voice_aliases": [],
               "sort_order": 90,
               "is_active": true
             },
@@ -15506,6 +15920,7 @@
                 "барный алкоголь",
                 "настойки и лимончелло"
               ],
+              "voice_aliases": [],
               "sort_order": 100,
               "is_active": true
             }
@@ -15542,6 +15957,7 @@
                 "барный алкоголь",
                 "пиво и сидр"
               ],
+              "voice_aliases": [],
               "sort_order": 10,
               "is_active": true
             },
@@ -15568,6 +15984,7 @@
                 "барный алкоголь",
                 "пиво и сидр"
               ],
+              "voice_aliases": [],
               "sort_order": 20,
               "is_active": true
             },
@@ -15594,6 +16011,7 @@
                 "барный алкоголь",
                 "пиво и сидр"
               ],
+              "voice_aliases": [],
               "sort_order": 30,
               "is_active": true
             },
@@ -15620,6 +16038,7 @@
                 "барный алкоголь",
                 "пиво и сидр"
               ],
+              "voice_aliases": [],
               "sort_order": 40,
               "is_active": true
             },
@@ -15651,6 +16070,7 @@
                 "барный алкоголь",
                 "пиво и сидр"
               ],
+              "voice_aliases": [],
               "sort_order": 50,
               "is_active": true
             },
@@ -15677,6 +16097,7 @@
                 "барный алкоголь",
                 "пиво и сидр"
               ],
+              "voice_aliases": [],
               "sort_order": 60,
               "is_active": true
             },
@@ -15703,6 +16124,7 @@
                 "барный алкоголь",
                 "пиво и сидр"
               ],
+              "voice_aliases": [],
               "sort_order": 70,
               "is_active": true
             },
@@ -15729,6 +16151,7 @@
                 "барный алкоголь",
                 "пиво и сидр"
               ],
+              "voice_aliases": [],
               "sort_order": 80,
               "is_active": true
             },
@@ -15755,6 +16178,7 @@
                 "барный алкоголь",
                 "пиво и сидр"
               ],
+              "voice_aliases": [],
               "sort_order": 90,
               "is_active": true
             },
@@ -15781,6 +16205,7 @@
                 "барный алкоголь",
                 "пиво и сидр"
               ],
+              "voice_aliases": [],
               "sort_order": 100,
               "is_active": true
             },
@@ -15807,6 +16232,7 @@
                 "барный алкоголь",
                 "пиво и сидр"
               ],
+              "voice_aliases": [],
               "sort_order": 110,
               "is_active": true
             },
@@ -15833,6 +16259,7 @@
                 "барный алкоголь",
                 "пиво и сидр"
               ],
+              "voice_aliases": [],
               "sort_order": 120,
               "is_active": true
             },
@@ -15859,6 +16286,7 @@
                 "барный алкоголь",
                 "пиво и сидр"
               ],
+              "voice_aliases": [],
               "sort_order": 130,
               "is_active": true
             },
@@ -15885,6 +16313,7 @@
                 "барный алкоголь",
                 "пиво и сидр"
               ],
+              "voice_aliases": [],
               "sort_order": 140,
               "is_active": true
             },
@@ -15911,6 +16340,7 @@
                 "барный алкоголь",
                 "пиво и сидр"
               ],
+              "voice_aliases": [],
               "sort_order": 150,
               "is_active": true
             },
@@ -15937,6 +16367,7 @@
                 "барный алкоголь",
                 "пиво и сидр"
               ],
+              "voice_aliases": [],
               "sort_order": 160,
               "is_active": true
             },
@@ -15963,6 +16394,7 @@
                 "барный алкоголь",
                 "пиво и сидр"
               ],
+              "voice_aliases": [],
               "sort_order": 170,
               "is_active": true
             }
@@ -16035,6 +16467,7 @@
                 "безалкогольные напитки",
                 "лимонады"
               ],
+              "voice_aliases": [],
               "sort_order": 10,
               "is_active": true
             },
@@ -16091,6 +16524,7 @@
                 "безалкогольные напитки",
                 "лимонады"
               ],
+              "voice_aliases": [],
               "sort_order": 20,
               "is_active": true
             },
@@ -16142,6 +16576,7 @@
                 "безалкогольные напитки",
                 "лимонады"
               ],
+              "voice_aliases": [],
               "sort_order": 30,
               "is_active": true
             },
@@ -16193,6 +16628,7 @@
                 "безалкогольные напитки",
                 "лимонады"
               ],
+              "voice_aliases": [],
               "sort_order": 40,
               "is_active": true
             },
@@ -16254,6 +16690,7 @@
                 "безалкогольные напитки",
                 "лимонады"
               ],
+              "voice_aliases": [],
               "sort_order": 50,
               "is_active": true
             },
@@ -16310,6 +16747,7 @@
                 "безалкогольные напитки",
                 "лимонады"
               ],
+              "voice_aliases": [],
               "sort_order": 60,
               "is_active": true
             },
@@ -16356,6 +16794,7 @@
                 "безалкогольные напитки",
                 "лимонады"
               ],
+              "voice_aliases": [],
               "sort_order": 70,
               "is_active": true
             },
@@ -16402,6 +16841,7 @@
                 "безалкогольные напитки",
                 "лимонады"
               ],
+              "voice_aliases": [],
               "sort_order": 80,
               "is_active": true
             },
@@ -16448,6 +16888,7 @@
                 "безалкогольные напитки",
                 "лимонады"
               ],
+              "voice_aliases": [],
               "sort_order": 90,
               "is_active": true
             },
@@ -16499,6 +16940,7 @@
                 "безалкогольные напитки",
                 "лимонады"
               ],
+              "voice_aliases": [],
               "sort_order": 100,
               "is_active": true
             },
@@ -16555,6 +16997,7 @@
                 "безалкогольные напитки",
                 "лимонады"
               ],
+              "voice_aliases": [],
               "sort_order": 110,
               "is_active": true
             },
@@ -16611,6 +17054,7 @@
                 "безалкогольные напитки",
                 "лимонады"
               ],
+              "voice_aliases": [],
               "sort_order": 120,
               "is_active": true
             },
@@ -16662,6 +17106,7 @@
                 "безалкогольные напитки",
                 "лимонады"
               ],
+              "voice_aliases": [],
               "sort_order": 130,
               "is_active": true
             },
@@ -16708,6 +17153,7 @@
                 "безалкогольные напитки",
                 "лимонады"
               ],
+              "voice_aliases": [],
               "sort_order": 140,
               "is_active": true
             },
@@ -16759,6 +17205,7 @@
                 "безалкогольные напитки",
                 "лимонады"
               ],
+              "voice_aliases": [],
               "sort_order": 150,
               "is_active": true
             },
@@ -16785,6 +17232,7 @@
                 "безалкогольные напитки",
                 "лимонады"
               ],
+              "voice_aliases": [],
               "sort_order": 160,
               "is_active": true
             },
@@ -16811,6 +17259,7 @@
                 "безалкогольные напитки",
                 "лимонады"
               ],
+              "voice_aliases": [],
               "sort_order": 170,
               "is_active": true
             },
@@ -16837,6 +17286,7 @@
                 "безалкогольные напитки",
                 "лимонады"
               ],
+              "voice_aliases": [],
               "sort_order": 180,
               "is_active": true
             }
@@ -16873,6 +17323,7 @@
                 "безалкогольные напитки",
                 "фреши"
               ],
+              "voice_aliases": [],
               "sort_order": 10,
               "is_active": true
             },
@@ -16899,6 +17350,7 @@
                 "безалкогольные напитки",
                 "фреши"
               ],
+              "voice_aliases": [],
               "sort_order": 20,
               "is_active": true
             },
@@ -16925,6 +17377,7 @@
                 "безалкогольные напитки",
                 "фреши"
               ],
+              "voice_aliases": [],
               "sort_order": 30,
               "is_active": true
             },
@@ -16951,6 +17404,7 @@
                 "безалкогольные напитки",
                 "фреши"
               ],
+              "voice_aliases": [],
               "sort_order": 40,
               "is_active": true
             },
@@ -16977,6 +17431,7 @@
                 "безалкогольные напитки",
                 "фреши"
               ],
+              "voice_aliases": [],
               "sort_order": 50,
               "is_active": true
             },
@@ -17003,6 +17458,7 @@
                 "безалкогольные напитки",
                 "фреши"
               ],
+              "voice_aliases": [],
               "sort_order": 60,
               "is_active": true
             },
@@ -17029,6 +17485,7 @@
                 "безалкогольные напитки",
                 "фреши"
               ],
+              "voice_aliases": [],
               "sort_order": 70,
               "is_active": true
             },
@@ -17055,6 +17512,7 @@
                 "безалкогольные напитки",
                 "фреши"
               ],
+              "voice_aliases": [],
               "sort_order": 80,
               "is_active": true
             },
@@ -17081,6 +17539,7 @@
                 "безалкогольные напитки",
                 "фреши"
               ],
+              "voice_aliases": [],
               "sort_order": 90,
               "is_active": true
             },
@@ -17107,6 +17566,7 @@
                 "безалкогольные напитки",
                 "фреши"
               ],
+              "voice_aliases": [],
               "sort_order": 100,
               "is_active": true
             },
@@ -17133,6 +17593,7 @@
                 "безалкогольные напитки",
                 "фреши"
               ],
+              "voice_aliases": [],
               "sort_order": 110,
               "is_active": true
             },
@@ -17159,6 +17620,7 @@
                 "безалкогольные напитки",
                 "фреши"
               ],
+              "voice_aliases": [],
               "sort_order": 120,
               "is_active": true
             }
@@ -17210,6 +17672,7 @@
                 "безалкогольные напитки",
                 "смузи и милкшейки"
               ],
+              "voice_aliases": [],
               "sort_order": 10,
               "is_active": true
             },
@@ -17261,6 +17724,7 @@
                 "безалкогольные напитки",
                 "смузи и милкшейки"
               ],
+              "voice_aliases": [],
               "sort_order": 20,
               "is_active": true
             },
@@ -17312,6 +17776,7 @@
                 "безалкогольные напитки",
                 "смузи и милкшейки"
               ],
+              "voice_aliases": [],
               "sort_order": 30,
               "is_active": true
             }
@@ -17348,6 +17813,7 @@
                 "безалкогольные напитки",
                 "напитки в бутылках"
               ],
+              "voice_aliases": [],
               "sort_order": 10,
               "is_active": true
             },
@@ -17374,6 +17840,7 @@
                 "безалкогольные напитки",
                 "напитки в бутылках"
               ],
+              "voice_aliases": [],
               "sort_order": 20,
               "is_active": true
             },
@@ -17400,6 +17867,7 @@
                 "безалкогольные напитки",
                 "напитки в бутылках"
               ],
+              "voice_aliases": [],
               "sort_order": 30,
               "is_active": true
             },
@@ -17426,6 +17894,7 @@
                 "безалкогольные напитки",
                 "напитки в бутылках"
               ],
+              "voice_aliases": [],
               "sort_order": 40,
               "is_active": true
             },
@@ -17452,6 +17921,7 @@
                 "безалкогольные напитки",
                 "напитки в бутылках"
               ],
+              "voice_aliases": [],
               "sort_order": 50,
               "is_active": true
             },
@@ -17478,6 +17948,7 @@
                 "безалкогольные напитки",
                 "напитки в бутылках"
               ],
+              "voice_aliases": [],
               "sort_order": 60,
               "is_active": true
             },
@@ -17504,6 +17975,7 @@
                 "безалкогольные напитки",
                 "напитки в бутылках"
               ],
+              "voice_aliases": [],
               "sort_order": 70,
               "is_active": true
             },
@@ -17530,6 +18002,7 @@
                 "безалкогольные напитки",
                 "напитки в бутылках"
               ],
+              "voice_aliases": [],
               "sort_order": 80,
               "is_active": true
             },
@@ -17556,6 +18029,7 @@
                 "безалкогольные напитки",
                 "напитки в бутылках"
               ],
+              "voice_aliases": [],
               "sort_order": 90,
               "is_active": true
             },
@@ -17582,6 +18056,7 @@
                 "безалкогольные напитки",
                 "напитки в бутылках"
               ],
+              "voice_aliases": [],
               "sort_order": 100,
               "is_active": true
             },
@@ -17608,6 +18083,7 @@
                 "безалкогольные напитки",
                 "напитки в бутылках"
               ],
+              "voice_aliases": [],
               "sort_order": 110,
               "is_active": true
             },
@@ -17634,6 +18110,7 @@
                 "безалкогольные напитки",
                 "напитки в бутылках"
               ],
+              "voice_aliases": [],
               "sort_order": 120,
               "is_active": true
             },
@@ -17660,6 +18137,7 @@
                 "безалкогольные напитки",
                 "напитки в бутылках"
               ],
+              "voice_aliases": [],
               "sort_order": 130,
               "is_active": true
             },
@@ -17686,6 +18164,7 @@
                 "безалкогольные напитки",
                 "напитки в бутылках"
               ],
+              "voice_aliases": [],
               "sort_order": 140,
               "is_active": true
             },
@@ -17712,6 +18191,7 @@
                 "безалкогольные напитки",
                 "напитки в бутылках"
               ],
+              "voice_aliases": [],
               "sort_order": 150,
               "is_active": true
             },
@@ -17738,6 +18218,7 @@
                 "безалкогольные напитки",
                 "напитки в бутылках"
               ],
+              "voice_aliases": [],
               "sort_order": 160,
               "is_active": true
             }
@@ -17774,6 +18255,7 @@
                 "безалкогольные напитки",
                 "вода, компоты и морсы"
               ],
+              "voice_aliases": [],
               "sort_order": 10,
               "is_active": true
             },
@@ -17800,6 +18282,7 @@
                 "безалкогольные напитки",
                 "вода, компоты и морсы"
               ],
+              "voice_aliases": [],
               "sort_order": 20,
               "is_active": true
             },
@@ -17826,6 +18309,7 @@
                 "безалкогольные напитки",
                 "вода, компоты и морсы"
               ],
+              "voice_aliases": [],
               "sort_order": 30,
               "is_active": true
             },
@@ -17852,6 +18336,7 @@
                 "безалкогольные напитки",
                 "вода, компоты и морсы"
               ],
+              "voice_aliases": [],
               "sort_order": 40,
               "is_active": true
             },
@@ -17878,6 +18363,7 @@
                 "безалкогольные напитки",
                 "вода, компоты и морсы"
               ],
+              "voice_aliases": [],
               "sort_order": 50,
               "is_active": true
             },
@@ -17904,6 +18390,7 @@
                 "безалкогольные напитки",
                 "вода, компоты и морсы"
               ],
+              "voice_aliases": [],
               "sort_order": 60,
               "is_active": true
             },
@@ -17930,6 +18417,7 @@
                 "безалкогольные напитки",
                 "вода, компоты и морсы"
               ],
+              "voice_aliases": [],
               "sort_order": 70,
               "is_active": true
             },
@@ -17956,6 +18444,7 @@
                 "безалкогольные напитки",
                 "вода, компоты и морсы"
               ],
+              "voice_aliases": [],
               "sort_order": 80,
               "is_active": true
             },
@@ -17982,6 +18471,7 @@
                 "безалкогольные напитки",
                 "вода, компоты и морсы"
               ],
+              "voice_aliases": [],
               "sort_order": 90,
               "is_active": true
             },
@@ -18008,6 +18498,7 @@
                 "безалкогольные напитки",
                 "вода, компоты и морсы"
               ],
+              "voice_aliases": [],
               "sort_order": 100,
               "is_active": true
             },
@@ -18034,6 +18525,7 @@
                 "безалкогольные напитки",
                 "вода, компоты и морсы"
               ],
+              "voice_aliases": [],
               "sort_order": 110,
               "is_active": true
             },
@@ -18060,6 +18552,7 @@
                 "безалкогольные напитки",
                 "вода, компоты и морсы"
               ],
+              "voice_aliases": [],
               "sort_order": 120,
               "is_active": true
             },
@@ -18086,6 +18579,7 @@
                 "безалкогольные напитки",
                 "вода, компоты и морсы"
               ],
+              "voice_aliases": [],
               "sort_order": 130,
               "is_active": true
             },
@@ -18112,6 +18606,7 @@
                 "безалкогольные напитки",
                 "вода, компоты и морсы"
               ],
+              "voice_aliases": [],
               "sort_order": 140,
               "is_active": true
             }
@@ -18161,6 +18656,7 @@
           "tags": [
             "десерты"
           ],
+          "voice_aliases": [],
           "sort_order": 10,
           "is_active": true
         },
@@ -18196,6 +18692,7 @@
           "tags": [
             "десерты"
           ],
+          "voice_aliases": [],
           "sort_order": 20,
           "is_active": true
         },
@@ -18231,6 +18728,7 @@
           "tags": [
             "десерты"
           ],
+          "voice_aliases": [],
           "sort_order": 30,
           "is_active": true
         },
@@ -18266,6 +18764,7 @@
           "tags": [
             "десерты"
           ],
+          "voice_aliases": [],
           "sort_order": 40,
           "is_active": true
         },
@@ -18301,6 +18800,7 @@
           "tags": [
             "десерты"
           ],
+          "voice_aliases": [],
           "sort_order": 50,
           "is_active": true
         },
@@ -18331,6 +18831,7 @@
           "tags": [
             "десерты"
           ],
+          "voice_aliases": [],
           "sort_order": 60,
           "is_active": false
         },
@@ -18366,6 +18867,7 @@
           "tags": [
             "десерты"
           ],
+          "voice_aliases": [],
           "sort_order": 70,
           "is_active": false
         },
@@ -18396,6 +18898,7 @@
           "tags": [
             "десерты"
           ],
+          "voice_aliases": [],
           "sort_order": 80,
           "is_active": true
         },
@@ -18426,6 +18929,7 @@
           "tags": [
             "десерты"
           ],
+          "voice_aliases": [],
           "sort_order": 90,
           "is_active": true
         },
@@ -18461,6 +18965,7 @@
           "tags": [
             "десерты"
           ],
+          "voice_aliases": [],
           "sort_order": 100,
           "is_active": false
         }
@@ -18508,6 +19013,7 @@
             "чай",
             "классический"
           ],
+          "voice_aliases": [],
           "sort_order": 10,
           "is_active": true
         },
@@ -18544,6 +19050,7 @@
             "чай",
             "классический"
           ],
+          "voice_aliases": [],
           "sort_order": 20,
           "is_active": true
         }

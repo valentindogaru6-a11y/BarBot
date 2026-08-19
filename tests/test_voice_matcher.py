@@ -1,5 +1,7 @@
 """Tests for voice aliases, fuzzy ranking, thresholds, and active filtering."""
 
+import pytest
+
 from app.models.catalog import Catalog
 from app.services.voice_matcher import (
     HIGH_CONFIDENCE_THRESHOLD,
@@ -49,6 +51,45 @@ def _catalog() -> Catalog:
                         }
                     ],
                 }
+            ],
+        }
+    )
+
+
+def _universal_catalog() -> Catalog:
+    return Catalog.model_validate(
+        {
+            "version": 1,
+            "categories": [
+                {
+                    "id": "cocktails",
+                    "name": "Коктейли",
+                    "items": [
+                        {"id": "kiwi-punch", "name": "Kiwi Punch"},
+                        {"id": "pornstar-girl", "name": "Pornstar Girl"},
+                        {"id": "pornstar-boy", "name": "Pornstar Boy"},
+                        {
+                            "id": "pornstar-strawb",
+                            "name": "Pornstar Strawberry",
+                        },
+                        {"id": "black-hive", "name": "Black Hive"},
+                        {"id": "old-fashioned", "name": "Old Fashioned"},
+                        {"id": "whiskey-sour", "name": "Whiskey Sour"},
+                        {"id": "negroni", "name": "Negroni"},
+                    ],
+                },
+                {
+                    "id": "coffee",
+                    "name": "Кофе",
+                    "items": [{"id": "flat-white", "name": "Flat White"}],
+                },
+                {
+                    "id": "wine",
+                    "name": "Вино",
+                    "items": [
+                        {"id": "pinot-grigio", "name": "Pinot Grigio"}
+                    ],
+                },
             ],
         }
     )
@@ -150,3 +191,59 @@ def test_medium_threshold_boundary_is_inclusive(monkeypatch) -> None:
 
     assert outcome.confidence is MatchConfidence.MEDIUM
     assert outcome.matches
+
+
+@pytest.mark.parametrize(
+    ("query", "item_id"),
+    [
+        ("киви панч", "kiwi-punch"),
+        ("киви панц", "kiwi-punch"),
+        ("порнстар герл", "pornstar-girl"),
+        ("порнстар бой", "pornstar-boy"),
+        ("блэк хайв", "black-hive"),
+        ("олд фешн", "old-fashioned"),
+        ("виски сауэр", "whiskey-sour"),
+        ("негрони", "negroni"),
+        ("флэт уайт", "flat-white"),
+        ("пино гриджо", "pinot-grigio"),
+    ],
+)
+def test_phonetic_query_finds_item_with_high_confidence(
+    query: str,
+    item_id: str,
+) -> None:
+    outcome = VoiceCatalogMatcher(_universal_catalog()).match(query)
+
+    assert outcome.confidence is MatchConfidence.HIGH
+    assert outcome.matches[0].result.item.id == item_id
+
+
+def test_shared_pornstar_prefix_returns_three_medium_results() -> None:
+    outcome = VoiceCatalogMatcher(_universal_catalog()).match("порнстар")
+
+    assert outcome.confidence is MatchConfidence.MEDIUM
+    assert {match.result.item.id for match in outcome.matches} == {
+        "pornstar-girl",
+        "pornstar-boy",
+        "pornstar-strawb",
+    }
+
+
+def test_unknown_phonetic_phrase_remains_low() -> None:
+    outcome = VoiceCatalogMatcher(_universal_catalog()).match(
+        "совершенно неизвестная позиция"
+    )
+
+    assert outcome.confidence is MatchConfidence.LOW
+
+
+def test_rank_exposes_best_alias_score_for_diagnostics() -> None:
+    ranked = VoiceCatalogMatcher(_universal_catalog()).rank(
+        "киви панч",
+        limit=3,
+    )
+
+    assert len(ranked) == 3
+    assert ranked[0].result.item.id == "kiwi-punch"
+    assert ranked[0].score == 1.0
+    assert ranked[0].matched_text == "киви панч"

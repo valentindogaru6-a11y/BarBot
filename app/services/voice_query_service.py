@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 
 _PUNCTUATION_RE = re.compile(r"[^\w\s-]+", re.UNICODE)
 _SPACE_RE = re.compile(r"\s+")
@@ -34,7 +35,9 @@ TRAILING_POLITE_WORDS = ("пожалуйста", "спасибо")
 def normalize_voice_text(value: str) -> str:
     """Normalize punctuation, case, spacing, and common dictated initials."""
 
-    normalized = value.casefold().replace("ё", "е")
+    normalized = unicodedata.normalize("NFKC", value)
+    normalized = normalized.casefold().replace("ё", "е")
+    normalized = normalized.replace("_", " ").replace("-", " ")
     normalized = _PUNCTUATION_RE.sub(" ", normalized)
     normalized = _SPACE_RE.sub(" ", normalized).strip()
     replacements = {

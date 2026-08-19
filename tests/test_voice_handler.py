@@ -167,6 +167,10 @@ def test_medium_confidence_shows_existing_search_result_buttons(
         if button.callback_data and button.callback_data.startswith("i:")
     ]
     assert len(item_buttons) == 2
+    assert {button.text.split(" — ", 1)[0] for button in item_buttons} == {
+        "Berry Red",
+        "Berry Blue",
+    }
 
 
 def test_low_confidence_offers_voice_and_text_retry(

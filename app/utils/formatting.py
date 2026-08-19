@@ -68,10 +68,29 @@ def format_category_heading(category: Category) -> str:
     return _format_section_heading(category)
 
 
-def format_subcategory_heading(subcategory: Subcategory) -> str:
-    """Format a subcategory heading with escaped user-managed content."""
+def format_subcategory_heading(
+    subcategory: Subcategory,
+    category: Category | None = None,
+) -> str:
+    """Format a subcategory and optionally show its full parent context."""
 
-    return _format_section_heading(subcategory)
+    if category is None:
+        return _format_section_heading(subcategory)
+    category_emoji = (
+        f"{escape(category.emoji.strip())} " if category.emoji else ""
+    )
+    subcategory_emoji = (
+        f"{escape(subcategory.emoji.strip())} "
+        if subcategory.emoji
+        else ""
+    )
+    parts = [
+        f"<b>{category_emoji}{escape(category.name)}</b>\n"
+        f"↳ <b>{subcategory_emoji}{escape(subcategory.name)}</b>"
+    ]
+    if subcategory.description and subcategory.description.strip():
+        parts.append(escape(subcategory.description.strip()))
+    return "\n\n".join(parts)
 
 
 def format_item_card(item: CatalogItem) -> str:

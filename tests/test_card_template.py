@@ -25,6 +25,7 @@ def _item() -> CatalogItem:
         fields={"glassware": "Рокс", "method": "Dry Shake → Shake"},
         steps=["Перебить", "Процедить", "Подать"],
         tags=["авторский", "виски", "цитрусовый"],
+        voice_aliases=["кис ми", "кисс ми"],
         sort_order=10,
         is_active=False,
     )
@@ -43,6 +44,7 @@ def test_full_item_serializes_and_round_trips() -> None:
     assert parsed.fields == item.fields
     assert parsed.steps == item.steps
     assert parsed.tags == item.tags
+    assert parsed.voice_aliases == item.voice_aliases
     assert parsed.sort_order == 10
     assert parsed.is_active is False
     assert "telegram-file-id" not in template
@@ -60,6 +62,7 @@ def test_empty_optional_fields_serialize_as_clear_markers() -> None:
     assert parsed.fields == {}
     assert parsed.steps == []
     assert parsed.tags == []
+    assert parsed.voice_aliases == []
 
 
 def test_parser_accepts_case_insensitive_headings() -> None:
@@ -80,6 +83,7 @@ def test_dash_clears_every_optional_section() -> None:
         "glassware | Рокс\nmethod | Dry Shake → Shake",
         "Перебить\nПроцедить\nПодать",
         "авторский, виски, цитрусовый",
+        "кис ми\nкисс ми",
     ):
         template = template.replace(value, "-")
 
@@ -91,6 +95,7 @@ def test_dash_clears_every_optional_section() -> None:
     assert not parsed.fields
     assert not parsed.steps
     assert not parsed.tags
+    assert not parsed.voice_aliases
 
 
 def test_parser_reports_bad_ingredient_with_section_and_line() -> None:
@@ -198,6 +203,7 @@ def test_empty_creation_template_has_all_sections_without_protected_data() -> No
             "ХАРАКТЕРИСТИКИ:",
             "ПРИГОТОВЛЕНИЕ:",
             "ТЕГИ:",
+            "ГОЛОСОВЫЕ АЛИАСЫ:",
             "ПОРЯДОК:",
             "АКТИВНА:",
         )
