@@ -21,6 +21,10 @@ backups/
 *.db
 *.sqlite3
 
+# Local speech-recognition models (keep documentation only)
+models/*
+!models/README.md
+
 # OS
 .DS_Store
 Thumbs.db

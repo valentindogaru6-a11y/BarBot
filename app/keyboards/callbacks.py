@@ -44,4 +44,4 @@ class PaginationCallback(CallbackData, prefix="p"):
 class SearchCallback(CallbackData, prefix="s"):
     """Control the search conversation."""
 
-    action: Literal["cancel", "retry"]
+    action: Literal["cancel", "retry", "voice_retry"]

@@ -43,6 +43,7 @@ def test_all_callback_factories_produce_short_data() -> None:
             subcategory_id="b" * 18,
         ),
         SearchCallback(action="retry"),
+        SearchCallback(action="voice_retry"),
     ]
 
     assert all(len(callback.pack().encode("utf-8")) <= 64 for callback in callbacks)

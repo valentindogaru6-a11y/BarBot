@@ -4,12 +4,13 @@ import json
 import logging
 from pathlib import Path
 
-from pydantic import SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CATALOG_PATH = PROJECT_ROOT / "data" / "catalog.json"
 DEFAULT_DATABASE_PATH = PROJECT_ROOT / "data" / "barbot.db"
+DEFAULT_VOSK_MODEL_PATH = PROJECT_ROOT / "models" / "vosk-model-small-ru-0.22"
 ENV_FILE = PROJECT_ROOT / ".env"
 logger = logging.getLogger(__name__)
 
@@ -68,6 +69,13 @@ class Settings(BaseSettings):
     database_path: Path = DEFAULT_DATABASE_PATH
     super_admin_ids: frozenset[int] | None = None
     admin_ids: frozenset[int] = frozenset()
+    voice_search_enabled: bool = True
+    vosk_model_path: Path = DEFAULT_VOSK_MODEL_PATH
+    vosk_language: str = "ru"
+    voice_max_duration_seconds: int = Field(default=30, gt=0)
+    voice_max_file_size_mb: int = Field(default=10, gt=0)
+    voice_max_concurrent: int = Field(default=1, gt=0)
+    voice_debug_transcripts: bool = False
 
     @field_validator("super_admin_ids", mode="before")
     @classmethod
@@ -94,6 +102,30 @@ class Settings(BaseSettings):
         if path.is_absolute():
             return path
         return PROJECT_ROOT / path
+
+    @field_validator("vosk_model_path")
+    @classmethod
+    def resolve_vosk_model_path(cls, path: Path) -> Path:
+        """Resolve the model path without allowing relative path traversal."""
+
+        resolved = (
+            path.resolve()
+            if path.is_absolute()
+            else (PROJECT_ROOT / path).resolve()
+        )
+        try:
+            resolved.relative_to(PROJECT_ROOT)
+        except ValueError as exc:
+            raise ValueError(
+                "VOSK_MODEL_PATH должен находиться внутри каталога проекта"
+            ) from exc
+        return resolved
+
+    @property
+    def voice_max_file_size_bytes(self) -> int:
+        """Return the configured Telegram voice-file limit in bytes."""
+
+        return self.voice_max_file_size_mb * 1024 * 1024
 
     @property
     def effective_super_admin_ids(self) -> frozenset[int]:

@@ -41,5 +41,6 @@ class CatalogItem(BaseModel):
     fields: dict[str, Any] = Field(default_factory=dict)
     steps: list[str] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
+    voice_aliases: list[str] = Field(default_factory=list)
     sort_order: int = 0
     is_active: bool = True

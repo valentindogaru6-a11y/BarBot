@@ -8,13 +8,16 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 from app.config import PROJECT_ROOT, Settings
-from app.handlers import catalog, search, start
+from app.handlers import catalog, search, start, voice
 from app.handlers.admin import router as admin_router
 from app.middlewares.user_context import UserSyncMiddleware
 from app.services.admin_service import AdminService
+from app.services.audio_service import AudioService
 from app.services.audit_service import AuditService
 from app.services.auth_service import AuthService
+from app.services.speech_service import SpeechService
 from app.services.user_service import UserService
+from app.services.voice_processing_service import VoiceProcessingService
 from app.storage.json_storage import JsonCatalogStorage
 from app.storage.user_database import UserDatabase
 from app.telegram_commands import configure_bot_commands
@@ -41,6 +44,14 @@ async def main() -> None:
         storage=JsonCatalogStorage(settings.catalog_path),
         audit=audit_service,
     )
+    voice_processing_service = VoiceProcessingService(
+        AudioService(),
+        SpeechService(
+            settings.vosk_model_path,
+            language=settings.vosk_language,
+        ),
+        max_concurrent=settings.voice_max_concurrent,
+    )
     bot = Bot(
         token=settings.bot_token.get_secret_value(),
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
@@ -49,6 +60,7 @@ async def main() -> None:
     dispatcher.update.outer_middleware(UserSyncMiddleware(user_service))
     dispatcher.include_router(start.router)
     dispatcher.include_router(catalog.router)
+    dispatcher.include_router(voice.router)
     dispatcher.include_router(search.router)
     dispatcher.include_router(admin_router)
     dispatcher.errors.register(start.handle_unexpected_error)
@@ -62,6 +74,8 @@ async def main() -> None:
             auth_service=auth_service,
             admin_service=admin_service,
             user_service=user_service,
+            settings=settings,
+            voice_processing_service=voice_processing_service,
             close_bot_session=False,
         )
     finally:

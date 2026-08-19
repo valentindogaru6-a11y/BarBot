@@ -55,3 +55,23 @@ def build_search_retry_keyboard() -> InlineKeyboardMarkup:
     )
     builder.adjust(1)
     return builder.as_markup()
+
+
+def build_voice_retry_keyboard() -> InlineKeyboardMarkup:
+    """Build recovery controls after an uncertain voice request."""
+
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text="🎙 Повторить голосом",
+        callback_data=SearchCallback(action="voice_retry"),
+    )
+    builder.button(
+        text="🔍 Обычный поиск",
+        callback_data=MainCallback(action="search"),
+    )
+    builder.button(
+        text="⬅️ Главное меню",
+        callback_data=MainCallback(action="home"),
+    )
+    builder.adjust(1)
+    return builder.as_markup()
