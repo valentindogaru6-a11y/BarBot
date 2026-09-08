@@ -12,6 +12,7 @@ from app.handlers import voice as voice_handlers
 from app.middlewares import access as access_middleware
 from app.middlewares.access import BLOCKED_TEXT, CatalogAccessFilter
 from app.models.catalog import Catalog
+from app.models.user import Role
 from app.services.auth_service import AuthService
 from app.services.speech_service import (
     SpeechModelNotFoundError,
@@ -286,7 +287,12 @@ def test_access_filter_rejects_blocked_user_before_handler(monkeypatch) -> None:
 
     event = FakeMessage()
     monkeypatch.setattr(access_middleware, "Message", FakeMessage)
-    auth = SimpleNamespace(can_view_catalog=lambda _: False)
+    auth = SimpleNamespace(
+        get_context=lambda _: SimpleNamespace(
+            role=Role.BLOCKED,
+            can_view_catalog=False,
+        ),
+    )
 
     allowed = asyncio.run(CatalogAccessFilter()(event, auth))
 

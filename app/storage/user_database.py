@@ -7,8 +7,9 @@ from pathlib import Path
 from typing import Iterator
 
 from app.models.user import DATABASE_ROLES, Role, UserRecord
+from app.storage.migrations import CURRENT_SCHEMA_VERSION, run_migrations
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = CURRENT_SCHEMA_VERSION
 BUSY_TIMEOUT_MS = 5_000
 
 
@@ -48,29 +49,25 @@ class UserDatabase:
         """Create or safely reuse the current schema."""
 
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with self._connect() as connection:
-            connection.execute("PRAGMA journal_mode = WAL")
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS users (
-                    telegram_user_id INTEGER PRIMARY KEY,
-                    username TEXT NULL,
-                    first_name TEXT NULL,
-                    last_name TEXT NULL,
-                    role TEXT NOT NULL DEFAULT 'user'
-                        CHECK (role IN ('admin', 'bartender', 'user', 'blocked')),
-                    is_active INTEGER NOT NULL DEFAULT 1
-                        CHECK (is_active IN (0, 1)),
-                    first_seen_at TEXT NOT NULL,
-                    last_seen_at TEXT NOT NULL,
-                    created_by INTEGER NULL,
-                    updated_at TEXT NOT NULL,
-                    has_started INTEGER NOT NULL DEFAULT 0
-                        CHECK (has_started IN (0, 1))
-                )
-                """
+        connection: sqlite3.Connection | None = None
+        try:
+            connection = sqlite3.connect(
+                self.path,
+                timeout=5.0,
+                isolation_level=None,
             )
-            connection.execute("PRAGMA user_version = 1")
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON")
+            connection.execute("PRAGMA busy_timeout = 5000")
+            connection.execute("PRAGMA journal_mode = WAL")
+            run_migrations(connection)
+        except sqlite3.Error as exc:
+            raise UserDatabaseError(
+                "Не удалось инициализировать базу пользователей"
+            ) from exc
+        finally:
+            if connection is not None:
+                connection.close()
 
     @staticmethod
     def _record(row: sqlite3.Row | None) -> UserRecord | None:

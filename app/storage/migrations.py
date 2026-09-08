@@ -1,0 +1,343 @@
+"""Versioned, transactional SQLite schema migrations."""
+
+from __future__ import annotations
+
+import re
+import sqlite3
+from collections.abc import Callable
+
+CURRENT_SCHEMA_VERSION = 2
+
+USER_COLUMNS = (
+    "telegram_user_id",
+    "username",
+    "first_name",
+    "last_name",
+    "role",
+    "is_active",
+    "first_seen_at",
+    "last_seen_at",
+    "created_by",
+    "updated_at",
+    "has_started",
+)
+
+V1_ROLES = ("admin", "bartender", "user", "blocked")
+V2_ROLES = ("admin", "bartender", "accountant", "user", "blocked")
+
+_EXPECTED_COLUMNS = (
+    ("telegram_user_id", "INTEGER", 0, None, 1),
+    ("username", "TEXT", 0, None, 0),
+    ("first_name", "TEXT", 0, None, 0),
+    ("last_name", "TEXT", 0, None, 0),
+    ("role", "TEXT", 1, "'user'", 0),
+    ("is_active", "INTEGER", 1, "1", 0),
+    ("first_seen_at", "TEXT", 1, None, 0),
+    ("last_seen_at", "TEXT", 1, None, 0),
+    ("created_by", "INTEGER", 0, None, 0),
+    ("updated_at", "TEXT", 1, None, 0),
+    ("has_started", "INTEGER", 1, "0", 0),
+)
+
+_USERS_V2_SQL = """
+CREATE TABLE users (
+    telegram_user_id INTEGER PRIMARY KEY,
+    username TEXT NULL,
+    first_name TEXT NULL,
+    last_name TEXT NULL,
+    role TEXT NOT NULL DEFAULT 'user'
+        CHECK (role IN ('admin', 'bartender', 'accountant', 'user', 'blocked')),
+    is_active INTEGER NOT NULL DEFAULT 1
+        CHECK (is_active IN (0, 1)),
+    first_seen_at TEXT NOT NULL,
+    last_seen_at TEXT NOT NULL,
+    created_by INTEGER NULL,
+    updated_at TEXT NOT NULL,
+    has_started INTEGER NOT NULL DEFAULT 0
+        CHECK (has_started IN (0, 1))
+)
+"""
+
+_USERS_V2_REPLACEMENT_SQL = _USERS_V2_SQL.replace(
+    "CREATE TABLE users", "CREATE TABLE __users_v2_migration", 1
+)
+
+
+class DatabaseMigrationError(RuntimeError):
+    """Base error for schema initialization and migration failures."""
+
+
+class UnsupportedSchemaVersionError(DatabaseMigrationError):
+    """Raised when the database was created by a newer application."""
+
+
+class SchemaValidationError(DatabaseMigrationError):
+    """Raised when schema metadata and ``user_version`` disagree."""
+
+
+def _table_sql(connection: sqlite3.Connection, table: str) -> str | None:
+    row = connection.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?",
+        (table,),
+    ).fetchone()
+    return str(row[0]) if row is not None and row[0] is not None else None
+
+
+def _quoted_identifier(value: str) -> str:
+    return '"' + value.replace('"', '""') + '"'
+
+
+def _column_signature(
+    connection: sqlite3.Connection,
+    table: str,
+) -> tuple[tuple[str, str, int, str | None, int], ...]:
+    rows = connection.execute(
+        f"PRAGMA table_info({_quoted_identifier(table)})"
+    ).fetchall()
+    return tuple(
+        (
+            str(row[1]),
+            str(row[2]).upper(),
+            int(row[3]),
+            str(row[4]) if row[4] is not None else None,
+            int(row[5]),
+        )
+        for row in rows
+    )
+
+
+def _role_check_values(table_sql: str) -> tuple[str, ...] | None:
+    compact = re.sub(r"\s+", "", table_sql.casefold())
+    compact = compact.translate(str.maketrans("", "", '"`[]'))
+    matches = re.findall(r"check\(rolein\(([^()]*)\)\)", compact)
+    if len(matches) != 1:
+        return None
+    values = re.findall(r"'([^']+)'", matches[0])
+    return tuple(values) if values else None
+
+
+def _validate_boolean_checks(table_sql: str) -> bool:
+    compact = re.sub(r"\s+", "", table_sql.casefold())
+    compact = compact.translate(str.maketrans("", "", '"`[]'))
+    return (
+        "check(is_activein(0,1))" in compact
+        and "check(has_startedin(0,1))" in compact
+    )
+
+
+def _validate_stored_roles(
+    connection: sqlite3.Connection,
+    expected_roles: tuple[str, ...],
+    version: int,
+) -> None:
+    placeholders = ", ".join("?" for _ in expected_roles)
+    invalid = connection.execute(
+        f"SELECT 1 FROM users WHERE role NOT IN ({placeholders}) LIMIT 1",
+        expected_roles,
+    ).fetchone()
+    if invalid is not None:
+        raise SchemaValidationError(
+            f"Таблица users содержит недопустимую роль для схемы v{version}"
+        )
+
+
+def _validate_no_dependent_objects(connection: sqlite3.Connection) -> None:
+    dependent = connection.execute(
+        """
+        SELECT type, name
+        FROM sqlite_master
+        WHERE tbl_name = 'users'
+          AND type IN ('index', 'trigger')
+          AND sql IS NOT NULL
+        LIMIT 1
+        """
+    ).fetchone()
+    if dependent is not None:
+        raise SchemaValidationError(
+            "Таблица users содержит неподдерживаемый индекс или триггер"
+        )
+
+    tables = connection.execute(
+        """
+        SELECT name
+        FROM sqlite_master
+        WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+        """
+    ).fetchall()
+    for row in tables:
+        table = str(row[0])
+        if table == "users":
+            continue
+        foreign_keys = connection.execute(
+            f"PRAGMA foreign_key_list({_quoted_identifier(table)})"
+        ).fetchall()
+        if any(str(key[2]) == "users" for key in foreign_keys):
+            raise SchemaValidationError(
+                "Таблица users имеет неподдерживаемые внешние зависимости"
+            )
+
+
+def validate_users_schema(
+    connection: sqlite3.Connection,
+    version: int,
+) -> None:
+    """Validate the concrete invariants of the known users schemas."""
+
+    expected_roles = (
+        V1_ROLES
+        if version == 1
+        else V2_ROLES
+        if version == 2
+        else None
+    )
+    if expected_roles is None:
+        raise UnsupportedSchemaVersionError(
+            f"Неподдерживаемая версия схемы SQLite: {version}"
+        )
+
+    table_sql = _table_sql(connection, "users")
+    if table_sql is None:
+        raise SchemaValidationError(
+            f"Версия схемы SQLite равна {version}, но таблица users отсутствует"
+        )
+    if _column_signature(connection, "users") != _EXPECTED_COLUMNS:
+        raise SchemaValidationError(
+            f"Таблица users не соответствует ожидаемой схеме v{version}"
+        )
+    if _role_check_values(table_sql) != expected_roles:
+        raise SchemaValidationError(
+            f"Ограничение ролей users не соответствует схеме v{version}"
+        )
+    if not _validate_boolean_checks(table_sql):
+        raise SchemaValidationError(
+            f"Ограничения статусов users не соответствуют схеме v{version}"
+        )
+    _validate_stored_roles(connection, expected_roles, version)
+    _validate_no_dependent_objects(connection)
+
+
+def _verify_users_preserved(connection: sqlite3.Connection) -> None:
+    columns = ", ".join(USER_COLUMNS)
+    old_count = int(
+        connection.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    )
+    new_count = int(
+        connection.execute(
+            "SELECT COUNT(*) FROM __users_v2_migration"
+        ).fetchone()[0]
+    )
+    if old_count != new_count:
+        raise DatabaseMigrationError(
+            "Миграция users не сохранила количество пользователей"
+        )
+
+    missing = connection.execute(
+        f"""
+        SELECT 1 FROM (
+            SELECT {columns} FROM users
+            EXCEPT
+            SELECT {columns} FROM __users_v2_migration
+        ) LIMIT 1
+        """
+    ).fetchone()
+    changed = connection.execute(
+        f"""
+        SELECT 1 FROM (
+            SELECT {columns} FROM __users_v2_migration
+            EXCEPT
+            SELECT {columns} FROM users
+        ) LIMIT 1
+        """
+    ).fetchone()
+    if missing is not None or changed is not None:
+        raise DatabaseMigrationError(
+            "Миграция users не сохранила значения пользовательских данных"
+        )
+
+
+def _migrate_v1_to_v2(connection: sqlite3.Connection) -> None:
+    validate_users_schema(connection, 1)
+    if _table_sql(connection, "__users_v2_migration") is not None:
+        raise SchemaValidationError(
+            "Обнаружена незавершённая служебная таблица миграции"
+        )
+
+    placeholders = ", ".join(USER_COLUMNS)
+    connection.execute(_USERS_V2_REPLACEMENT_SQL)
+    connection.execute(
+        f"""
+        INSERT INTO __users_v2_migration ({placeholders})
+        SELECT {placeholders} FROM users
+        """
+    )
+    _verify_users_preserved(connection)
+    connection.execute("DROP TABLE users")
+    connection.execute("ALTER TABLE __users_v2_migration RENAME TO users")
+    connection.execute("PRAGMA user_version = 2")
+    validate_users_schema(connection, 2)
+
+
+Migration = Callable[[sqlite3.Connection], None]
+MIGRATIONS: dict[int, Migration] = {1: _migrate_v1_to_v2}
+
+
+def run_migrations(connection: sqlite3.Connection) -> None:
+    """Initialize or upgrade one database under an explicit transaction."""
+
+    version = int(connection.execute("PRAGMA user_version").fetchone()[0])
+    if version > CURRENT_SCHEMA_VERSION:
+        raise UnsupportedSchemaVersionError(
+            "Версия SQLite новее поддерживаемой: "
+            f"{version} > {CURRENT_SCHEMA_VERSION}"
+        )
+    if connection.in_transaction:
+        raise DatabaseMigrationError(
+            "Migration runner требует соединение без активной транзакции"
+        )
+
+    try:
+        connection.execute("BEGIN IMMEDIATE")
+        if version == 0:
+            if _table_sql(connection, "users") is not None:
+                raise SchemaValidationError(
+                    "Таблица users существует при нулевой версии схемы"
+                )
+            if _table_sql(connection, "__users_v2_migration") is not None:
+                raise SchemaValidationError(
+                    "Обнаружена незавершённая служебная таблица миграции"
+                )
+            connection.execute(_USERS_V2_SQL)
+            connection.execute("PRAGMA user_version = 2")
+            validate_users_schema(connection, 2)
+        elif version == CURRENT_SCHEMA_VERSION:
+            validate_users_schema(connection, CURRENT_SCHEMA_VERSION)
+        else:
+            while version < CURRENT_SCHEMA_VERSION:
+                migration = MIGRATIONS.get(version)
+                if migration is None:
+                    raise UnsupportedSchemaVersionError(
+                        f"Нет миграции для схемы SQLite v{version}"
+                    )
+                migration(connection)
+                next_version = int(
+                    connection.execute("PRAGMA user_version").fetchone()[0]
+                )
+                if next_version != version + 1:
+                    raise DatabaseMigrationError(
+                        "Миграция SQLite должна повышать версию ровно на один шаг"
+                    )
+                version = next_version
+            validate_users_schema(connection, CURRENT_SCHEMA_VERSION)
+        connection.commit()
+    except Exception as exc:
+        if connection.in_transaction:
+            connection.rollback()
+        if isinstance(exc, DatabaseMigrationError):
+            raise
+        if isinstance(exc, sqlite3.Error):
+            raise DatabaseMigrationError(
+                "Не удалось применить миграцию SQLite"
+            ) from exc
+        raise DatabaseMigrationError(
+            "Миграция SQLite прервана и отменена"
+        ) from exc

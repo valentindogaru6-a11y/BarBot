@@ -2,12 +2,13 @@
 
 from pathlib import Path
 
+import pytest
 from aiogram.types import User
 
 from app.models.user import Role
 from app.services.user_service import UserService
 from app.storage import user_database as database_module
-from app.storage.user_database import UserDatabase
+from app.storage.user_database import UserDatabase, UserDatabaseError
 
 
 def _database(tmp_path: Path) -> UserDatabase:
@@ -25,7 +26,7 @@ def test_creates_and_reinitializes_database(tmp_path: Path) -> None:
         "journal_mode": "wal",
         "busy_timeout": 5000,
         "foreign_keys": 1,
-        "user_version": 1,
+        "user_version": 2,
     }
 
 
@@ -128,4 +129,13 @@ def test_user_service_paginates_and_counts_roles(tmp_path: Path) -> None:
     assert (page, pages) == (1, 3)
     assert counts[Role.ADMIN] == 1
     assert counts[Role.BARTENDER] == 1
+    assert counts[Role.ACCOUNTANT] == 0
     assert counts[Role.USER] == 9
+
+
+def test_super_admin_cannot_be_stored_as_sqlite_role(tmp_path: Path) -> None:
+    database = _database(tmp_path)
+    database.ensure_user(12)
+
+    with pytest.raises(UserDatabaseError, match="Недопустимая"):
+        database.set_role(12, Role.SUPER_ADMIN, actor_user_id=1)

@@ -64,7 +64,13 @@ class UserService:
     def count_by_role(self) -> dict[Role, int]:
         return {
             role: self.database.count_users(role)
-            for role in (Role.ADMIN, Role.BARTENDER, Role.USER, Role.BLOCKED)
+            for role in (
+                Role.ADMIN,
+                Role.BARTENDER,
+                Role.ACCOUNTANT,
+                Role.USER,
+                Role.BLOCKED,
+            )
         }
 
     def set_role(

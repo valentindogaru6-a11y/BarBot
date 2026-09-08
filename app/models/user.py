@@ -9,12 +9,13 @@ class Role(StrEnum):
     SUPER_ADMIN = "super_admin"
     ADMIN = "admin"
     BARTENDER = "bartender"
+    ACCOUNTANT = "accountant"
     USER = "user"
     BLOCKED = "blocked"
 
 
 DATABASE_ROLES = frozenset(
-    {Role.ADMIN, Role.BARTENDER, Role.USER, Role.BLOCKED}
+    {Role.ADMIN, Role.BARTENDER, Role.ACCOUNTANT, Role.USER, Role.BLOCKED}
 )
 
 

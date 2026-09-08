@@ -6,13 +6,20 @@ from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramAPIError
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, ErrorEvent, Message, ReplyKeyboardRemove
+from aiogram.types import (
+    CallbackQuery,
+    ErrorEvent,
+    InlineKeyboardMarkup,
+    Message,
+    ReplyKeyboardRemove,
+)
 
 from app.handlers.common import edit_or_send_text
 from app.keyboards.callbacks import MainCallback
 from app.keyboards.main_menu import build_main_menu_keyboard
 from app.middlewares.access import BLOCKED_TEXT
 from app.models.user import Role
+from app.services.access_service import UserContext
 from app.services.auth_service import AuthService
 from app.telegram_commands import update_user_commands
 
@@ -34,6 +41,25 @@ HELP_TEXT = (
     "🎙 <b>Голосом</b> — отправьте название позиции голосовым сообщением.\n\n"
     "Основные команды также доступны через встроенное меню Telegram."
 )
+ACCOUNTANT_WELCOME_TEXT = (
+    "🧾 <b>BarBot для бухгалтера</b>\n\n"
+    "Доступ к каталогу и поиску для этой роли закрыт. Просмотр и выгрузка "
+    "отчётов появятся после включения складского модуля.\n\n"
+    "Сейчас доступны команды /start, /help и /myid."
+)
+ACCOUNTANT_HELP_TEXT = (
+    "<b>Помощь</b>\n\n"
+    "Для роли бухгалтера сейчас доступны /start, /help и /myid.\n"
+    "Каталог, поиск и административные функции недоступны. Просмотр отчётов "
+    "будет добавлен вместе со складским модулем."
+)
+
+
+def _main_menu_for(context: UserContext) -> InlineKeyboardMarkup | None:
+    return build_main_menu_keyboard(
+        can_view_catalog=context.can_view_catalog,
+        can_manage_catalog=context.can_manage_catalog,
+    )
 
 
 @router.message(CommandStart())
@@ -60,11 +86,14 @@ async def handle_start(
     if context.role is Role.BLOCKED:
         await message.answer(BLOCKED_TEXT)
         return
+    text = (
+        ACCOUNTANT_WELCOME_TEXT
+        if context.role is Role.ACCOUNTANT
+        else WELCOME_TEXT
+    )
     await message.answer(
-        WELCOME_TEXT,
-        reply_markup=build_main_menu_keyboard(
-            is_admin=context.can_manage_catalog
-        ),
+        text,
+        reply_markup=_main_menu_for(context),
     )
 
 
@@ -92,19 +121,26 @@ async def handle_help(
         )
     await state.clear()
     user = message.from_user
-    if user and not auth_service.can_view_catalog(user.id):
+    context = auth_service.get_context(user.id) if user else None
+    if context and context.role is Role.BLOCKED:
         await message.answer(BLOCKED_TEXT)
         return
-    is_admin = bool(user and auth_service.is_admin(user.id))
+    if context and context.role is Role.ACCOUNTANT:
+        await message.answer(ACCOUNTANT_HELP_TEXT)
+        return
     text = HELP_TEXT
-    if is_admin:
+    if context and context.can_manage_catalog:
         text += (
             "\n\n🛠 <b>Управление каталогом</b> доступно "
             "администраторам."
         )
     await message.answer(
         text,
-        reply_markup=build_main_menu_keyboard(is_admin=is_admin),
+        reply_markup=(
+            _main_menu_for(context)
+            if context is not None
+            else build_main_menu_keyboard()
+        ),
     )
 
 
@@ -116,7 +152,8 @@ async def handle_home(
 ) -> None:
     """Return to the main menu."""
 
-    if not auth_service.can_view_catalog(callback.from_user.id):
+    context = auth_service.get_context(callback.from_user.id)
+    if context.role is Role.BLOCKED:
         await callback.answer(BLOCKED_TEXT, show_alert=True)
         return
     await callback.answer()
@@ -134,10 +171,12 @@ async def handle_home(
     if isinstance(callback.message, Message):
         await edit_or_send_text(
             callback.message,
-            WELCOME_TEXT,
-            build_main_menu_keyboard(
-                is_admin=auth_service.is_admin(callback.from_user.id)
+            (
+                ACCOUNTANT_WELCOME_TEXT
+                if context.role is Role.ACCOUNTANT
+                else WELCOME_TEXT
             ),
+            _main_menu_for(context),
         )
 
 

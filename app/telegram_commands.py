@@ -23,9 +23,14 @@ USER_COMMANDS = (
     BotCommand(command="help", description="Помощь"),
     BotCommand(command="myid", description="Показать мой Telegram ID"),
 )
-ADMIN_COMMANDS = USER_COMMANDS + (
+ADMIN_COMMANDS = USER_COMMANDS[:3] + (
     BotCommand(command="admin", description="Управление ботом"),
     BotCommand(command="users", description="Управление пользователями"),
+) + USER_COMMANDS[3:]
+ACCOUNTANT_COMMANDS = (
+    BotCommand(command="start", description="Главное меню"),
+    BotCommand(command="help", description="Помощь"),
+    BotCommand(command="myid", description="Показать мой Telegram ID"),
 )
 BLOCKED_COMMANDS = (
     BotCommand(command="start", description="Проверить доступ"),
@@ -37,6 +42,8 @@ BLOCKED_COMMANDS = (
 def commands_for_role(role: Role) -> tuple[BotCommand, ...]:
     if role in {Role.SUPER_ADMIN, Role.ADMIN}:
         return ADMIN_COMMANDS
+    if role is Role.ACCOUNTANT:
+        return ACCOUNTANT_COMMANDS
     if role is Role.BLOCKED:
         return BLOCKED_COMMANDS
     return USER_COMMANDS
@@ -77,7 +84,7 @@ async def configure_bot_commands(bot: Bot, auth_service: AuthService) -> None:
         for user_id in auth_service.super_admin_ids
     }
     if auth_service.user_service is not None:
-        for role in (Role.ADMIN, Role.BLOCKED):
+        for role in (Role.ADMIN, Role.ACCOUNTANT, Role.BLOCKED):
             users, _, _ = auth_service.user_service.list_users(
                 role=role,
                 page_size=100_000,

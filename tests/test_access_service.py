@@ -19,12 +19,13 @@ def _services(tmp_path: Path) -> tuple[AuthService, UserService, Path]:
     audit = AuditService(audit_path)
     users = UserService(database, audit)
     access = AuthService(frozenset({1, 2}), users, audit)
-    for user_id in (1, 2, 10, 20, 30, 40):
+    for user_id in (1, 2, 10, 20, 30, 40, 50):
         users.ensure_user(user_id)
     database.set_role(10, Role.ADMIN, actor_user_id=1)
     database.set_role(20, Role.BARTENDER, actor_user_id=10)
     database.set_role(30, Role.USER, actor_user_id=10)
     database.set_role(40, Role.BLOCKED, actor_user_id=10)
+    database.set_role(50, Role.ACCOUNTANT, actor_user_id=10)
     return access, users, audit_path
 
 
@@ -36,10 +37,14 @@ def test_resolves_all_roles_and_catalog_access(tmp_path: Path) -> None:
     assert access.get_context(20).role is Role.BARTENDER
     assert access.get_context(30).role is Role.USER
     assert access.get_context(40).role is Role.BLOCKED
+    assert access.get_context(50).role is Role.ACCOUNTANT
     assert access.can_manage_catalog(1)
     assert access.can_manage_catalog(10)
     assert not access.can_manage_catalog(20)
     assert not access.can_view_catalog(40)
+    assert not access.can_view_catalog(50)
+    assert not access.can_manage_catalog(50)
+    assert not access.can_manage_users(50)
 
 
 def test_super_admin_assigns_admin_and_admin_assigns_bartender(
@@ -50,6 +55,17 @@ def test_super_admin_assigns_admin_and_admin_assigns_bartender(
     assert access.change_role(1, 30, Role.ADMIN).role is Role.ADMIN
     assert access.change_role(10, 20, Role.USER).role is Role.USER
     assert access.change_role(10, 20, Role.BARTENDER).role is Role.BARTENDER
+    assert access.change_role(10, 20, Role.ACCOUNTANT).role is Role.ACCOUNTANT
+    assert access.change_role(1, 30, Role.ACCOUNTANT).role is Role.ACCOUNTANT
+
+
+def test_admin_can_assign_accountant_to_all_non_admin_targets(
+    tmp_path: Path,
+) -> None:
+    access, _, _ = _services(tmp_path)
+
+    for target_id in (20, 30, 40, 50):
+        assert access.can_change_role(10, target_id, Role.ACCOUNTANT)
 
 
 def test_admin_cannot_assign_admin_or_change_admin(tmp_path: Path) -> None:
@@ -57,8 +73,13 @@ def test_admin_cannot_assign_admin_or_change_admin(tmp_path: Path) -> None:
 
     with pytest.raises(AccessDeniedError, match="Недостаточно прав"):
         access.change_role(10, 30, Role.ADMIN)
+    access.change_role(1, 30, Role.ADMIN)
+    with pytest.raises(AccessDeniedError):
+        access.change_role(10, 30, Role.ACCOUNTANT)
     with pytest.raises(AccessDeniedError):
         access.change_role(10, 1, Role.USER)
+    with pytest.raises(AccessDeniedError):
+        access.change_role(10, 1, Role.ACCOUNTANT)
 
     assert "role_change_denied" in audit_path.read_text(encoding="utf-8")
 
@@ -80,6 +101,30 @@ def test_admin_cannot_change_own_role(tmp_path: Path) -> None:
     assert access.available_role_changes(10, 1) == []
 
 
+def test_accountant_cannot_change_roles(tmp_path: Path) -> None:
+    access, _, audit_path = _services(tmp_path)
+
+    assert not access.can_change_role(50, 30, Role.ACCOUNTANT)
+    with pytest.raises(AccessDeniedError):
+        access.change_role(50, 30, Role.ACCOUNTANT)
+
+    audit = audit_path.read_text(encoding="utf-8")
+    assert '"action":"accountant_assignment_denied"' in audit
+    assert '"previous_role":"user"' in audit
+    assert '"new_role":"accountant"' in audit
+
+
+def test_environment_super_admin_overrides_stored_accountant(
+    tmp_path: Path,
+) -> None:
+    access, users, _ = _services(tmp_path)
+
+    users.set_role(1, Role.ACCOUNTANT, actor_user_id=2)
+
+    assert users.get_user(1).role is Role.ACCOUNTANT
+    assert access.get_context(1).role is Role.SUPER_ADMIN
+
+
 def test_block_and_unblock_are_audited(tmp_path: Path) -> None:
     access, _, audit_path = _services(tmp_path)
 
@@ -89,3 +134,33 @@ def test_block_and_unblock_are_audited(tmp_path: Path) -> None:
 
     assert "user_blocked" in audit
     assert "user_unblocked" in audit
+
+
+def test_accountant_assignment_and_removal_are_audited(tmp_path: Path) -> None:
+    access, _, audit_path = _services(tmp_path)
+
+    access.change_role(10, 30, Role.ACCOUNTANT)
+    access.change_role(10, 30, Role.USER)
+    audit = audit_path.read_text(encoding="utf-8")
+
+    assert '"action":"accountant_assigned"' in audit
+    assert '"previous_role":"user","new_role":"accountant"' in audit
+    assert '"action":"accountant_removed"' in audit
+    assert '"previous_role":"accountant","new_role":"user"' in audit
+
+
+def test_audit_failure_does_not_rollback_accountant_role(tmp_path: Path) -> None:
+    class FailingAudit:
+        def record_user_event(self, **_values) -> bool:
+            return False
+
+    database = UserDatabase(tmp_path / "audit-failure.db")
+    database.initialize()
+    users = UserService(database)
+    users.ensure_user(80)
+    access = AuthService(frozenset({1}), users, FailingAudit())
+
+    updated = access.change_role(1, 80, Role.ACCOUNTANT)
+
+    assert updated.role is Role.ACCOUNTANT
+    assert users.get_user(80).role is Role.ACCOUNTANT

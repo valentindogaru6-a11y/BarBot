@@ -34,8 +34,17 @@ class UserContext:
         return self.role in {Role.SUPER_ADMIN, Role.ADMIN}
 
     @property
+    def can_assign_accountant(self) -> bool:
+        return self.role in {Role.SUPER_ADMIN, Role.ADMIN}
+
+    @property
     def can_view_catalog(self) -> bool:
-        return self.role is not Role.BLOCKED
+        return self.role in {
+            Role.SUPER_ADMIN,
+            Role.ADMIN,
+            Role.BARTENDER,
+            Role.USER,
+        }
 
 
 class AccessService:
@@ -79,6 +88,9 @@ class AccessService:
     def can_assign_bartender(self, telegram_user_id: int) -> bool:
         return self.get_context(telegram_user_id).can_assign_bartender
 
+    def can_assign_accountant(self, telegram_user_id: int) -> bool:
+        return self.get_context(telegram_user_id).can_assign_accountant
+
     def can_change_role(
         self,
         actor_user_id: int,
@@ -95,12 +107,18 @@ class AccessService:
             return new_role in {
                 Role.ADMIN,
                 Role.BARTENDER,
+                Role.ACCOUNTANT,
                 Role.USER,
                 Role.BLOCKED,
             }
         if target.role is Role.ADMIN or new_role is Role.ADMIN:
             return False
-        return new_role in {Role.BARTENDER, Role.USER, Role.BLOCKED}
+        return new_role in {
+            Role.BARTENDER,
+            Role.ACCOUNTANT,
+            Role.USER,
+            Role.BLOCKED,
+        }
 
     def available_role_changes(
         self,
@@ -110,10 +128,43 @@ class AccessService:
         target = self.get_context(target_user_id)
         return [
             role
-            for role in (Role.ADMIN, Role.BARTENDER, Role.USER, Role.BLOCKED)
+            for role in (
+                Role.ADMIN,
+                Role.BARTENDER,
+                Role.ACCOUNTANT,
+                Role.USER,
+                Role.BLOCKED,
+            )
             if role is not target.role
             and self.can_change_role(actor_user_id, target_user_id, role)
         ]
+
+    def require_role_change(
+        self,
+        actor_user_id: int,
+        target_user_id: int,
+        new_role: Role,
+    ) -> UserContext:
+        """Authorize one role-change attempt and audit a denial."""
+
+        target = self.get_context(target_user_id)
+        if self.can_change_role(actor_user_id, target_user_id, new_role):
+            return target
+        action = (
+            "accountant_assignment_denied"
+            if new_role is Role.ACCOUNTANT
+            else "role_change_denied"
+        )
+        self._audit_role_change(
+            actor_user_id,
+            target_user_id,
+            target.role,
+            new_role,
+            action,
+            "error",
+            "Изменение роли отклонено проверкой разрешений",
+        )
+        raise AccessDeniedError("Недостаточно прав")
 
     def change_role(
         self,
@@ -123,18 +174,7 @@ class AccessService:
     ) -> UserRecord:
         """Recompute permissions immediately before the SQLite write."""
 
-        target = self.get_context(target_user_id)
-        if not self.can_change_role(actor_user_id, target_user_id, new_role):
-            self._audit_role_change(
-                actor_user_id,
-                target_user_id,
-                target.role,
-                new_role,
-                "role_change_denied",
-                "error",
-                "Изменение роли отклонено проверкой разрешений",
-            )
-            raise AccessDeniedError("Недостаточно прав")
+        self.require_role_change(actor_user_id, target_user_id, new_role)
         if self.user_service is None:
             raise RuntimeError("UserService is required for role changes")
         previous_role, updated = self.user_service.set_role(
@@ -142,13 +182,21 @@ class AccessService:
             new_role,
             actor_user_id=actor_user_id,
         )
-        action = (
-            "user_blocked"
-            if new_role is Role.BLOCKED
-            else "user_unblocked"
-            if previous_role is Role.BLOCKED
-            else "role_changed"
-        )
+        if new_role is Role.ACCOUNTANT:
+            action = "accountant_assigned"
+            description = "Пользователю назначена роль бухгалтера"
+        elif previous_role is Role.ACCOUNTANT:
+            action = "accountant_removed"
+            description = "С пользователя снята роль бухгалтера"
+        elif new_role is Role.BLOCKED:
+            action = "user_blocked"
+            description = "Роль пользователя изменена"
+        elif previous_role is Role.BLOCKED:
+            action = "user_unblocked"
+            description = "Роль пользователя изменена"
+        else:
+            action = "role_changed"
+            description = "Роль пользователя изменена"
         self._audit_role_change(
             actor_user_id,
             target_user_id,
@@ -156,7 +204,7 @@ class AccessService:
             new_role,
             action,
             "success",
-            "Роль пользователя изменена",
+            description,
         )
         return updated
 

@@ -12,7 +12,10 @@ from aiogram.types import (
 
 from app.models.user import Role
 from app.services.auth_service import AuthService
+from app.services.user_service import UserService
+from app.storage.user_database import UserDatabase
 from app.telegram_commands import (
+    ACCOUNTANT_COMMANDS,
     ADMIN_COMMANDS,
     BLOCKED_COMMANDS,
     USER_COMMANDS,
@@ -38,13 +41,15 @@ def test_user_and_admin_command_sets() -> None:
         "start",
         "catalog",
         "search",
-        "help",
-        "myid",
         "admin",
         "users",
+        "help",
+        "myid",
     ]
+    assert _names(ACCOUNTANT_COMMANDS) == ["start", "help", "myid"]
     assert _names(BLOCKED_COMMANDS) == ["start", "help", "myid"]
     assert commands_for_role(Role.BARTENDER) == USER_COMMANDS
+    assert commands_for_role(Role.ACCOUNTANT) == ACCOUNTANT_COMMANDS
     assert commands_for_role(Role.BLOCKED) == BLOCKED_COMMANDS
 
 
@@ -87,3 +92,33 @@ def test_updates_one_chat_scope_after_role_change() -> None:
     assert _names(call.kwargs["commands"]) == _names(BLOCKED_COMMANDS)
     assert isinstance(call.kwargs["scope"], BotCommandScopeChat)
     assert call.kwargs["scope"].chat_id == 55
+
+
+def test_configures_known_accountant_chat_scope(tmp_path) -> None:
+    database = UserDatabase(tmp_path / "commands.db")
+    database.initialize()
+    users = UserService(database)
+    users.ensure_user(70)
+    users.set_role(70, Role.ACCOUNTANT, actor_user_id=10)
+    bot = SimpleNamespace(
+        set_my_commands=AsyncMock(),
+        set_chat_menu_button=AsyncMock(),
+    )
+
+    asyncio.run(
+        configure_bot_commands(
+            bot,
+            AuthService(frozenset(), users),
+        )
+    )
+
+    accountant_calls = [
+        call
+        for call in bot.set_my_commands.await_args_list
+        if isinstance(call.kwargs["scope"], BotCommandScopeChat)
+        and call.kwargs["scope"].chat_id == 70
+    ]
+    assert len(accountant_calls) == 1
+    assert _names(accountant_calls[0].kwargs["commands"]) == _names(
+        ACCOUNTANT_COMMANDS
+    )

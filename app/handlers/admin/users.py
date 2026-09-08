@@ -33,7 +33,7 @@ from app.keyboards.user_callbacks import (
     UserRoleCallback,
     UserViewCallback,
 )
-from app.models.user import Role, UserRecord
+from app.models.user import DATABASE_ROLES, Role, UserRecord
 from app.services.access_service import AccessDeniedError
 from app.services.auth_service import AuthService
 from app.services.user_service import UserService
@@ -76,16 +76,20 @@ async def _show_menu(
         message,
         f"{USERS_HEADER}\n\nВыберите действие:",
         build_user_management_keyboard(
-            can_assign_admin=auth_service.can_assign_admin(actor_user_id)
+            can_assign_admin=auth_service.can_assign_admin(actor_user_id),
+            can_assign_accountant=auth_service.can_assign_accountant(
+                actor_user_id
+            ),
         ),
     )
 
 
 def _parse_role(value: str) -> Role | None:
     try:
-        return Role(value)
+        role = Role(value)
     except ValueError:
         return None
+    return role if role in DATABASE_ROLES else None
 
 
 def _filtered_users(
@@ -177,7 +181,10 @@ async def _show_user_card(
             message,
             f"{USERS_HEADER}\n\nПользователь больше не найден.",
             build_user_management_keyboard(
-                can_assign_admin=auth_service.can_assign_admin(actor_user_id)
+                can_assign_admin=auth_service.can_assign_admin(actor_user_id),
+                can_assign_accountant=auth_service.can_assign_accountant(
+                    actor_user_id
+                ),
             ),
         )
         return
@@ -214,7 +221,10 @@ async def users_command(
     await message.answer(
         f"{USERS_HEADER}\n\nВыберите действие:",
         reply_markup=build_user_management_keyboard(
-            can_assign_admin=auth_service.can_assign_admin(message.from_user.id)
+            can_assign_admin=auth_service.can_assign_admin(message.from_user.id),
+            can_assign_accountant=auth_service.can_assign_accountant(
+                message.from_user.id
+            ),
         ),
     )
 
@@ -259,7 +269,9 @@ async def users_cancel(
         await _show_menu(callback.message, auth_service, callback.from_user.id)
 
 
-@router.callback_query(UserAdminCallback.filter(F.action.in_({"pa", "pb"})))
+@router.callback_query(
+    UserAdminCallback.filter(F.action.in_({"pa", "pb", "pc"}))
+)
 async def picker_start(
     callback: CallbackQuery,
     callback_data: UserAdminCallback,
@@ -268,13 +280,20 @@ async def picker_start(
 ) -> None:
     if not await _require_callback(callback, auth_service):
         return
-    new_role = Role.ADMIN if callback_data.action == "pa" else Role.BARTENDER
+    new_role = {
+        "pa": Role.ADMIN,
+        "pb": Role.BARTENDER,
+        "pc": Role.ACCOUNTANT,
+    }[callback_data.action]
     if (
         new_role is Role.ADMIN
         and not auth_service.can_assign_admin(callback.from_user.id)
     ) or (
         new_role is Role.BARTENDER
         and not auth_service.can_assign_bartender(callback.from_user.id)
+    ) or (
+        new_role is Role.ACCOUNTANT
+        and not auth_service.can_assign_accountant(callback.from_user.id)
     ):
         if isinstance(callback.message, Message):
             await callback.message.answer("Недостаточно прав")
@@ -356,11 +375,17 @@ async def picker_users_shared(
         return
     selected = shared.users[0]
     new_role = _parse_role(str(data.get("new_role", "")))
-    if new_role is None or not auth_service.can_change_role(
-        message.from_user.id,
-        selected.user_id,
-        new_role,
-    ):
+    if new_role is None:
+        await message.answer("Недостаточно прав", reply_markup=ReplyKeyboardRemove())
+        await state.clear()
+        return
+    try:
+        auth_service.require_role_change(
+            message.from_user.id,
+            selected.user_id,
+            new_role,
+        )
+    except AccessDeniedError:
         await message.answer("Недостаточно прав", reply_markup=ReplyKeyboardRemove())
         await state.clear()
         return
@@ -457,15 +482,17 @@ async def role_change_prompt(
         return
     role = _parse_role(callback_data.role)
     user = user_service.get_user(callback_data.user_id)
-    if (
-        role is None
-        or user is None
-        or not auth_service.can_change_role(
+    if role is None or user is None:
+        if isinstance(callback.message, Message):
+            await callback.message.answer("Недостаточно прав")
+        return
+    try:
+        auth_service.require_role_change(
             callback.from_user.id,
             callback_data.user_id,
             role,
         )
-    ):
+    except AccessDeniedError:
         if isinstance(callback.message, Message):
             await callback.message.answer("Недостаточно прав")
         return

@@ -20,7 +20,7 @@ Telegram user ID через окружение.
 - поиск по названию, описаниям, тегам и ингредиентам;
 - локальный голосовой поиск через Vosk без внешних STT API;
 - FSM-диалог поиска с командой `/cancel` и inline-отменой;
-- роли `super_admin`, `admin`, `bartender`, `user` и `blocked`;
+- роли `super_admin`, `admin`, `bartender`, `accountant`, `user` и `blocked`;
 - локальная SQLite-база пользователей и управление ролями;
 - защищённая Telegram-админка для каталога, текстов и фотографий;
 - атомарная запись, резервные копии и JSONL-аудит;
@@ -248,8 +248,11 @@ Matcher берёт лучший score среди всех aliases, тегов и
 - `super_admin` задаётся только через `SUPER_ADMIN_IDS`, имеет все права,
   назначает и снимает `admin` и не может быть изменён через бота;
 - `admin` управляет каталогом и пользователями, назначает `bartender`,
-  меняет `user/bartender/blocked`, но не управляет admin/super_admin и собой;
+  `accountant`, меняет `user/bartender/accountant/blocked`, но не управляет
+  admin/super_admin и собой;
 - `bartender` использует каталог и поиск без административных функций;
+- `accountant` (Бухгалтер) пока имеет только `/start`, `/help` и `/myid`;
+  каталог, поиск, голосовой поиск и административные функции ему недоступны;
 - `user` имеет обычный доступ к каталогу и поиску;
 - `blocked` видит только сообщение об ограничении, `/help` и `/myid`.
 
@@ -314,9 +317,10 @@ inline: после `/start` пользователь выбирает дейст
 - `/admin` — открыть административную панель;
 - `/users` — открыть управление пользователями.
 
-Blocked видит только `/start`, `/help` и `/myid`. User и bartender видят
-пользовательский набор; admin и super_admin — пользовательский и
-административный.
+Accountant и blocked видят только `/start`, `/help` и `/myid`. User и
+bartender видят пользовательский набор; admin и super_admin — пользовательский
+и административный. Для известных accountant, admin и blocked при старте
+приложения регистрируются отдельные `BotCommandScopeChat`.
 
 Администратор также видит inline-кнопку «🛠 Управление каталогом» в главном
 меню. `ReplyKeyboardMarkup` как основной интерфейс не используется.
@@ -580,6 +584,9 @@ glassware | Рокс
 
 `data/barbot.db` создаётся безопасно при старте. Используется стандартный
 `sqlite3`, WAL, `foreign_keys=ON`, `busy_timeout` и `PRAGMA user_version`.
+Единственный versioned migration runner создаёт новую базу сразу как schema
+v2, атомарно обновляет v1 до v2 и отклоняет неизвестную будущую либо
+несогласованную схему. Повторная инициализация v2 не меняет данные.
 ORM, PostgreSQL, Redis и общая удалённая база не используются.
 
 Таблица `users` хранит Telegram ID как стабильный ключ, профиль Telegram,
@@ -591,7 +598,7 @@ ORM, PostgreSQL, Redis и общая удалённая база не испол
 ```text
 telegram_user_id INTEGER PRIMARY KEY
 username / first_name / last_name TEXT NULL
-role TEXT: admin | bartender | user | blocked
+role TEXT: admin | bartender | accountant | user | blocked
 is_active INTEGER
 first_seen_at / last_seen_at / updated_at TEXT
 created_by INTEGER NULL

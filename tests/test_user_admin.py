@@ -10,8 +10,19 @@ from aiogram.types import SharedUser, User, UsersShared
 from app.handlers.admin.user_states import RoleChangeStates
 from app.handlers.admin import users as user_handlers
 from app.handlers.admin.users import picker_users_shared
-from app.handlers.start import handle_myid, handle_start
-from app.middlewares.access import BLOCKED_TEXT
+from app.handlers.start import (
+    ACCOUNTANT_HELP_TEXT,
+    ACCOUNTANT_WELCOME_TEXT,
+    handle_help,
+    handle_myid,
+    handle_start,
+)
+from app.middlewares import access as access_middleware
+from app.middlewares.access import (
+    BLOCKED_TEXT,
+    CATALOG_ACCESS_DENIED_TEXT,
+    CatalogAccessFilter,
+)
 from app.keyboards.user_admin import (
     build_picker_reply_keyboard,
     build_user_card_keyboard,
@@ -71,6 +82,13 @@ def test_picker_uses_single_non_bot_request() -> None:
     assert markup.is_persistent is False
 
 
+def test_role_callback_parser_accepts_accountant_and_rejects_non_stored_roles(
+) -> None:
+    assert user_handlers._parse_role("accountant") is Role.ACCOUNTANT
+    assert user_handlers._parse_role("super_admin") is None
+    assert user_handlers._parse_role("unknown") is None
+
+
 def test_all_user_callbacks_fit_telegram_limit() -> None:
     callbacks = [
         UserAdminCallback(action="search"),
@@ -79,7 +97,7 @@ def test_all_user_callbacks_fit_telegram_limit() -> None:
         UserRoleCallback(
             action="confirm",
             user_id=9_223_372_036_854_775_807,
-            role="bartender",
+            role="accountant",
         ),
     ]
 
@@ -87,13 +105,20 @@ def test_all_user_callbacks_fit_telegram_limit() -> None:
 
 
 def test_admin_menu_hides_add_admin() -> None:
-    regular = build_user_management_keyboard(can_assign_admin=False)
-    super_admin = build_user_management_keyboard(can_assign_admin=True)
+    regular = build_user_management_keyboard(
+        can_assign_admin=False,
+        can_assign_accountant=True,
+    )
+    super_admin = build_user_management_keyboard(
+        can_assign_admin=True,
+        can_assign_accountant=True,
+    )
     regular_text = {button.text for row in regular.inline_keyboard for button in row}
     super_text = {button.text for row in super_admin.inline_keyboard for button in row}
 
     assert "➕ Добавить администратора" not in regular_text
     assert "➕ Добавить администратора" in super_text
+    assert "➕ Добавить бухгалтера" in regular_text
 
 
 def test_user_card_hides_current_and_forbidden_actions() -> None:
@@ -108,6 +133,7 @@ def test_user_card_hides_current_and_forbidden_actions() -> None:
 
     assert "🍸 Назначить Bartender" not in texts
     assert "🛠 Назначить Admin" not in texts
+    assert "🧾 Назначить бухгалтера" not in texts
     assert "👤 Сделать User" in texts
     assert "🚫 Заблокировать" in texts
 
@@ -231,3 +257,85 @@ def test_blocked_start_only_shows_restriction(tmp_path: Path) -> None:
     asyncio.run(handle_start(message, _State({}), access, bot))
 
     message.answer.assert_awaited_once_with(BLOCKED_TEXT)
+
+
+def test_accountant_start_and_help_have_no_action_keyboard(tmp_path: Path) -> None:
+    access, users = _services(tmp_path)
+    users.ensure_user(60)
+    users.set_role(60, Role.ACCOUNTANT, actor_user_id=1)
+    message = SimpleNamespace(
+        from_user=User(id=60, is_bot=False, first_name="Accountant"),
+        answer=AsyncMock(),
+    )
+    bot = SimpleNamespace(set_my_commands=AsyncMock())
+
+    asyncio.run(handle_start(message, _State({}), access, bot))
+    asyncio.run(handle_help(message, _State({}), access))
+
+    assert message.answer.await_args_list[0].args[0] == ACCOUNTANT_WELCOME_TEXT
+    assert message.answer.await_args_list[0].kwargs["reply_markup"] is None
+    assert message.answer.await_args_list[1].args[0] == ACCOUNTANT_HELP_TEXT
+    assert "reply_markup" not in message.answer.await_args_list[1].kwargs
+
+
+def test_accountant_catalog_filter_rejects_message_and_forged_callback(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    access, users = _services(tmp_path)
+    users.ensure_user(61)
+    users.set_role(61, Role.ACCOUNTANT, actor_user_id=1)
+
+    class FakeMessage:
+        def __init__(self) -> None:
+            self.from_user = SimpleNamespace(id=61)
+            self.answer = AsyncMock()
+
+    class FakeCallback:
+        def __init__(self) -> None:
+            self.from_user = SimpleNamespace(id=61)
+            self.answer = AsyncMock()
+
+    message = FakeMessage()
+    callback = FakeCallback()
+    monkeypatch.setattr(access_middleware, "Message", FakeMessage)
+    monkeypatch.setattr(access_middleware, "CallbackQuery", FakeCallback)
+
+    assert asyncio.run(CatalogAccessFilter()(message, access)) is False
+    assert asyncio.run(CatalogAccessFilter()(callback, access)) is False
+    message.answer.assert_awaited_once_with(CATALOG_ACCESS_DENIED_TEXT)
+    callback.answer.assert_awaited_once_with(
+        CATALOG_ACCESS_DENIED_TEXT,
+        show_alert=True,
+    )
+
+
+def test_stale_accountant_role_callback_is_reauthorized(tmp_path: Path) -> None:
+    access, users = _services(tmp_path)
+    users.ensure_user(10)
+    users.ensure_user(70)
+    users.set_role(10, Role.ADMIN, actor_user_id=1)
+    users.set_role(70, Role.ADMIN, actor_user_id=1)
+    callback = SimpleNamespace(
+        from_user=User(id=10, is_bot=False, first_name="Admin"),
+        message=SimpleNamespace(answer=AsyncMock()),
+        answer=AsyncMock(),
+    )
+
+    asyncio.run(
+        user_handlers.role_change_confirm(
+            callback,
+            UserRoleCallback(
+                action="confirm",
+                user_id=70,
+                role=Role.ACCOUNTANT.value,
+            ),
+            _State({}),
+            access,
+            users,
+            SimpleNamespace(),
+        )
+    )
+
+    assert users.get_user(70).role is Role.ADMIN
+    callback.answer.assert_awaited_once()

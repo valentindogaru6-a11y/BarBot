@@ -24,6 +24,7 @@ ROLE_LABELS = {
     Role.SUPER_ADMIN: "👑 Super Admin",
     Role.ADMIN: "👑 Admin",
     Role.BARTENDER: "🍸 Bartender",
+    Role.ACCOUNTANT: "🧾 Бухгалтер",
     Role.USER: "👤 User",
     Role.BLOCKED: "🚫 Blocked",
 }
@@ -32,6 +33,7 @@ ROLE_LABELS = {
 def build_user_management_keyboard(
     *,
     can_assign_admin: bool,
+    can_assign_accountant: bool,
 ) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     if can_assign_admin:
@@ -43,9 +45,15 @@ def build_user_management_keyboard(
         text="➕ Добавить бармена",
         callback_data=UserAdminCallback(action="pb"),
     )
+    if can_assign_accountant:
+        builder.button(
+            text="➕ Добавить бухгалтера",
+            callback_data=UserAdminCallback(action="pc"),
+        )
     for text, role in (
         ("👑 Администраторы", Role.ADMIN),
         ("🍸 Бармены", Role.BARTENDER),
+        ("🧾 Бухгалтеры", Role.ACCOUNTANT),
         ("👤 Пользователи", Role.USER),
         ("🚫 Заблокированные", Role.BLOCKED),
     ):
@@ -190,6 +198,7 @@ def build_user_card_keyboard(
         labels = {
             Role.ADMIN: "🛠 Назначить Admin",
             Role.BARTENDER: "🍸 Назначить Bartender",
+            Role.ACCOUNTANT: "🧾 Назначить бухгалтера",
             Role.USER: "👤 Сделать User",
             Role.BLOCKED: "🚫 Заблокировать",
         }

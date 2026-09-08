@@ -8,24 +8,29 @@ from app.keyboards.admin_callbacks import AdminPanelCallback
 
 
 def build_main_menu_keyboard(
-    is_admin: bool = False,
-) -> InlineKeyboardMarkup:
+    *,
+    can_view_catalog: bool = True,
+    can_manage_catalog: bool = False,
+) -> InlineKeyboardMarkup | None:
     """Build the static top-level menu without catalog business logic."""
 
     builder = InlineKeyboardBuilder()
-    builder.button(
-        text="📚 Каталог",
-        callback_data=MainCallback(action="catalog"),
-    )
-    builder.button(
-        text="🔍 Поиск",
-        callback_data=MainCallback(action="search"),
-    )
-    if is_admin:
+    if can_view_catalog:
+        builder.button(
+            text="📚 Каталог",
+            callback_data=MainCallback(action="catalog"),
+        )
+        builder.button(
+            text="🔍 Поиск",
+            callback_data=MainCallback(action="search"),
+        )
+    if can_manage_catalog:
         builder.button(
             text="🛠 Управление каталогом",
             callback_data=AdminPanelCallback(action="o"),
         )
+    if not can_view_catalog and not can_manage_catalog:
+        return None
     builder.adjust(1)
     return builder.as_markup()
 

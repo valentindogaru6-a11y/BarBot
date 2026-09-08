@@ -22,7 +22,10 @@ def _settings(admin_ids: object) -> Settings:
 
 
 def _button_texts(is_administrator: bool) -> list[str]:
-    markup = build_main_menu_keyboard(is_admin=is_administrator)
+    markup = build_main_menu_keyboard(
+        can_manage_catalog=is_administrator,
+    )
+    assert markup is not None
     return [
         button.text
         for row in markup.inline_keyboard

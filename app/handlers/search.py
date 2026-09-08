@@ -102,7 +102,7 @@ async def handle_search_cancel_callback(
             callback.message,
             "Поиск отменён.",
             build_main_menu_keyboard(
-                is_admin=auth_service.is_admin(callback.from_user.id)
+                can_manage_catalog=auth_service.is_admin(callback.from_user.id)
             ),
         )
 
@@ -119,7 +119,7 @@ async def handle_search_cancel_command(
     await message.answer(
         "Поиск отменён.",
         reply_markup=build_main_menu_keyboard(
-            is_admin=bool(
+            can_manage_catalog=bool(
                 message.from_user
                 and auth_service.is_admin(message.from_user.id)
             )
@@ -152,7 +152,7 @@ async def handle_search_query(
         await message.answer(
             catalog_error_message(exc),
             reply_markup=build_main_menu_keyboard(
-                is_admin=bool(
+                can_manage_catalog=bool(
                     message.from_user
                     and auth_service.is_admin(message.from_user.id)
                 )
