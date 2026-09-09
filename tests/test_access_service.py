@@ -47,6 +47,15 @@ def test_resolves_all_roles_and_catalog_access(tmp_path: Path) -> None:
     assert not access.can_manage_users(50)
 
 
+def test_warehouse_nomenclature_is_limited_to_admins(tmp_path: Path) -> None:
+    access, _, _ = _services(tmp_path)
+
+    assert access.can_manage_warehouse_nomenclature(1)
+    assert access.can_manage_warehouse_nomenclature(10)
+    for user_id in (20, 30, 40, 50):
+        assert not access.can_manage_warehouse_nomenclature(user_id)
+
+
 def test_super_admin_assigns_admin_and_admin_assigns_bartender(
     tmp_path: Path,
 ) -> None:

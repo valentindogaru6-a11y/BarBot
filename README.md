@@ -31,7 +31,7 @@ Telegram user ID через окружение.
 ```text
 data/catalog.json          data/barbot.db
        ↓                         ↓
-JSON storage              SQLite user storage
+JSON storage              SQLite users + warehouse foundation
        └──────────┬──────────────┘
                   ↓
 app/models → app/services → app/handlers → app/keyboards
@@ -39,7 +39,7 @@ app/models → app/services → app/handlers → app/keyboards
 
 Основные каталоги:
 
-- `app/models/` — модели каталога, пользователей и ролей;
+- `app/models/` — модели каталога, пользователей, ролей и warehouse domain;
 - `app/storage/` — JSON-каталог и SQLite без ORM;
 - `app/services/` — каталог, поиск, авторизация, CRUD и аудит;
 - `app/handlers/` — пользовательские сценарии и разделённый пакет `admin/`;
@@ -580,13 +580,36 @@ glassware | Рокс
 - замена и удаление требуют предпросмотра/подтверждения;
 - прежний текстовый fallback продолжает работать при недействительном ID.
 
+## Warehouse nomenclature foundation
+
+Schema v3 добавляет отдельный warehouse namespace в локальную SQLite:
+locations, products, aliases, допустимые типы операций и singleton settings.
+Rename сохраняет stable ID, updates используют optimistic revision check,
+а official names и aliases находятся в едином нормализованном namespace.
+Управлять справочником могут только `admin` и `super_admin`.
+
+Telegram-интерфейс склада, списания, перемещения, смены и scheduler пока не
+включены. Продукты из каталога автоматически в SQLite не импортируются.
+
+`source/warehouse_product_candidates.json` — предварительный список со
+статусами `pending` для ручного review, а не активная номенклатура:
+
+```bash
+.venv/bin/python scripts/preview_warehouse_candidates.py \
+  --catalog data/catalog.json \
+  --output source/warehouse_product_candidates.json
+```
+
+Без `--output` утилита работает в read-only preview-режиме.
+
 ## Пользователи и SQLite
 
 `data/barbot.db` создаётся безопасно при старте. Используется стандартный
 `sqlite3`, WAL, `foreign_keys=ON`, `busy_timeout` и `PRAGMA user_version`.
 Единственный versioned migration runner создаёт новую базу сразу как schema
-v2, атомарно обновляет v1 до v2 и отклоняет неизвестную будущую либо
-несогласованную схему. Повторная инициализация v2 не меняет данные.
+v3, атомарно обновляет v1 → v2 → v3 или v2 → v3 и отклоняет неизвестную
+будущую либо несогласованную схему. Каждый migration step имеет отдельную
+транзакцию; повторная инициализация v3 только валидирует данные.
 ORM, PostgreSQL, Redis и общая удалённая база не используются.
 
 Таблица `users` хранит Telegram ID как стабильный ключ, профиль Telegram,

@@ -26,6 +26,10 @@ class UserContext:
         return self.role in {Role.SUPER_ADMIN, Role.ADMIN}
 
     @property
+    def can_manage_warehouse_nomenclature(self) -> bool:
+        return self.role in {Role.SUPER_ADMIN, Role.ADMIN}
+
+    @property
     def can_assign_admin(self) -> bool:
         return self.role is Role.SUPER_ADMIN
 
@@ -81,6 +85,11 @@ class AccessService:
 
     def can_manage_users(self, telegram_user_id: int) -> bool:
         return self.get_context(telegram_user_id).can_manage_users
+
+    def can_manage_warehouse_nomenclature(self, telegram_user_id: int) -> bool:
+        return self.get_context(
+            telegram_user_id
+        ).can_manage_warehouse_nomenclature
 
     def can_assign_admin(self, telegram_user_id: int) -> bool:
         return self.get_context(telegram_user_id).can_assign_admin

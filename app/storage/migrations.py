@@ -6,7 +6,15 @@ import re
 import sqlite3
 from collections.abc import Callable
 
-CURRENT_SCHEMA_VERSION = 2
+from app.storage.warehouse_schema import (
+    WarehouseSchemaValidationError,
+    create_warehouse_schema,
+    seed_warehouse_defaults,
+    validate_warehouse_schema,
+    warehouse_schema_is_absent,
+)
+
+CURRENT_SCHEMA_VERSION = 3
 
 USER_COLUMNS = (
     "telegram_user_id",
@@ -256,7 +264,7 @@ def _verify_users_preserved(connection: sqlite3.Connection) -> None:
 
 
 def _migrate_v1_to_v2(connection: sqlite3.Connection) -> None:
-    validate_users_schema(connection, 1)
+    _validate_schema(connection, 1)
     if _table_sql(connection, "__users_v2_migration") is not None:
         raise SchemaValidationError(
             "Обнаружена незавершённая служебная таблица миграции"
@@ -277,8 +285,88 @@ def _migrate_v1_to_v2(connection: sqlite3.Connection) -> None:
     validate_users_schema(connection, 2)
 
 
+def _validate_schema(connection: sqlite3.Connection, version: int) -> None:
+    if version == 1:
+        validate_users_schema(connection, 1)
+        if not warehouse_schema_is_absent(connection):
+            raise SchemaValidationError(
+                "Warehouse tables не должны существовать в schema v1"
+            )
+        return
+    if version == 2:
+        validate_users_schema(connection, 2)
+        if not warehouse_schema_is_absent(connection):
+            raise SchemaValidationError(
+                "Warehouse tables не должны существовать в schema v2"
+            )
+        return
+    if version == 3:
+        validate_users_schema(connection, 2)
+        try:
+            validate_warehouse_schema(connection)
+        except WarehouseSchemaValidationError as exc:
+            raise SchemaValidationError(str(exc)) from exc
+        return
+    raise UnsupportedSchemaVersionError(
+        f"Неподдерживаемая версия схемы SQLite: {version}"
+    )
+
+
+def _migrate_v2_to_v3(connection: sqlite3.Connection) -> None:
+    _validate_schema(connection, 2)
+    create_warehouse_schema(connection)
+    seed_warehouse_defaults(connection)
+    connection.execute("PRAGMA user_version = 3")
+    _validate_schema(connection, 3)
+
+
+def _create_fresh_v3(connection: sqlite3.Connection) -> None:
+    if _table_sql(connection, "users") is not None:
+        raise SchemaValidationError(
+            "Таблица users существует при нулевой версии схемы"
+        )
+    if _table_sql(connection, "__users_v2_migration") is not None:
+        raise SchemaValidationError(
+            "Обнаружена незавершённая служебная таблица миграции"
+        )
+    if not warehouse_schema_is_absent(connection):
+        raise SchemaValidationError(
+            "Warehouse tables существуют при нулевой версии схемы"
+        )
+    connection.execute(_USERS_V2_SQL)
+    create_warehouse_schema(connection)
+    seed_warehouse_defaults(connection)
+    connection.execute("PRAGMA user_version = 3")
+    _validate_schema(connection, 3)
+
+
 Migration = Callable[[sqlite3.Connection], None]
-MIGRATIONS: dict[int, Migration] = {1: _migrate_v1_to_v2}
+MIGRATIONS: dict[int, Migration] = {
+    1: _migrate_v1_to_v2,
+    2: _migrate_v2_to_v3,
+}
+
+
+def _run_atomic_step(
+    connection: sqlite3.Connection,
+    operation: Migration,
+) -> None:
+    try:
+        connection.execute("BEGIN IMMEDIATE")
+        operation(connection)
+        connection.commit()
+    except Exception as exc:
+        if connection.in_transaction:
+            connection.rollback()
+        if isinstance(exc, DatabaseMigrationError):
+            raise
+        if isinstance(exc, sqlite3.Error):
+            raise DatabaseMigrationError(
+                "Не удалось применить миграцию SQLite"
+            ) from exc
+        raise DatabaseMigrationError(
+            "Миграция SQLite прервана и отменена"
+        ) from exc
 
 
 def run_migrations(connection: sqlite3.Connection) -> None:
@@ -295,49 +383,37 @@ def run_migrations(connection: sqlite3.Connection) -> None:
             "Migration runner требует соединение без активной транзакции"
         )
 
-    try:
-        connection.execute("BEGIN IMMEDIATE")
-        if version == 0:
-            if _table_sql(connection, "users") is not None:
-                raise SchemaValidationError(
-                    "Таблица users существует при нулевой версии схемы"
+    if version == 0:
+        _run_atomic_step(connection, _create_fresh_v3)
+        return
+    if version == CURRENT_SCHEMA_VERSION:
+        _run_atomic_step(
+            connection,
+            lambda current: _validate_schema(current, CURRENT_SCHEMA_VERSION),
+        )
+        return
+
+    while version < CURRENT_SCHEMA_VERSION:
+        migration = MIGRATIONS.get(version)
+        if migration is None:
+            raise UnsupportedSchemaVersionError(
+                f"Нет миграции для схемы SQLite v{version}"
+            )
+        expected_version = version + 1
+
+        def apply_step(current: sqlite3.Connection) -> None:
+            migration(current)
+            actual_version = int(
+                current.execute("PRAGMA user_version").fetchone()[0]
+            )
+            if actual_version != expected_version:
+                raise DatabaseMigrationError(
+                    "Миграция SQLite должна повышать версию ровно на один шаг"
                 )
-            if _table_sql(connection, "__users_v2_migration") is not None:
-                raise SchemaValidationError(
-                    "Обнаружена незавершённая служебная таблица миграции"
-                )
-            connection.execute(_USERS_V2_SQL)
-            connection.execute("PRAGMA user_version = 2")
-            validate_users_schema(connection, 2)
-        elif version == CURRENT_SCHEMA_VERSION:
-            validate_users_schema(connection, CURRENT_SCHEMA_VERSION)
-        else:
-            while version < CURRENT_SCHEMA_VERSION:
-                migration = MIGRATIONS.get(version)
-                if migration is None:
-                    raise UnsupportedSchemaVersionError(
-                        f"Нет миграции для схемы SQLite v{version}"
-                    )
-                migration(connection)
-                next_version = int(
-                    connection.execute("PRAGMA user_version").fetchone()[0]
-                )
-                if next_version != version + 1:
-                    raise DatabaseMigrationError(
-                        "Миграция SQLite должна повышать версию ровно на один шаг"
-                    )
-                version = next_version
-            validate_users_schema(connection, CURRENT_SCHEMA_VERSION)
-        connection.commit()
-    except Exception as exc:
-        if connection.in_transaction:
-            connection.rollback()
-        if isinstance(exc, DatabaseMigrationError):
-            raise
-        if isinstance(exc, sqlite3.Error):
-            raise DatabaseMigrationError(
-                "Не удалось применить миграцию SQLite"
-            ) from exc
-        raise DatabaseMigrationError(
-            "Миграция SQLite прервана и отменена"
-        ) from exc
+
+        _run_atomic_step(connection, apply_step)
+        version = expected_version
+    _run_atomic_step(
+        connection,
+        lambda current: _validate_schema(current, CURRENT_SCHEMA_VERSION),
+    )
