@@ -591,8 +591,8 @@ Rename сохраняет stable ID, updates используют optimistic rev
 Telegram-интерфейс склада, списания, перемещения, смены и scheduler пока не
 включены. Продукты из каталога автоматически в SQLite не импортируются.
 
-`source/warehouse_product_candidates.json` — предварительный список со
-статусами `pending` для ручного review, а не активная номенклатура:
+`source/warehouse_product_candidates.json` — автоматически извлечённый
+материал для анализа, а не активная warehouse-номенклатура.
 
 ```bash
 .venv/bin/python scripts/preview_warehouse_candidates.py \
@@ -601,6 +601,35 @@ Telegram-интерфейс склада, списания, перемещени
 ```
 
 Без `--output` утилита работает в read-only preview-режиме.
+
+`source/warehouse_products_seed.json` — валидируемый утверждённый источник
+начальной номенклатуры. Он детерминированно формируется из candidate report,
+сохраняет все 412 извлечённых позиций и две отдельные owner-required позиции.
+Позиции, требующие review, присутствуют неактивными. Ни candidate report, ни
+seed сами по себе не изменяют SQLite.
+
+Повторная генерация seed:
+
+```bash
+.venv/bin/python scripts/generate_warehouse_product_seed.py \
+  --input source/warehouse_product_candidates.json \
+  --output source/warehouse_products_seed.json
+```
+
+Импорт требует подготовленную schema v3 и обязательный путь к базе. Без
+`--apply` команда только валидирует seed и показывает план:
+
+```bash
+.venv/bin/python scripts/import_warehouse_products.py \
+  --database /path/to/test.db \
+  --input source/warehouse_products_seed.json
+```
+
+Запись выполняется только с явным `--apply`, одним атомарным batch. Повторный
+импорт идентичного seed возвращает `unchanged`; расхождение stable ID или
+единого namespace вызывает полный отказ без частичных updates. Production DB
+не является значением по умолчанию и дополнительно запрещена CLI.
+Автоматического импорта при startup нет.
 
 ## Пользователи и SQLite
 

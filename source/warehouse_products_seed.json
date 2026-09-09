@@ -1,0 +1,7531 @@
+{
+  "format_version": 1,
+  "source_candidate_format_version": 1,
+  "source_catalog_sha256": "352d21202790188e213b3f5caac4f494e5dc41645c7a3decfb3c1ea16b393b7b",
+  "policy": {
+    "clean_candidates_active": true,
+    "review_required_active": false,
+    "owner_required_active": true
+  },
+  "products": [
+    {
+      "stable_id": "abrikos_p_f",
+      "official_name": "Абрикос П/Ф",
+      "normalized_name": "абрикос п/ф",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "abrikos_p_f"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "abrikosovka",
+      "official_name": "Абрикосовка настойка п/ф",
+      "normalized_name": "абрикосовка настойка п/ф",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "abrikosovka"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "abrikosovka_p_f",
+      "official_name": "Абрикосовка п/ф",
+      "normalized_name": "абрикосовка п/ф",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "abrikosovka_p_f"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "absolyul_anchan_pf",
+      "official_name": "Абсолюл анчан пф",
+      "normalized_name": "абсолюл анчан пф",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "absolyul_anchan_pf"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "albumin",
+      "official_name": "Альбумин",
+      "normalized_name": "альбумин",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "albumin"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "ananasovka",
+      "official_name": "Ананасовка настойка п/ф",
+      "normalized_name": "ананасовка настойка п/ф",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "ananasovka"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "ananasovka_p_f",
+      "official_name": "Ананасовка п/ф",
+      "normalized_name": "ананасовка п/ф",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "ananasovka_p_f"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "angostura",
+      "official_name": "Angostura",
+      "normalized_name": "angostura",
+      "base_unit": "l",
+      "is_active": false,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "angostura"
+      ],
+      "review_status": "review_required",
+      "warnings": [
+        "Неизвестные единицы: dash"
+      ],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "apelsin",
+      "official_name": "Апельсин",
+      "normalized_name": "апельсин",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "apelsin"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "aperol",
+      "official_name": "Апероль",
+      "normalized_name": "апероль",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "aperol"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "badyan",
+      "official_name": "Бадьян",
+      "normalized_name": "бадьян",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "badyan"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "balonchik_d",
+      "official_name": "Балончик д/сифона 8гр сливки",
+      "normalized_name": "балончик д/сифона 8гр сливки",
+      "base_unit": "pcs",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "balonchik_d"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "banan",
+      "official_name": "Банан",
+      "normalized_name": "банан",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "banan"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "banan_zachishch",
+      "official_name": "Банан зачищ",
+      "normalized_name": "банан зачищ",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "banan_zachishch"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "bazilik",
+      "official_name": "Базилик",
+      "normalized_name": "базилик",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "bazilik"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "bazilik_2",
+      "official_name": "Базилик зачищ. бар",
+      "normalized_name": "базилик зачищ. бар",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "bazilik_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "belaya_sangriya_1l",
+      "official_name": "Белая сангрия 1л",
+      "normalized_name": "белая сангрия 1л",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "belaya_sangriya_1l"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "bern",
+      "official_name": "Берн",
+      "normalized_name": "берн",
+      "base_unit": "pcs",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "bern"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "big_moustache",
+      "official_name": "Big Moustache",
+      "normalized_name": "big moustache",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "big_moustache"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "bonakva_gaz_bez",
+      "official_name": "Бонаква газ\\без газ 0,33",
+      "normalized_name": "бонаква газ\\без газ 0,33",
+      "base_unit": "pcs",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "bonakva_gaz_bez"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "borzhomi_steklo",
+      "official_name": "Боржоми стекло 0,5л",
+      "normalized_name": "боржоми стекло 0,5л",
+      "base_unit": "pcs",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "borzhomi_steklo"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "brendi_pisko",
+      "official_name": "Бренди писко",
+      "normalized_name": "бренди писко",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "brendi_pisko"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "brendi_pisko_el",
+      "official_name": "Бренди Писко Эль Гобернадор",
+      "normalized_name": "бренди писко эль гобернадор",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "brendi_pisko_el"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "brendi_sent_2",
+      "official_name": "Бренди Сент Реми ХО",
+      "normalized_name": "бренди сент реми хо",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "brendi_sent_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "brendi_sent_remi",
+      "official_name": "Бренди Сент Реми ВСОП",
+      "normalized_name": "бренди сент реми всоп",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "brendi_sent_remi"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "brila_lda",
+      "official_name": "Брила льда",
+      "normalized_name": "брила льда",
+      "base_unit": "pcs",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "brila_lda"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "chay_chernyy_pf",
+      "official_name": "Чай черный пф",
+      "normalized_name": "чай черный пф",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "chay_chernyy_pf"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "chay_grechaniy",
+      "official_name": "Чай Гречаний",
+      "normalized_name": "чай гречаний",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "chay_grechaniy"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "chay_karkade",
+      "official_name": "Чай каркаде",
+      "normalized_name": "чай каркаде",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "chay_karkade"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "chay_oblepikha",
+      "official_name": "Чай облепиха-имбирь п/ф",
+      "normalized_name": "чай облепиха-имбирь п/ф",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "chay_oblepikha"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "chay_paketirovanyy",
+      "official_name": "Чай пакетированый",
+      "normalized_name": "чай пакетированый",
+      "base_unit": "pcs",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "chay_paketirovanyy"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "chay_rassypnoy_v",
+      "official_name": "Чай рассыпной в ассорт",
+      "normalized_name": "чай рассыпной в ассорт",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "chay_rassypnoy_v"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "chay_smorodina",
+      "official_name": "Чай смородина-базилик п/ф",
+      "normalized_name": "чай смородина-базилик п/ф",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "chay_smorodina"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "chernaya_pena_p",
+      "official_name": "Черная пена П/Ф 2025",
+      "normalized_name": "черная пена п/ф 2025",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "chernaya_pena_p"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "chips_ananas",
+      "official_name": "Чипс ананас",
+      "normalized_name": "чипс ананас",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "chips_ananas"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "chips_grusha",
+      "official_name": "Чипс груша",
+      "normalized_name": "чипс груша",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "chips_grusha"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "chips_list_p_f",
+      "official_name": "Чипс лист п/ф",
+      "normalized_name": "чипс лист п/ф",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "chips_list_p_f"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "easy_foam",
+      "official_name": "Easy Foam",
+      "normalized_name": "easy foam",
+      "base_unit": "l",
+      "is_active": false,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "easy_foam"
+      ],
+      "review_status": "review_required",
+      "warnings": [
+        "Неизвестные единицы: dash"
+      ],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "evervest_tonik_0",
+      "official_name": "Эвервест тоник 0,25л стекло",
+      "normalized_name": "эвервест тоник 0,25л стекло",
+      "base_unit": "pcs",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "evervest_tonik_0"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "fever_tonik_0_2l",
+      "official_name": "Февер тоник 0,2л стекло",
+      "normalized_name": "февер тоник 0,2л стекло",
+      "base_unit": "pcs",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "fever_tonik_0_2l"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "filtr_p_f",
+      "official_name": "Фильтр П/Ф",
+      "normalized_name": "фильтр п/ф",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "filtr_p_f"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "fistashki",
+      "official_name": "Фисташки",
+      "normalized_name": "фисташки",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "fistashki"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "fistashkove",
+      "official_name": "Фисташкове морозиво П/Ф",
+      "normalized_name": "фисташкове морозиво п/ф",
+      "base_unit": "kg",
+      "is_active": false,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "fistashkove"
+      ],
+      "review_status": "review_required",
+      "warnings": [
+        "Ингредиент встречается только в скрытых карточках"
+      ],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "fresh_apelsin_pf",
+      "official_name": "Фреш апельсин пф(бар)",
+      "normalized_name": "фреш апельсин пф(бар",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "fresh_apelsin_pf"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "fresh_greypfrut",
+      "official_name": "Фреш грейпфрут пф(бар)",
+      "normalized_name": "фреш грейпфрут пф(бар",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "fresh_greypfrut"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "fresh_laym_p_f",
+      "official_name": "Фреш лайм п/ф",
+      "normalized_name": "фреш лайм п/ф",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "fresh_laym_p_f"
+      ],
+      "review_status": "approved",
+      "warnings": [
+        "Base unit approved by owner policy: kg → l"
+      ],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "fresh_laym_pf_bar",
+      "official_name": "Фреш лайм пф(бар)",
+      "normalized_name": "фреш лайм пф(бар",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "fresh_laym_pf_bar"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "fresh_limon_p_f",
+      "official_name": "Фреш лимон п/ф",
+      "normalized_name": "фреш лимон п/ф",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "fresh_limon_p_f"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "fresh_limon_pf_bar",
+      "official_name": "Фреш лимон пф(бар)",
+      "normalized_name": "фреш лимон пф(бар",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "fresh_limon_pf_bar"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "fresh_limona",
+      "official_name": "Фреш лимона",
+      "normalized_name": "фреш лимона",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "fresh_limona"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "fresh_limona_p_f",
+      "official_name": "Фреш лимона п/ф",
+      "normalized_name": "фреш лимона п/ф",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "fresh_limona_p_f"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "fresh_morkov_pf",
+      "official_name": "Фреш морковь пф(бар)",
+      "normalized_name": "фреш морковь пф(бар",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "fresh_morkov_pf"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "fresh_ogurets_pf",
+      "official_name": "Фреш огурец пф(бар)",
+      "normalized_name": "фреш огурец пф(бар",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "fresh_ogurets_pf"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "fresh_selderey",
+      "official_name": "Фреш сельдерей пф(бар)",
+      "normalized_name": "фреш сельдерей пф(бар",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "fresh_selderey"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "fresh_yablochnyy",
+      "official_name": "Фреш яблочный пф(бар)",
+      "normalized_name": "фреш яблочный пф(бар",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "fresh_yablochnyy"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "frizante",
+      "official_name": "Фризанте",
+      "normalized_name": "фризанте",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "frizante"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "gin_finsbari",
+      "official_name": "Джин Финсбари клубника",
+      "normalized_name": "джин финсбари клубника",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "gin_finsbari"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "gin_finsbari_2",
+      "official_name": "Джин Финсбари Платинум",
+      "normalized_name": "джин финсбари платинум",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "gin_finsbari_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "gin_finsbury",
+      "official_name": "Джин Finsbury (клубника)",
+      "normalized_name": "джин finsbury (клубника",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "gin_finsbury"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "gin_finsbury_plata",
+      "official_name": "Джин Finsbury Plata",
+      "normalized_name": "джин finsbury plata",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "gin_finsbury_plata"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "gin_gordons",
+      "official_name": "Джин Гордонс",
+      "normalized_name": "джин гордонс",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "gin_gordons"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "gin_gordons_pink",
+      "official_name": "Джин Гордонс пинк",
+      "normalized_name": "джин гордонс пинк",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "gin_gordons_pink"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "gin_laymovyy_pf",
+      "official_name": "Джин лаймовый пф",
+      "normalized_name": "джин лаймовый пф",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "gin_laymovyy_pf"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "gin_roku",
+      "official_name": "Джин року",
+      "normalized_name": "джин року",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "gin_roku"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "gin_tankerey",
+      "official_name": "Джин Танкерей",
+      "normalized_name": "джин танкерей",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "gin_tankerey"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "gin_uitli_2",
+      "official_name": "Джин Уитли Нейлл алое и огурец",
+      "normalized_name": "джин уитли нейлл алое и огурец",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "gin_uitli_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "gin_uitli_3",
+      "official_name": "Джин Уитли Нейлл клубника б/а л",
+      "normalized_name": "джин уитли нейлл клубника б/а л",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "gin_uitli_3"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "gin_uitli_4",
+      "official_name": "Джин Уитли Нейлл Юдзу Стробери",
+      "normalized_name": "джин уитли нейлл юдзу стробери",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "gin_uitli_4"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "gin_uitli_neyll",
+      "official_name": "Джин Уитли Нейлл айва",
+      "normalized_name": "джин уитли нейлл айва",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "gin_uitli_neyll"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "gin_whitley",
+      "official_name": "Джин Whitley Neill (клубника-юдзу)",
+      "normalized_name": "джин whitley neill (клубника-юдзу",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "gin_whitley"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "gin_whitley_2",
+      "official_name": "Джин Whitley Neill N/A",
+      "normalized_name": "джин whitley neill n/a",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "gin_whitley_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "golubika_svezh",
+      "official_name": "Голубика свеж",
+      "normalized_name": "голубика свеж",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "golubika_svezh"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "greypfrut",
+      "official_name": "Грейпфрут",
+      "normalized_name": "грейпфрут",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "greypfrut"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "gvozdika",
+      "official_name": "Гвоздика",
+      "normalized_name": "гвоздика",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "gvozdika"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "id_7_ap_sprayt_0",
+      "official_name": "7-ап\\спрайт 0,25л стекло",
+      "normalized_name": "7-ап\\спрайт 0,25л стекло",
+      "base_unit": "pcs",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "id_7_ap_sprayt_0"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "id_7ap_sprayt",
+      "official_name": "7ап / спрайт",
+      "normalized_name": "7ап / спрайт",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "id_7ap_sprayt"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "imbir_fresh",
+      "official_name": "Имбирь фреш",
+      "normalized_name": "имбирь фреш",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "imbir_fresh"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "imbir_koren",
+      "official_name": "Имбирь корень",
+      "normalized_name": "имбирь корень",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "imbir_koren"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "inzhir_svezhiy",
+      "official_name": "Инжир свежий",
+      "normalized_name": "инжир свежий",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "inzhir_svezhiy"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "inzhirniy",
+      "official_name": "Инжирній кордиал П/Ф",
+      "normalized_name": "инжирній кордиал п/ф",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "inzhirniy"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "izi_foam",
+      "official_name": "Изи фоам",
+      "normalized_name": "изи фоам",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "izi_foam"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "kakao",
+      "official_name": "Какао",
+      "normalized_name": "какао",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "kakao"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "kakao_2",
+      "official_name": "Какао алкалезированный",
+      "normalized_name": "какао алкалезированный",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "kakao_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "kampari",
+      "official_name": "Кампари",
+      "normalized_name": "кампари",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "kampari"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "karamel_bar_kg",
+      "official_name": "Карамель бар. кг",
+      "normalized_name": "карамель бар. кг",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "karamel_bar_kg"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "kardamon",
+      "official_name": "Кардамон",
+      "normalized_name": "кардамон",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "kardamon"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "karpatska",
+      "official_name": "Карпатська джерельна (г,б/г) 0,5л стекло",
+      "normalized_name": "карпатська джерельна (г,б/г) 0,5л стекло",
+      "base_unit": "pcs",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "karpatska"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "kislota",
+      "official_name": "Кислота виноградная",
+      "normalized_name": "кислота виноградная",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "kislota"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "kislota_2",
+      "official_name": "Кислота яблочная",
+      "normalized_name": "кислота яблочная",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "kislota_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "kislota_gumiarabik",
+      "official_name": "Кислота гумиарабик",
+      "normalized_name": "кислота гумиарабик",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "kislota_gumiarabik"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "kislotnyy",
+      "official_name": "Кислотный раствор п/ф",
+      "normalized_name": "кислотный раствор п/ф",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "kislotnyy"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "kivi",
+      "official_name": "Киви",
+      "normalized_name": "киви",
+      "base_unit": "kg",
+      "is_active": false,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "kivi"
+      ],
+      "review_status": "review_required",
+      "warnings": [
+        "Ингредиент встречается только в скрытых карточках"
+      ],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "kivi_p_f",
+      "official_name": "Киви П/Ф",
+      "normalized_name": "киви п/ф",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "kivi_p_f"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "klubnichnoe_kuli",
+      "official_name": "Клубничное кули",
+      "normalized_name": "клубничное кули",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "klubnichnoe_kuli"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "klubnichnyy_laym",
+      "official_name": "Клубничный лайм п/ф",
+      "normalized_name": "клубничный лайм п/ф",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "klubnichnyy_laym"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "klubnika",
+      "official_name": "Клубника",
+      "normalized_name": "клубника",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "klubnika"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "klubnika_laym",
+      "official_name": "Клубника лайм настойка п/ф",
+      "normalized_name": "клубника лайм настойка п/ф",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "klubnika_laym"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "klubnika_pyure_pf",
+      "official_name": "Клубника пюре пф",
+      "normalized_name": "клубника пюре пф",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "klubnika_pyure_pf"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "klubnika_svezh",
+      "official_name": "Клубника свеж. зачищ",
+      "normalized_name": "клубника свеж. зачищ",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "klubnika_svezh"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "kofe_filtr_kg",
+      "official_name": "Кофе фильтр кг",
+      "normalized_name": "кофе фильтр кг",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "kofe_filtr_kg"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "kofe_zernovoy",
+      "official_name": "Кофе зерновой",
+      "normalized_name": "кофе зерновой",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "kofe_zernovoy"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "kokosovaya_pena_pf",
+      "official_name": "Кокосовая пена пф",
+      "normalized_name": "кокосовая пена пф",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "kokosovaya_pena_pf"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "kola_0_25l",
+      "official_name": "Кола 0,25л",
+      "normalized_name": "кола 0,25л",
+      "base_unit": "pcs",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "kola_0_25l"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "kompot_yablochno",
+      "official_name": "Компот яблочно-клубничный п/ф",
+      "normalized_name": "компот яблочно-клубничный п/ф",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "kompot_yablochno"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "kondurin_zoloto",
+      "official_name": "Кондурин золото(украшение)",
+      "normalized_name": "кондурин золото(украшение",
+      "base_unit": "kg",
+      "is_active": false,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "kondurin_zoloto"
+      ],
+      "review_status": "review_required",
+      "warnings": [
+        "Возможный garnish/decor или количество «по вкусу»"
+      ],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "konyak_remi",
+      "official_name": "Коньяк Реми Мартин ВСОП",
+      "normalized_name": "коньяк реми мартин всоп",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "konyak_remi"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "konyak_shato",
+      "official_name": "Коньяк Шато Монтифо ВС",
+      "normalized_name": "коньяк шато монтифо вс",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "konyak_shato"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "konyak_shato_2",
+      "official_name": "Коньяк Шато Монтифо ВСОП",
+      "normalized_name": "коньяк шато монтифо всоп",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "konyak_shato_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "kopmot_yabloko",
+      "official_name": "Копмот яблоко кардомон",
+      "normalized_name": "копмот яблоко кардомон",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "kopmot_yabloko"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "kordial_chernika",
+      "official_name": "Кордиал черника (можно заменить кордиалом для чая Бери Редианс)",
+      "normalized_name": "кордиал черника (можно заменить кордиалом для чая бери редианс",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "kordial_chernika"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "kordial_grey_pf",
+      "official_name": "Кордиал грей пф",
+      "normalized_name": "кордиал грей пф",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "kordial_grey_pf"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "kordial_lichi",
+      "official_name": "Кордиал личи-жасмин",
+      "normalized_name": "кордиал личи-жасмин",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "kordial_lichi"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "kordial_vishnya",
+      "official_name": "Кордиал вишня П/Ф 2025",
+      "normalized_name": "кордиал вишня п/ф 2025",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "kordial_vishnya"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "koritsa_molotaya",
+      "official_name": "Корица молотая",
+      "normalized_name": "корица молотая",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "koritsa_molotaya"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "koritsa_palochki",
+      "official_name": "Корица палочки",
+      "normalized_name": "корица палочки",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "koritsa_palochki"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "krasitel_bar_kg",
+      "official_name": "Краситель бар. кг",
+      "normalized_name": "краситель бар. кг",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "krasitel_bar_kg"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "krasnaya",
+      "official_name": "Красная сангрия 1л",
+      "normalized_name": "красная сангрия 1л",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "krasnaya"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "kroshka_p_f_2026",
+      "official_name": "Крошка П/Ф 2026",
+      "normalized_name": "крошка п/ф 2026",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "kroshka_p_f_2026"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "laym",
+      "official_name": "Лайм",
+      "normalized_name": "лайм",
+      "base_unit": "kg",
+      "is_active": false,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "laym"
+      ],
+      "review_status": "review_required",
+      "warnings": [
+        "Base unit approved by owner policy: null → kg",
+        "Конфликт размерностей единиц"
+      ],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "laym_fresh_2_p_f",
+      "official_name": "Лайм фреш 2 П/Ф",
+      "normalized_name": "лайм фреш 2 п/ф",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "laym_fresh_2_p_f"
+      ],
+      "review_status": "approved",
+      "warnings": [
+        "Base unit approved by owner policy: kg → l"
+      ],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "liker",
+      "official_name": "Ликер СиерраТропикаль",
+      "normalized_name": "ликер сиерратропикаль",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "liker"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "liker_aperol",
+      "official_name": "Ликер Апероль",
+      "normalized_name": "ликер апероль",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "liker_aperol"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "liker_beylis",
+      "official_name": "Ликер Бейлис",
+      "normalized_name": "ликер бейлис",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "liker_beylis"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "liker_caffo",
+      "official_name": "Ликер Caffo Vecchio Amaro",
+      "normalized_name": "ликер caffo vecchio amaro",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "liker_caffo"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "liker_de_kayper",
+      "official_name": "Ликер Де кайпер в асс",
+      "normalized_name": "ликер де кайпер в асс",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "liker_de_kayper"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "liker_egermeyster",
+      "official_name": "Ликер Егермейстер",
+      "normalized_name": "ликер егермейстер",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "liker_egermeyster"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "liker_kalua",
+      "official_name": "Ликер Калуа",
+      "normalized_name": "ликер калуа",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "liker_kalua"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "liker_kuantro",
+      "official_name": "Ликер Куантро",
+      "normalized_name": "ликер куантро",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "liker_kuantro"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "liker_sambuka",
+      "official_name": "Ликер Самбука",
+      "normalized_name": "ликер самбука",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "liker_sambuka"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "liker_volare_v_ass",
+      "official_name": "Ликер Воларе в асс",
+      "normalized_name": "ликер воларе в асс",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "liker_volare_v_ass"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "likyor_de_2",
+      "official_name": "Ликёр De Kyper (зелёная дыня)",
+      "normalized_name": "ликер de kyper (зеленая дыня",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "likyor_de_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "likyor_de_3",
+      "official_name": "Ликёр De Kyper (кокос)",
+      "normalized_name": "ликер de kyper (кокос",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "likyor_de_3"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "likyor_de_4",
+      "official_name": "Ликёр De Kyper (кофейный)",
+      "normalized_name": "ликер de kyper (кофейный",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "likyor_de_4"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "likyor_de_5",
+      "official_name": "Ликёр De Kyper (крем де кассис)",
+      "normalized_name": "ликер de kyper (крем де кассис",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "likyor_de_5"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "likyor_de_6",
+      "official_name": "Ликёр De Kyper (трипл-сек)",
+      "normalized_name": "ликер de kyper (трипл-сек",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "likyor_de_6"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "likyor_de_kyper",
+      "official_name": "Ликёр De Kyper (амаретто)",
+      "normalized_name": "ликер de kyper (амаретто",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "likyor_de_kyper"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "likyor_gek",
+      "official_name": "Ликёр Джек Дениалс (медовый)",
+      "normalized_name": "ликер джек дениалс (медовый",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "likyor_gek"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "likyor_vekhio",
+      "official_name": "Ликёр Вехио Амаро",
+      "normalized_name": "ликер вехио амаро",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "likyor_vekhio"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "limon",
+      "official_name": "Лимон",
+      "normalized_name": "лимон",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "limon"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "limonad_2_pf",
+      "official_name": "Лимонад 2 пф",
+      "normalized_name": "лимонад 2 пф",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "limonad_2_pf"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "limonchello",
+      "official_name": "Лимончелло",
+      "normalized_name": "лимончелло",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "limonchello"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "limonnaya_kislota",
+      "official_name": "Лимонная кислота",
+      "normalized_name": "лимонная кислота",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "limonnaya_kislota"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "lipa",
+      "official_name": "Липа",
+      "normalized_name": "липа",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "lipa"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "list_layma",
+      "official_name": "Лист лайма",
+      "normalized_name": "лист лайма",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "list_layma"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "listya_bambuka",
+      "official_name": "Листья бамбука",
+      "normalized_name": "листья бамбука",
+      "base_unit": "pcs",
+      "is_active": false,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "listya_bambuka"
+      ],
+      "review_status": "review_required",
+      "warnings": [
+        "Наблюдается дробная часть штуки"
+      ],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "listya_skeleton_up",
+      "official_name": "Листья Скелетон уп",
+      "normalized_name": "листья скелетон уп",
+      "base_unit": "pcs",
+      "is_active": false,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "listya_skeleton_up"
+      ],
+      "review_status": "review_required",
+      "warnings": [
+        "Наблюдается дробная часть штуки"
+      ],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "malina",
+      "official_name": "Малина сублимированая",
+      "normalized_name": "малина сублимированая",
+      "base_unit": "kg",
+      "is_active": false,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "malina"
+      ],
+      "review_status": "review_required",
+      "warnings": [
+        "Ингредиент встречается только в скрытых карточках"
+      ],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "malina_vinograd",
+      "official_name": "Малина виноград П/Ф",
+      "normalized_name": "малина виноград п/ф",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "malina_vinograd"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "mandarin_zachishch",
+      "official_name": "Мандарин зачищ",
+      "normalized_name": "мандарин зачищ",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "mandarin_zachishch"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "mango_marakuya",
+      "official_name": "Манго-маракуя пюре пф",
+      "normalized_name": "манго-маракуя пюре пф",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "mango_marakuya"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "marka",
+      "official_name": "Марка",
+      "normalized_name": "марка",
+      "base_unit": "pcs",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "marka"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "marshmellou_bar",
+      "official_name": "Маршмеллоу (бар)",
+      "normalized_name": "маршмеллоу (бар",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "marshmellou_bar"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "maslo_tryufelnoe",
+      "official_name": "Масло трюфельное",
+      "normalized_name": "масло трюфельное",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "maslo_tryufelnoe"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "matcha",
+      "official_name": "Матча",
+      "normalized_name": "матча",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "matcha"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "med",
+      "official_name": "Мед",
+      "normalized_name": "мед",
+      "base_unit": "kg",
+      "is_active": false,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "med"
+      ],
+      "review_status": "review_required",
+      "warnings": [
+        "Base unit approved by owner policy: null → kg",
+        "Конфликт размерностей единиц"
+      ],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "medovo_imbirniy",
+      "official_name": "Медово-имбирній сироп",
+      "normalized_name": "медово-имбирній сироп",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "medovo_imbirniy"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "merri_miks",
+      "official_name": "Мерри микс",
+      "normalized_name": "мерри микс",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "merri_miks"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "mirinda_fanta_0",
+      "official_name": "Миринда/ фанта 0,25л стекло",
+      "normalized_name": "миринда/ фанта 0,25л стекло",
+      "base_unit": "pcs",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "mirinda_fanta_0"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "moloko",
+      "official_name": "Молоко",
+      "normalized_name": "молоко",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "moloko"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "moloko_2",
+      "official_name": "Молоко альтернативное",
+      "normalized_name": "молоко альтернативное",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "moloko_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "molotyy_kofe_iz",
+      "official_name": "Молотый кофе из гриндера",
+      "normalized_name": "молотый кофе из гриндера",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [
+        "кофе из гриндера",
+        "молотый кофе с гриндера",
+        "остаток кофе в гриндере",
+        "кофе гриндер"
+      ],
+      "source_candidate_ids": [
+        "owner_ground_coffee"
+      ],
+      "review_status": "owner_required",
+      "warnings": [],
+      "owner_metadata": {
+        "required_rule": {
+          "mode": "recommended",
+          "unit": "kg",
+          "schedule": "daily",
+          "quantity": "0.06"
+        }
+      }
+    },
+    {
+      "stable_id": "monin_pyure_yuzu",
+      "official_name": "Monin пюре юдзу",
+      "normalized_name": "monin пюре юдзу",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "monin_pyure_yuzu"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "monin_rancho_lime",
+      "official_name": "Monin Rancho-Lime",
+      "normalized_name": "monin rancho-lime",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "monin_rancho_lime"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "monin_sirop",
+      "official_name": "Monin сироп клубника",
+      "normalized_name": "monin сироп клубника",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "monin_sirop"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "monin_sirop_2",
+      "official_name": "Monin сироп лемонграсс",
+      "normalized_name": "monin сироп лемонграсс",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "monin_sirop_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "monin_sirop_3",
+      "official_name": "Monin сироп маракуйя",
+      "normalized_name": "monin сироп маракуйя",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "monin_sirop_3"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "monin_sirop_4",
+      "official_name": "Monin сироп попкорн",
+      "normalized_name": "monin сироп попкорн",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "monin_sirop_4"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "monin_sirop_buzina",
+      "official_name": "Monin сироп бузина",
+      "normalized_name": "monin сироп бузина",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "monin_sirop_buzina"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "monin_sirop_grusha",
+      "official_name": "Monin сироп груша",
+      "normalized_name": "monin сироп груша",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "monin_sirop_grusha"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "monin_sirop_kivi",
+      "official_name": "Monin сироп киви",
+      "normalized_name": "monin сироп киви",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "monin_sirop_kivi"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "monin_sirop_orekh",
+      "official_name": "Monin сироп орех",
+      "normalized_name": "monin сироп орех",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "monin_sirop_orekh"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "monin_sirop_persik",
+      "official_name": "Monin сироп персик",
+      "normalized_name": "monin сироп персик",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "monin_sirop_persik"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "monster_energi_0_5",
+      "official_name": "Монстер Енерджи 0,5",
+      "normalized_name": "монстер енерджи 0,5",
+      "base_unit": "pcs",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "monster_energi_0_5"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "morkov_zachishch",
+      "official_name": "Морковь зачищ",
+      "normalized_name": "морковь зачищ",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "morkov_zachishch"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "morozhenoe",
+      "official_name": "Мороженое",
+      "normalized_name": "мороженое",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "morozhenoe"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "morozhnoe",
+      "official_name": "Морожное шоколад 2026",
+      "normalized_name": "морожное шоколад 2026",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "morozhnoe"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "morozhnoe_2026",
+      "official_name": "Морожное 2026",
+      "normalized_name": "морожное 2026",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "morozhnoe_2026"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "morozivo",
+      "official_name": "Морозиво шоколад П/Ф",
+      "normalized_name": "морозиво шоколад п/ф",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "morozivo"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "mors_pf",
+      "official_name": "Морс пф",
+      "normalized_name": "морс пф",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "mors_pf"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "morshinska_0_33",
+      "official_name": "Моршинська 0,33",
+      "normalized_name": "моршинська 0,33",
+      "base_unit": "pcs",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "morshinska_0_33"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "myata",
+      "official_name": "Мята",
+      "normalized_name": "мята",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "myata"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "myata_bazilik",
+      "official_name": "Мята/базилик",
+      "normalized_name": "мята/базилик",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "myata_bazilik"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "myata_zachishch",
+      "official_name": "Мята зачищ",
+      "normalized_name": "мята зачищ",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "myata_zachishch"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "nabeglavi_0_5l",
+      "official_name": "Набеглави 0,5л",
+      "normalized_name": "набеглави 0,5л",
+      "base_unit": "pcs",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "nabeglavi_0_5l"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "nastoyka_absent",
+      "official_name": "Настойка Абсент",
+      "normalized_name": "настойка абсент",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "nastoyka_absent"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "nastoyka_angostura",
+      "official_name": "Настойка Ангостура",
+      "normalized_name": "настойка ангостура",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "nastoyka_angostura"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "nastoyka_kampari",
+      "official_name": "Настойка Кампари",
+      "normalized_name": "настойка кампари",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "nastoyka_kampari"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "nektarin",
+      "official_name": "Нектарин",
+      "normalized_name": "нектарин",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "nektarin"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "nektarin_zachistka",
+      "official_name": "Нектарин зачистка",
+      "normalized_name": "нектарин зачистка",
+      "base_unit": "kg",
+      "is_active": false,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "nektarin_zachistka"
+      ],
+      "review_status": "review_required",
+      "warnings": [
+        "Ингредиент встречается только в скрытых карточках"
+      ],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "oblepikha_p_f",
+      "official_name": "Облепиха П/Ф",
+      "normalized_name": "облепиха п/ф",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "oblepikha_p_f"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "oblepikha_pyure_pf",
+      "official_name": "Облепиха пюре пф",
+      "normalized_name": "облепиха пюре пф",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "oblepikha_pyure_pf"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "oblepikha_s_m",
+      "official_name": "Облепиха с/м",
+      "normalized_name": "облепиха с/м",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "oblepikha_s_m"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "oblepikha_s_m_2",
+      "official_name": "Облепиха с/м (оттайка)",
+      "normalized_name": "облепиха с/м (оттайка",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "oblepikha_s_m_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "odk_pyure_mango",
+      "official_name": "ODK пюре манго",
+      "normalized_name": "odk пюре манго",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "odk_pyure_mango"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "ogurets_svezhiy",
+      "official_name": "Огурец свежий",
+      "normalized_name": "огурец свежий",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "ogurets_svezhiy"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "orekhovaya_pena",
+      "official_name": "Ореховая пена П/Ф",
+      "normalized_name": "ореховая пена п/ф",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "orekhovaya_pena"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "ostatok_moloka_v",
+      "official_name": "Остаток молока в питчерах",
+      "normalized_name": "остаток молока в питчерах",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [
+        "молоко в питчерах",
+        "остаток молока",
+        "молоко с питчеров",
+        "молоко из питчеров"
+      ],
+      "source_candidate_ids": [
+        "owner_pitcher_milk"
+      ],
+      "review_status": "owner_required",
+      "warnings": [],
+      "owner_metadata": {
+        "required_rule": {
+          "mode": "manual",
+          "unit": "l",
+          "schedule": "daily",
+          "quantity": null
+        }
+      }
+    },
+    {
+      "stable_id": "pasta_fistashki",
+      "official_name": "Паста фисташки",
+      "normalized_name": "паста фисташки",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "pasta_fistashki"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "pasta_pandana",
+      "official_name": "Паста пандана",
+      "normalized_name": "паста пандана",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "pasta_pandana"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "pepsi_0_25l_steklo",
+      "official_name": "Пепси 0,25л стекло",
+      "normalized_name": "пепси 0,25л стекло",
+      "base_unit": "pcs",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "pepsi_0_25l_steklo"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "pepsi_0_3l_steklo",
+      "official_name": "Пепси 0,3л стекло",
+      "normalized_name": "пепси 0,3л стекло",
+      "base_unit": "pcs",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "pepsi_0_3l_steklo"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "pepsi_zero_0_25l",
+      "official_name": "Пепси зеро 0,25л стекло",
+      "normalized_name": "пепси зеро 0,25л стекло",
+      "base_unit": "pcs",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "pepsi_zero_0_25l"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "perets_chernyy",
+      "official_name": "Перец черный молотый",
+      "normalized_name": "перец черный молотый",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "perets_chernyy"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "persik",
+      "official_name": "Персик",
+      "normalized_name": "персик",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "persik"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "persikovyy_likyor",
+      "official_name": "Персиковый ликёр",
+      "normalized_name": "персиковый ликер",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "persikovyy_likyor"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "pivo",
+      "official_name": "Пиво Кроненбург1664",
+      "normalized_name": "пиво кроненбург1664",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "pivo"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "pivo_2",
+      "official_name": "Пиво Варштайнер б/а 0,33",
+      "normalized_name": "пиво варштайнер б/а 0,33",
+      "base_unit": "pcs",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "pivo_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "pivo_estrella_0_5",
+      "official_name": "Пиво Естрелла 0,5",
+      "normalized_name": "пиво естрелла 0,5",
+      "base_unit": "pcs",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "pivo_estrella_0_5"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "pivo_ginnes",
+      "official_name": "Пиво Гиннес",
+      "normalized_name": "пиво гиннес",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "pivo_ginnes"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "pivo_grimbergen",
+      "official_name": "Пиво Гримберген",
+      "normalized_name": "пиво гримберген",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "pivo_grimbergen"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "pivo_karlsberg",
+      "official_name": "Пиво Карлсберг",
+      "normalized_name": "пиво карлсберг",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "pivo_karlsberg"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "pivo_korona_ekstra",
+      "official_name": "Пиво Корона Экстра",
+      "normalized_name": "пиво корона экстра",
+      "base_unit": "pcs",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "pivo_korona_ekstra"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "pivo_varshtayner",
+      "official_name": "Пиво Варштайнер",
+      "normalized_name": "пиво варштайнер",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "pivo_varshtayner"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "popkorn_karamelnyy",
+      "official_name": "Попкорн карамельный",
+      "normalized_name": "попкорн карамельный",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "popkorn_karamelnyy"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "posypka_kit_kat",
+      "official_name": "Посыпка кит-кат",
+      "normalized_name": "посыпка кит-кат",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "posypka_kit_kat"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "prosekko",
+      "official_name": "Просекко Спуманте Зонин Вальдобьяденно",
+      "normalized_name": "просекко спуманте зонин вальдобьяденно",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "prosekko"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "prosekko_2",
+      "official_name": "Просекко Спуманте Супериор Брют",
+      "normalized_name": "просекко спуманте супериор брют",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "prosekko_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "prosekko_alne",
+      "official_name": "Просекко Alne millesimato/драй",
+      "normalized_name": "просекко alne millesimato/драй",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "prosekko_alne"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "prosekko_frizante",
+      "official_name": "Просекко фризанте",
+      "normalized_name": "просекко фризанте",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "prosekko_frizante"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "prosekko_monblan",
+      "official_name": "Просекко Монблан Фризанте разлив",
+      "normalized_name": "просекко монблан фризанте разлив",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "prosekko_monblan"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "prosekko_trevizo",
+      "official_name": "Просекко Тревизо э/драй",
+      "normalized_name": "просекко тревизо э/драй",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "prosekko_trevizo"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "pudra_smorodina",
+      "official_name": "Пудра смородина/малина (бар)",
+      "normalized_name": "пудра смородина/малина (бар",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "pudra_smorodina"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "pyure_dynya_z",
+      "official_name": "Пюре дыня (з)",
+      "normalized_name": "пюре дыня (з",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "pyure_dynya_z"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "pyure_fruktovoe",
+      "official_name": "Пюре фруктовое в ассортименте",
+      "normalized_name": "пюре фруктовое в ассортименте",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "pyure_fruktovoe"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "pyure_kivi_p_f",
+      "official_name": "Пюре киви П/Ф",
+      "normalized_name": "пюре киви п/ф",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "pyure_kivi_p_f"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "pyure_lichi",
+      "official_name": "Пюре Личи",
+      "normalized_name": "пюре личи",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "pyure_lichi"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "pyure_lichi_z",
+      "official_name": "Пюре личи (з)",
+      "normalized_name": "пюре личи (з",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "pyure_lichi_z"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "pyure_malina_p_f",
+      "official_name": "Пюре малина П/Ф",
+      "normalized_name": "пюре малина п/ф",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "pyure_malina_p_f"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "pyure_mango",
+      "official_name": "Пюре манго",
+      "normalized_name": "пюре манго",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "pyure_mango"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "pyure_mango_2",
+      "official_name": "Пюре манго-маракуйя п/ф",
+      "normalized_name": "пюре манго-маракуйя п/ф",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "pyure_mango_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "pyure_marakuyya",
+      "official_name": "Пюре маракуйя",
+      "normalized_name": "пюре маракуйя",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "pyure_marakuyya"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "pyure_yuzu",
+      "official_name": "Пюре Юдзу",
+      "normalized_name": "пюре юдзу",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "pyure_yuzu"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "rancho_laym",
+      "official_name": "Ранчо Лайм",
+      "normalized_name": "ранчо лайм",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "rancho_laym"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "red_bul_v_2",
+      "official_name": "Ред бул в ассорт.0,355л",
+      "normalized_name": "ред бул в ассорт.0,355л",
+      "base_unit": "pcs",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "red_bul_v_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "red_bul_v_assort",
+      "official_name": "Ред бул в ассорт.0,25л",
+      "normalized_name": "ред бул в ассорт.0,25л",
+      "base_unit": "pcs",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "red_bul_v_assort"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "rom_botafogo_white",
+      "official_name": "Ром Botafogo White",
+      "normalized_name": "ром botafogo white",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "rom_botafogo_white"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "rom_botofogo",
+      "official_name": "Ром Ботофого",
+      "normalized_name": "ром ботофого",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "rom_botofogo"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "rom_don_papa",
+      "official_name": "Ром Дон Папа Бароко",
+      "normalized_name": "ром дон папа бароко",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "rom_don_papa"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "rom_kapitan",
+      "official_name": "Ром Капитан Морган белый",
+      "normalized_name": "ром капитан морган белый",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "rom_kapitan"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "rom_kapitan_2",
+      "official_name": "Ром Капитан Морган золотой",
+      "normalized_name": "ром капитан морган золотой",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "rom_kapitan_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "rom_kapitan_3",
+      "official_name": "Ром Капитан Морган Спайсед",
+      "normalized_name": "ром капитан морган спайсед",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "rom_kapitan_3"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "rom_kapitan_4",
+      "official_name": "Ром Капитан Морган Темный",
+      "normalized_name": "ром капитан морган темный",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "rom_kapitan_4"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "rom_santyago_de",
+      "official_name": "Ром Сантьяго де Куба",
+      "normalized_name": "ром сантьяго де куба",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "rom_santyago_de"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "rom_zakapa_sent",
+      "official_name": "Ром Закапа сент",
+      "normalized_name": "ром закапа сент",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "rom_zakapa_sent"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "rozhok_vafelniy",
+      "official_name": "Рожок вафельний для мороженого",
+      "normalized_name": "рожок вафельний для мороженого",
+      "base_unit": "pcs",
+      "is_active": false,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "rozhok_vafelniy"
+      ],
+      "review_status": "review_required",
+      "warnings": [
+        "Наблюдается дробная часть штуки"
+      ],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "rozmarin",
+      "official_name": "Розмарин",
+      "normalized_name": "розмарин",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "rozmarin"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "sakhar",
+      "official_name": "Сахар",
+      "normalized_name": "сахар",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "sakhar"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "sakhar_2",
+      "official_name": "Сахар тростниковый",
+      "normalized_name": "сахар тростниковый",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "sakhar_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "sakhar_fioletoviy",
+      "official_name": "Сахар фиолетовий",
+      "normalized_name": "сахар фиолетовий",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "sakhar_fioletoviy"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "sakhar_pesok",
+      "official_name": "Сахар песок",
+      "normalized_name": "сахар песок",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "sakhar_pesok"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "sakhar_v_stikakh",
+      "official_name": "Сахар в стиках",
+      "normalized_name": "сахар в стиках",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "sakhar_v_stikakh"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "sakhar_vanilnyy",
+      "official_name": "Сахар ванильный",
+      "normalized_name": "сахар ванильный",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "sakhar_vanilnyy"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "sakharnyy_sirop",
+      "official_name": "Сахарный сироп",
+      "normalized_name": "сахарный сироп",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "sakharnyy_sirop"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "sakharnyy_sirop_pf",
+      "official_name": "Сахарный сироп пф",
+      "normalized_name": "сахарный сироп пф",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "sakharnyy_sirop_pf"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "sangrita_1l",
+      "official_name": "Сангрита 1л",
+      "normalized_name": "сангрита 1л",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "sangrita_1l"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "sbor_spetsiy_bar",
+      "official_name": "Сбор специй бар пф",
+      "normalized_name": "сбор специй бар пф",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "sbor_spetsiy_bar"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "selderey_2",
+      "official_name": "Сельдерей стебель зачищ",
+      "normalized_name": "сельдерей стебель зачищ",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "selderey_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "selderey_stebel",
+      "official_name": "Сельдерей стебель",
+      "normalized_name": "сельдерей стебель",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "selderey_stebel"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "serdechki",
+      "official_name": "Сердечки",
+      "normalized_name": "сердечки",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "serdechki"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "shamp_moet",
+      "official_name": "Шамп. Моет Шандон Брют",
+      "normalized_name": "шамп. моет шандон брют",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "shamp_moet"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "shampanskoe_blan",
+      "official_name": "Шампанское Блан де Блан Брют",
+      "normalized_name": "шампанское блан де блан брют",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "shampanskoe_blan"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "shokolad",
+      "official_name": "Шоколад",
+      "normalized_name": "шоколад",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "shokolad"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "shpazhki_bambuk",
+      "official_name": "Шпажки бамбук/фуршет уп",
+      "normalized_name": "шпажки бамбук/фуршет уп",
+      "base_unit": "pcs",
+      "is_active": false,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "shpazhki_bambuk"
+      ],
+      "review_status": "review_required",
+      "warnings": [
+        "Наблюдается дробная часть штуки"
+      ],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "shveps_tonik_pet",
+      "official_name": "Швепс тоник ПЭТ",
+      "normalized_name": "швепс тоник пэт",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "shveps_tonik_pet"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "shveps_v_assort",
+      "official_name": "Швепс в ассорт 0,25",
+      "normalized_name": "швепс в ассорт 0,25",
+      "base_unit": "pcs",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "shveps_v_assort"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "sidr_dolchelini",
+      "official_name": "Сидр дольчелини бьянко (кега)/2203001000",
+      "normalized_name": "сидр дольчелини бьянко (кега)/2203001000",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "sidr_dolchelini"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "sirop",
+      "official_name": "Сироп тростниковый сахар",
+      "normalized_name": "сироп тростниковый сахар",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "sirop"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "sirop_bitter_zero",
+      "official_name": "Сироп биттер зеро",
+      "normalized_name": "сироп биттер зеро",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "sirop_bitter_zero"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "sirop_demerara_p_f",
+      "official_name": "Сироп демерара П/Ф",
+      "normalized_name": "сироп демерара п/ф",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "sirop_demerara_p_f"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "sirop_gibiskus_p_f",
+      "official_name": "Сироп гибискус П/Ф",
+      "normalized_name": "сироп гибискус п/ф",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "sirop_gibiskus_p_f"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "sirop_gin_zero",
+      "official_name": "Сироп джин зеро",
+      "normalized_name": "сироп джин зеро",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "sirop_gin_zero"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "sirop_rozmarin",
+      "official_name": "Сироп розмарин",
+      "normalized_name": "сироп розмарин",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "sirop_rozmarin"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "sirop_v",
+      "official_name": "Сироп в ассортименте",
+      "normalized_name": "сироп в ассортименте",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "sirop_v"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "sirop_vermut_zero",
+      "official_name": "Сироп вермут зеро",
+      "normalized_name": "сироп вермут зеро",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "sirop_vermut_zero"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "sladkaya_vata",
+      "official_name": "Сладкая вата",
+      "normalized_name": "сладкая вата",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "sladkaya_vata"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "slivki",
+      "official_name": "Сливки",
+      "normalized_name": "сливки",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "slivki"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "slivki_kokosovye",
+      "official_name": "Сливки кокосовые",
+      "normalized_name": "сливки кокосовые",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "slivki_kokosovye"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "smorodina",
+      "official_name": "Смородина",
+      "normalized_name": "смородина",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "smorodina"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "soda",
+      "official_name": "Сода",
+      "normalized_name": "сода",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "soda"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "sok_apelsinovyy",
+      "official_name": "Сок апельсиновый",
+      "normalized_name": "сок апельсиновый",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "sok_apelsinovyy"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "sok_granatovyy",
+      "official_name": "Сок гранатовый",
+      "normalized_name": "сок гранатовый",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "sok_granatovyy"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "sok_v_assortimente",
+      "official_name": "Сок в ассортименте",
+      "normalized_name": "сок в ассортименте",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "sok_v_assortimente"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "sol",
+      "official_name": "Соль",
+      "normalized_name": "соль",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "sol"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "sous_kimchi",
+      "official_name": "Соус кимчи",
+      "normalized_name": "соус кимчи",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "sous_kimchi"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "sous_molochnyy",
+      "official_name": "Соус молочный шоколад п/ф",
+      "normalized_name": "соус молочный шоколад п/ф",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "sous_molochnyy"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "sous_soevyy",
+      "official_name": "Соус соевый",
+      "normalized_name": "соус соевый",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "sous_soevyy"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "sous_svit_chili",
+      "official_name": "Соус свит-чили",
+      "normalized_name": "соус свит-чили",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "sous_svit_chili"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "sous_tabasko",
+      "official_name": "Соус табаско",
+      "normalized_name": "соус табаско",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "sous_tabasko"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "sous_vorchester",
+      "official_name": "Соус ворчестер",
+      "normalized_name": "соус ворчестер",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "sous_vorchester"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "sukhaya_smes",
+      "official_name": "Сухая смесь Мороженое Пломбир кг",
+      "normalized_name": "сухая смесь мороженое пломбир кг",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "sukhaya_smes"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "sukhaya_smes_2",
+      "official_name": "Сухая смесь Мороженое фисташка",
+      "normalized_name": "сухая смесь мороженое фисташка",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "sukhaya_smes_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "sukhaya_smes_3",
+      "official_name": "Сухая смесь Мороженое Шоколад кг",
+      "normalized_name": "сухая смесь мороженое шоколад кг",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "sukhaya_smes_3"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "svekla_zachishch",
+      "official_name": "Свекла зачищ",
+      "normalized_name": "свекла зачищ",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "svekla_zachishch"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "tart_yablochnyy",
+      "official_name": "Тарт яблочный п/ф",
+      "normalized_name": "тарт яблочный п/ф",
+      "base_unit": "kg",
+      "is_active": false,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "tart_yablochnyy"
+      ],
+      "review_status": "review_required",
+      "warnings": [
+        "Ингредиент встречается только в скрытых карточках"
+      ],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "tekila",
+      "official_name": "Текила Ельхимадор Бьянко",
+      "normalized_name": "текила ельхимадор бьянко",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "tekila"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "tekila_el",
+      "official_name": "Текила Ель химадор бланко",
+      "normalized_name": "текила ель химадор бланко",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "tekila_el"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "tekila_meskal",
+      "official_name": "Текила Мескаль Монтелобос",
+      "normalized_name": "текила мескаль монтелобос",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "tekila_meskal"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "tekila_olmeka",
+      "official_name": "Текила Ольмека сильвер",
+      "normalized_name": "текила ольмека сильвер",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "tekila_olmeka"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "tekila_olmeka_gold",
+      "official_name": "Текила Ольмека голд",
+      "normalized_name": "текила ольмека голд",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "tekila_olmeka_gold"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "tekila_sierra",
+      "official_name": "Текила Сиерра Антигуо Аньехо",
+      "normalized_name": "текила сиерра антигуо аньехо",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "tekila_sierra"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "tekila_sierra_2",
+      "official_name": "Текила Сиерра Антигуо Плата",
+      "normalized_name": "текила сиерра антигуо плата",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "tekila_sierra_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "testo_kataifi_p_f",
+      "official_name": "Тесто катаифи п/ф",
+      "normalized_name": "тесто катаифи п/ф",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "testo_kataifi_p_f"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "tonik",
+      "official_name": "Тоник",
+      "normalized_name": "тоник",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "tonik"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "tonik_goldberg",
+      "official_name": "Тоник Голдберг Юдзу",
+      "normalized_name": "тоник голдберг юдзу",
+      "base_unit": "pcs",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "tonik_goldberg"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "tonik_pet",
+      "official_name": "Тоник ПЭТ",
+      "normalized_name": "тоник пэт",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "tonik_pet"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "tropicheskaya",
+      "official_name": "Тропическая сангрия 1л",
+      "normalized_name": "тропическая сангрия 1л",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "tropicheskaya"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "tsukaty_imbirya",
+      "official_name": "Цукаты имбиря",
+      "normalized_name": "цукаты имбиря",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "tsukaty_imbirya"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "tsvety_dlya",
+      "official_name": "Цветы для украшения в ассорт. (бар)",
+      "normalized_name": "цветы для украшения в ассорт. (бар",
+      "base_unit": "pcs",
+      "is_active": false,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "tsvety_dlya"
+      ],
+      "review_status": "review_required",
+      "warnings": [
+        "Base unit approved by owner policy: kg → pcs",
+        "Возможный garnish/decor или количество «по вкусу»"
+      ],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "ukrashenie",
+      "official_name": "Украшение гелихризум (бар)",
+      "normalized_name": "украшение гелихризум (бар",
+      "base_unit": "pcs",
+      "is_active": false,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "ukrashenie"
+      ],
+      "review_status": "review_required",
+      "warnings": [
+        "Возможный garnish/decor или количество «по вкусу»"
+      ],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "uksus_vinnyy",
+      "official_name": "Уксус винный",
+      "normalized_name": "уксус винный",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "uksus_vinnyy"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vafli",
+      "official_name": "Вафли",
+      "normalized_name": "вафли",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vafli"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vanilnyy_sirop_pf",
+      "official_name": "Ванильный сироп пф",
+      "normalized_name": "ванильный сироп пф",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vanilnyy_sirop_pf"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "varene_iz",
+      "official_name": "Варенье из шишек. кг",
+      "normalized_name": "варенье из шишек. кг",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "varene_iz"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vermut_martini",
+      "official_name": "Вермут Martini (красный сладкий)",
+      "normalized_name": "вермут martini (красный сладкий",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vermut_martini"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vermut_martini_2",
+      "official_name": "Вермут Martini Bianco (сладкий)",
+      "normalized_name": "вермут martini bianco (сладкий",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vermut_martini_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vermut_martini_3",
+      "official_name": "Вермут Martini Extra Dry (сухой)",
+      "normalized_name": "вермут martini extra dry (сухой",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vermut_martini_3"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vermut_martini_4",
+      "official_name": "Вермут Мартини бьянко",
+      "normalized_name": "вермут мартини бьянко",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vermut_martini_4"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vermut_martini_5",
+      "official_name": "Вермут Мартини россо",
+      "normalized_name": "вермут мартини россо",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vermut_martini_5"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vermut_martini_6",
+      "official_name": "Вермут Мартини экстра драй",
+      "normalized_name": "вермут мартини экстра драй",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vermut_martini_6"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vershkove",
+      "official_name": "Вершкове морозиво П/Ф",
+      "normalized_name": "вершкове морозиво п/ф",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vershkove"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino",
+      "official_name": "Вино Вальполичелла к/сух",
+      "normalized_name": "вино вальполичелла к/сух",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_2",
+      "official_name": "Вино Гевюрцтраминер бел. п/сл",
+      "normalized_name": "вино гевюрцтраминер бел. п/сл",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_3",
+      "official_name": "Вино Гевюрцтраминер Хуберт бел",
+      "normalized_name": "вино гевюрцтраминер хуберт бел",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_3"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_amira_ners",
+      "official_name": "Вино Амира Нерс Давола",
+      "normalized_name": "вино амира нерс давола",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_amira_ners"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_beloe_sukh",
+      "official_name": "Вино белое.сух. Brancott sauvignon blanc",
+      "normalized_name": "вино белое.сух. brancott sauvignon blanc",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_beloe_sukh"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_beloe_vinya",
+      "official_name": "Вино белое. Винья Верде Бранко",
+      "normalized_name": "вино белое. винья верде бранко",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_beloe_vinya"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_bile_shabli",
+      "official_name": "Вино біле Шабли",
+      "normalized_name": "вино біле шабли",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_bile_shabli"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_feudo",
+      "official_name": "Вино Feudo Principi di Butera Сира крас.сух.л",
+      "normalized_name": "вино feudo principi di butera сира крас.сух.л",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_feudo"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_fyuzhn",
+      "official_name": "Вино Фьюжн Мальбек к/сух",
+      "normalized_name": "вино фьюжн мальбек к/сух",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_fyuzhn"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_gavi_de",
+      "official_name": "Вино Гави де Комуне ди Гави",
+      "normalized_name": "вино гави де комуне ди гави",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_gavi_de"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_igr",
+      "official_name": "Вино игр. Ламбруско Бьянко",
+      "normalized_name": "вино игр. ламбруско бьянко",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_igr"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_igr_2",
+      "official_name": "Вино игр. Ламбруско Розе п/сл",
+      "normalized_name": "вино игр. ламбруско розе п/сл",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_igr_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_igr_3",
+      "official_name": "Вино игр. Ламбруско Розе сух",
+      "normalized_name": "вино игр. ламбруско розе сух",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_igr_3"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_igr_kava",
+      "official_name": "Вино игр.Кава Брют",
+      "normalized_name": "вино игр.кава брют",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_igr_kava"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_igr_kava_2",
+      "official_name": "Вино игр.Кава Брют Розе",
+      "normalized_name": "вино игр.кава брют розе",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_igr_kava_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_kaliya",
+      "official_name": "Вино Калия Мальблек к/сух",
+      "normalized_name": "вино калия мальблек к/сух",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_kaliya"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_karitstsa",
+      "official_name": "Вино Карицца Инсолия белое",
+      "normalized_name": "вино карицца инсолия белое",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_karitstsa"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_khumiliya",
+      "official_name": "Вино Хумилия Монастрель к/сух",
+      "normalized_name": "вино хумилия монастрель к/сух",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_khumiliya"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_kivi",
+      "official_name": "Вино Киви Совиньон Блан Мальборо бел",
+      "normalized_name": "вино киви совиньон блан мальборо бел",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_kivi"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_kostamolino",
+      "official_name": "Вино Костамолино бел. п/сл",
+      "normalized_name": "вино костамолино бел. п/сл",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_kostamolino"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_koto_deks",
+      "official_name": "Вино Кото декс Прованс рожеве",
+      "normalized_name": "вино кото декс прованс рожеве",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_koto_deks"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_kyanti",
+      "official_name": "Вино Кьянти Классико",
+      "normalized_name": "вино кьянти классико",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_kyanti"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_lu_get",
+      "official_name": "Вино Лу Гет Манго белое",
+      "normalized_name": "вино лу гет манго белое",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_lu_get"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_nerodi",
+      "official_name": "Вино Нероди Троя к/сух",
+      "normalized_name": "вино нероди троя к/сух",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_nerodi"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_passo_del",
+      "official_name": "Вино Пассо дель Суд к/сух",
+      "normalized_name": "вино пассо дель суд к/сух",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_passo_del"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_pino_2",
+      "official_name": "Вино Пино Гриджио Терре б/сух",
+      "normalized_name": "вино пино гриджио терре б/сух",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_pino_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_pino_grigio",
+      "official_name": "Вино Пино Гриджио б/сух",
+      "normalized_name": "вино пино гриджио б/сух",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_pino_grigio"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_pino_nuar",
+      "official_name": "Вино Пино Нуар Кастельбо к/сух",
+      "normalized_name": "вино пино нуар кастельбо к/сух",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_pino_nuar"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_pino_nuar_2",
+      "official_name": "Вино Пино Нуар Мальборо к/сух",
+      "normalized_name": "вино пино нуар мальборо к/сух",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_pino_nuar_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_pino_nuar_3",
+      "official_name": "Вино Пино Нуар Мальборо Фалькон к/сух",
+      "normalized_name": "вино пино нуар мальборо фалькон к/сух",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_pino_nuar_3"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_pino_nuar_k",
+      "official_name": "Вино Пино Нуар к/сух",
+      "normalized_name": "вино пино нуар к/сух",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_pino_nuar_k"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_raitsa",
+      "official_name": "Вино Раица Резерв к/сух, 2204217600л",
+      "normalized_name": "вино раица резерв к/сух, 2204217600л",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_raitsa"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_risling",
+      "official_name": "Вино Рислинг Медиум Драй белое",
+      "normalized_name": "вино рислинг медиум драй белое",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_risling"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_risling_2",
+      "official_name": "Вино Рислинг Трокен б/сух",
+      "normalized_name": "вино рислинг трокен б/сух",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_risling_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_roze_d",
+      "official_name": "Вино Розе Д`Анжу роз. п/сл",
+      "normalized_name": "вино розе д`анжу роз. п/сл",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_roze_d"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_shardone",
+      "official_name": "Вино Шардоне Торронтес б/сух",
+      "normalized_name": "вино шардоне торронтес б/сух",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_shardone"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_sovinon",
+      "official_name": "Вино Совиньон Блан Мальборо бел.сух",
+      "normalized_name": "вино совиньон блан мальборо бел.сух",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_sovinon"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_sovinon_2",
+      "official_name": "Вино Совиньон Мальборо р/сух",
+      "normalized_name": "вино совиньон мальборо р/сух",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_sovinon_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_tetrapak",
+      "official_name": "Вино Тетрапак белое",
+      "normalized_name": "вино тетрапак белое",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_tetrapak"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_tetrapak_2",
+      "official_name": "Вино Тетрапак красн",
+      "normalized_name": "вино тетрапак красн",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_tetrapak_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_ze_nest",
+      "official_name": "Вино Зе Нест Мальборо",
+      "normalized_name": "вино зе нест мальборо",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_ze_nest"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_zinfandel",
+      "official_name": "Вино Зинфандель розовое",
+      "normalized_name": "вино зинфандель розовое",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_zinfandel"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_zinfandel_k",
+      "official_name": "Вино Зинфандель к/сух",
+      "normalized_name": "вино зинфандель к/сух",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_zinfandel_k"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vino_zonin",
+      "official_name": "Вино Зонин Вальполичелла Классико к/сух",
+      "normalized_name": "вино зонин вальполичелла классико к/сух",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vino_zonin"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vinograd",
+      "official_name": "Виноград",
+      "normalized_name": "виноград",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vinograd"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vishnevka",
+      "official_name": "Вишневка настойка п/ф",
+      "normalized_name": "вишневка настойка п/ф",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vishnevka"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vishnevka_p_f",
+      "official_name": "Вишневка п/ф",
+      "normalized_name": "вишневка п/ф",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vishnevka_p_f"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "viski_aber_fols",
+      "official_name": "Виски Абер Фолс",
+      "normalized_name": "виски абер фолс",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "viski_aber_fols"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "viski_bankhall",
+      "official_name": "Виски Bankhall",
+      "normalized_name": "виски bankhall",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "viski_bankhall"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "viski_benkkholl",
+      "official_name": "Виски Бенкхолл",
+      "normalized_name": "виски бенкхолл",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "viski_benkkholl"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "viski_epikurean",
+      "official_name": "Виски Епикуреан Бленд",
+      "normalized_name": "виски епикуреан бленд",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "viski_epikurean"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "viski_fugimi",
+      "official_name": "Виски Фуджими",
+      "normalized_name": "виски фуджими",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "viski_fugimi"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "viski_gek",
+      "official_name": "Виски Джек Джениелс сингл барел",
+      "normalized_name": "виски джек джениелс сингл барел",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "viski_gek"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "viski_gek_2",
+      "official_name": "Виски Джек Джениелс Ханни",
+      "normalized_name": "виски джек джениелс ханни",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "viski_gek_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "viski_gek_3",
+      "official_name": "Виски Джек Джениелс Яблоко",
+      "normalized_name": "виски джек джениелс яблоко",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "viski_gek_3"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "viski_gek_geniels",
+      "official_name": "Виски Джек Джениелс",
+      "normalized_name": "виски джек джениелс",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "viski_gek_geniels"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "viski_gemison",
+      "official_name": "Виски Джемисон",
+      "normalized_name": "виски джемисон",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "viski_gemison"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "viski_gentelmen",
+      "official_name": "Виски Джентельмен Джек",
+      "normalized_name": "виски джентельмен джек",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "viski_gentelmen"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "viski_glenmoranzh",
+      "official_name": "Виски Гленморанж",
+      "normalized_name": "виски гленморанж",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "viski_glenmoranzh"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "viski_gonni",
+      "official_name": "Виски Джонни Уокер Ред Лейбл",
+      "normalized_name": "виски джонни уокер ред лейбл",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "viski_gonni"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "viski_khanki",
+      "official_name": "Виски ханки Банистер",
+      "normalized_name": "виски ханки банистер",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "viski_khanki"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "viski_lafroyg",
+      "official_name": "Виски Лафройг",
+      "normalized_name": "виски лафройг",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "viski_lafroyg"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "viski_manki",
+      "official_name": "Виски Манки Шолдер",
+      "normalized_name": "виски манки шолдер",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "viski_manki"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "viski_pogis",
+      "official_name": "Виски Погис",
+      "normalized_name": "виски погис",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "viski_pogis"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "viski_pogis_khani",
+      "official_name": "Виски Погис Хани",
+      "normalized_name": "виски погис хани",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "viski_pogis_khani"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "viski_pouges",
+      "official_name": "Виски Pouges",
+      "normalized_name": "виски pouges",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "viski_pouges"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "viski_shotl",
+      "official_name": "Виски Шотл Спейберн",
+      "normalized_name": "виски шотл спейберн",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "viski_shotl"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "viski_singlton",
+      "official_name": "Виски Синглтон 12 л",
+      "normalized_name": "виски синглтон 12 л",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "viski_singlton"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "viski_the_macallan",
+      "official_name": "Вискі The Macallan",
+      "normalized_name": "вискі the macallan",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "viski_the_macallan"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "viski_uayld_2",
+      "official_name": "Виски Уайлд Теки Рай",
+      "normalized_name": "виски уайлд теки рай",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "viski_uayld_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "viski_uayld_teki",
+      "official_name": "Виски Уайлд Теки",
+      "normalized_name": "виски уайлд теки",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "viski_uayld_teki"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "viski_vudford",
+      "official_name": "Виски Вудфорд",
+      "normalized_name": "виски вудфорд",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "viski_vudford"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "voda",
+      "official_name": "Вода",
+      "normalized_name": "вода",
+      "base_unit": "l",
+      "is_active": false,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "voda"
+      ],
+      "review_status": "review_required",
+      "warnings": [
+        "Неизвестные единицы: кулера"
+      ],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "voda_2",
+      "official_name": "Вода минеральная (бар)",
+      "normalized_name": "вода минеральная (бар",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "voda_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "voda_mineralnaya",
+      "official_name": "Вода минеральная",
+      "normalized_name": "вода минеральная",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "voda_mineralnaya"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vodka",
+      "official_name": "Водка Финляндия (клюква)",
+      "normalized_name": "водка финляндия (клюква",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vodka"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vodka_2",
+      "official_name": "Водка Финляндия грей",
+      "normalized_name": "водка финляндия грей",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vodka_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vodka_3",
+      "official_name": "Водка Финляндия кокос",
+      "normalized_name": "водка финляндия кокос",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vodka_3"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vodka_absolut",
+      "official_name": "Водка Absolut Mango",
+      "normalized_name": "водка absolut mango",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vodka_absolut"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vodka_absolut_2",
+      "official_name": "Водка Absolut Vanilla",
+      "normalized_name": "водка absolut vanilla",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vodka_absolut_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vodka_absolyut",
+      "official_name": "Водка Абсолют",
+      "normalized_name": "водка абсолют",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vodka_absolyut"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vodka_absolyut_2",
+      "official_name": "Водка Абсолют Ваниль",
+      "normalized_name": "водка абсолют ваниль",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vodka_absolyut_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vodka_distil_2",
+      "official_name": "Водка Дистил №9 ваниль",
+      "normalized_name": "водка дистил no9 ваниль",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vodka_distil_2"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vodka_distil_o9",
+      "official_name": "Водка Дистил №9",
+      "normalized_name": "водка дистил no9",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vodka_distil_o9"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vodka_finlyandiya",
+      "official_name": "Водка Финляндия",
+      "normalized_name": "водка финляндия",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vodka_finlyandiya"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vodka_kiy",
+      "official_name": "Водка Кий",
+      "normalized_name": "водка кий",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vodka_kiy"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "vodka_nemirov",
+      "official_name": "Водка немиров",
+      "normalized_name": "водка немиров",
+      "base_unit": "l",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "vodka_nemirov"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "yabloki",
+      "official_name": "Яблоки",
+      "normalized_name": "яблоки",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "yabloki"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "yabloko_zachishch",
+      "official_name": "Яблоко зачищ",
+      "normalized_name": "яблоко зачищ",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "yabloko_zachishch"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "yagodnoe_pyure_pf",
+      "official_name": "Ягодное пюре пф",
+      "normalized_name": "ягодное пюре пф",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "yagodnoe_pyure_pf"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "yagody_s_m",
+      "official_name": "Ягоды с/м",
+      "normalized_name": "ягоды с/м",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "yagody_s_m"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "yagody_s_m_ottayka",
+      "official_name": "Ягоды с/м (оттайка)",
+      "normalized_name": "ягоды с/м (оттайка",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "yagody_s_m_ottayka"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "yaytsa_kurinye",
+      "official_name": "Яйца куриные",
+      "normalized_name": "яйца куриные",
+      "base_unit": "pcs",
+      "is_active": false,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "yaytsa_kurinye"
+      ],
+      "review_status": "review_required",
+      "warnings": [
+        "Наблюдается дробная часть штуки"
+      ],
+      "owner_metadata": null
+    },
+    {
+      "stable_id": "zhelatin",
+      "official_name": "Желатин",
+      "normalized_name": "желатин",
+      "base_unit": "kg",
+      "is_active": true,
+      "allowed_operation_types": [
+        "writeoff",
+        "transfer"
+      ],
+      "aliases": [],
+      "source_candidate_ids": [
+        "zhelatin"
+      ],
+      "review_status": "approved",
+      "warnings": [],
+      "owner_metadata": null
+    }
+  ]
+}
