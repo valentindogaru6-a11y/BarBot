@@ -37,8 +37,8 @@ def test_seed_contains_all_candidates_and_owner_products(seed) -> None:
     assert source_ids <= set(products)
     assert len(seed.products) == 414
     assert len(products) == 414
-    assert sum(product.is_active for product in seed.products) == 396
-    assert sum(not product.is_active for product in seed.products) == 18
+    assert sum(product.is_active for product in seed.products) == 414
+    assert sum(not product.is_active for product in seed.products) == 0
 
 
 def test_policy_units_and_separate_products(seed) -> None:
@@ -68,7 +68,7 @@ def test_review_and_clean_activation_policy(seed) -> None:
     clean = [p for p in seed.products if p.review_status == "approved"]
 
     assert len(review) == 18
-    assert all(not product.is_active for product in review)
+    assert all(product.is_active for product in review)
     assert len(clean) == 394
     assert all(product.is_active for product in clean)
 

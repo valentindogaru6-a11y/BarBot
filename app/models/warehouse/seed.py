@@ -73,9 +73,8 @@ class WarehouseSeedProduct(BaseModel):
             raise ValueError("owner metadata is required only for owner products")
         if self.owner_metadata and self.owner_metadata.required_rule.unit != self.base_unit:
             raise ValueError("required rule unit must match base unit")
-        expected_active = self.review_status != "review_required"
-        if self.is_active is not expected_active:
-            raise ValueError("active flag does not match seed review policy")
+        if not self.is_active:
+            raise ValueError("all approved warehouse seed products must be active")
         return self
 
 
@@ -83,7 +82,7 @@ class WarehouseSeedPolicy(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     clean_candidates_active: Literal[True]
-    review_required_active: Literal[False]
+    review_required_active: Literal[True]
     owner_required_active: Literal[True]
 
 

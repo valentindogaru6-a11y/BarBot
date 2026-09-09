@@ -13,8 +13,15 @@ from app.storage.warehouse_schema import (
     validate_warehouse_schema,
     warehouse_schema_is_absent,
 )
+from app.storage.warehouse_operations_schema import (
+    WarehouseOperationsSchemaError,
+    create_warehouse_operations_schema,
+    seed_v4_locations,
+    validate_warehouse_operations_schema,
+    warehouse_operations_schema_is_absent,
+)
 
-CURRENT_SCHEMA_VERSION = 3
+CURRENT_SCHEMA_VERSION = 4
 
 USER_COLUMNS = (
     "telegram_user_id",
@@ -288,14 +295,20 @@ def _migrate_v1_to_v2(connection: sqlite3.Connection) -> None:
 def _validate_schema(connection: sqlite3.Connection, version: int) -> None:
     if version == 1:
         validate_users_schema(connection, 1)
-        if not warehouse_schema_is_absent(connection):
+        if (
+            not warehouse_schema_is_absent(connection)
+            or not warehouse_operations_schema_is_absent(connection)
+        ):
             raise SchemaValidationError(
                 "Warehouse tables не должны существовать в schema v1"
             )
         return
     if version == 2:
         validate_users_schema(connection, 2)
-        if not warehouse_schema_is_absent(connection):
+        if (
+            not warehouse_schema_is_absent(connection)
+            or not warehouse_operations_schema_is_absent(connection)
+        ):
             raise SchemaValidationError(
                 "Warehouse tables не должны существовать в schema v2"
             )
@@ -305,6 +318,21 @@ def _validate_schema(connection: sqlite3.Connection, version: int) -> None:
         try:
             validate_warehouse_schema(connection)
         except WarehouseSchemaValidationError as exc:
+            raise SchemaValidationError(str(exc)) from exc
+        if not warehouse_operations_schema_is_absent(connection):
+            raise SchemaValidationError(
+                "Warehouse operations tables не должны существовать в schema v3"
+            )
+        return
+    if version == 4:
+        validate_users_schema(connection, 2)
+        try:
+            validate_warehouse_schema(connection)
+            validate_warehouse_operations_schema(connection)
+        except (
+            WarehouseSchemaValidationError,
+            WarehouseOperationsSchemaError,
+        ) as exc:
             raise SchemaValidationError(str(exc)) from exc
         return
     raise UnsupportedSchemaVersionError(
@@ -320,7 +348,15 @@ def _migrate_v2_to_v3(connection: sqlite3.Connection) -> None:
     _validate_schema(connection, 3)
 
 
-def _create_fresh_v3(connection: sqlite3.Connection) -> None:
+def _migrate_v3_to_v4(connection: sqlite3.Connection) -> None:
+    _validate_schema(connection, 3)
+    seed_v4_locations(connection)
+    create_warehouse_operations_schema(connection)
+    connection.execute("PRAGMA user_version = 4")
+    _validate_schema(connection, 4)
+
+
+def _create_fresh_v4(connection: sqlite3.Connection) -> None:
     if _table_sql(connection, "users") is not None:
         raise SchemaValidationError(
             "Таблица users существует при нулевой версии схемы"
@@ -329,21 +365,27 @@ def _create_fresh_v3(connection: sqlite3.Connection) -> None:
         raise SchemaValidationError(
             "Обнаружена незавершённая служебная таблица миграции"
         )
-    if not warehouse_schema_is_absent(connection):
+    if (
+        not warehouse_schema_is_absent(connection)
+        or not warehouse_operations_schema_is_absent(connection)
+    ):
         raise SchemaValidationError(
             "Warehouse tables существуют при нулевой версии схемы"
         )
     connection.execute(_USERS_V2_SQL)
     create_warehouse_schema(connection)
     seed_warehouse_defaults(connection)
-    connection.execute("PRAGMA user_version = 3")
-    _validate_schema(connection, 3)
+    seed_v4_locations(connection)
+    create_warehouse_operations_schema(connection)
+    connection.execute("PRAGMA user_version = 4")
+    _validate_schema(connection, 4)
 
 
 Migration = Callable[[sqlite3.Connection], None]
 MIGRATIONS: dict[int, Migration] = {
     1: _migrate_v1_to_v2,
     2: _migrate_v2_to_v3,
+    3: _migrate_v3_to_v4,
 }
 
 
@@ -384,7 +426,7 @@ def run_migrations(connection: sqlite3.Connection) -> None:
         )
 
     if version == 0:
-        _run_atomic_step(connection, _create_fresh_v3)
+        _run_atomic_step(connection, _create_fresh_v4)
         return
     if version == CURRENT_SCHEMA_VERSION:
         _run_atomic_step(

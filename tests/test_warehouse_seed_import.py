@@ -76,7 +76,7 @@ def test_apply_imports_every_product_alias_and_operation(prepared) -> None:
         }
     finally:
         connection.close()
-    assert counts == {0: 18, 1: 396}
+    assert counts == {1: 414}
     assert stable_ids == {product.stable_id for product in seed.products}
 
 
@@ -133,7 +133,7 @@ def test_wrong_schema_version_is_rejected(tmp_path: Path) -> None:
     connection.close()
     seed = build_warehouse_seed(CANDIDATES)
 
-    with pytest.raises(WarehouseSeedImportError, match="v3 required"):
+    with pytest.raises(WarehouseSeedImportError, match="v3 or v4 required"):
         WarehouseSeedDatabase(database_path).import_seed(seed)
 
 

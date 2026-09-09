@@ -16,6 +16,10 @@ from app.storage.warehouse_schema import (
     WarehouseSchemaValidationError,
     validate_warehouse_schema,
 )
+from app.storage.warehouse_operations_schema import (
+    WarehouseOperationsSchemaError,
+    validate_warehouse_operations_schema,
+)
 from app.utils.warehouse import normalize_warehouse_name
 
 
@@ -70,11 +74,18 @@ class WarehouseSeedDatabase:
     @staticmethod
     def _validate_schema(connection: sqlite3.Connection) -> None:
         version = int(connection.execute("PRAGMA user_version").fetchone()[0])
-        if version != 3:
-            raise WarehouseSeedImportError(f"Warehouse schema v3 required; found v{version}")
+        if version not in {3, 4}:
+            raise WarehouseSeedImportError(
+                f"Warehouse schema v3 or v4 required; found v{version}"
+            )
         try:
             validate_warehouse_schema(connection)
-        except WarehouseSchemaValidationError as exc:
+            if version == 4:
+                validate_warehouse_operations_schema(connection)
+        except (
+            WarehouseSchemaValidationError,
+            WarehouseOperationsSchemaError,
+        ) as exc:
             raise WarehouseSeedImportError(str(exc)) from exc
 
     @staticmethod

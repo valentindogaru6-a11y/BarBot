@@ -91,6 +91,8 @@ def test_location_crud_rename_keeps_stable_id(warehouse_services) -> None:
     assert service.get_location(ADMIN_ID, created.stable_id) == created
     assert {entry.stable_id for entry in service.list_locations(ADMIN_ID)} == {
         "bar",
+        "kitchen",
+        "confectionery",
         created.stable_id,
     }
     updated = service.update_location(

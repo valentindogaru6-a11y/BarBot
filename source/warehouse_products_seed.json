@@ -4,7 +4,7 @@
   "source_catalog_sha256": "352d21202790188e213b3f5caac4f494e5dc41645c7a3decfb3c1ea16b393b7b",
   "policy": {
     "clean_candidates_active": true,
-    "review_required_active": false,
+    "review_required_active": true,
     "owner_required_active": true
   },
   "products": [
@@ -139,7 +139,7 @@
       "official_name": "Angostura",
       "normalized_name": "angostura",
       "base_unit": "l",
-      "is_active": false,
+      "is_active": true,
       "allowed_operation_types": [
         "writeoff",
         "transfer"
@@ -681,7 +681,7 @@
       "official_name": "Easy Foam",
       "normalized_name": "easy foam",
       "base_unit": "l",
-      "is_active": false,
+      "is_active": true,
       "allowed_operation_types": [
         "writeoff",
         "transfer"
@@ -773,7 +773,7 @@
       "official_name": "Фисташкове морозиво П/Ф",
       "normalized_name": "фисташкове морозиво п/ф",
       "base_unit": "kg",
-      "is_active": false,
+      "is_active": true,
       "allowed_operation_types": [
         "writeoff",
         "transfer"
@@ -1659,7 +1659,7 @@
       "official_name": "Киви",
       "normalized_name": "киви",
       "base_unit": "kg",
-      "is_active": false,
+      "is_active": true,
       "allowed_operation_types": [
         "writeoff",
         "transfer"
@@ -1895,7 +1895,7 @@
       "official_name": "Кондурин золото(украшение)",
       "normalized_name": "кондурин золото(украшение",
       "base_unit": "kg",
-      "is_active": false,
+      "is_active": true,
       "allowed_operation_types": [
         "writeoff",
         "transfer"
@@ -2149,7 +2149,7 @@
       "official_name": "Лайм",
       "normalized_name": "лайм",
       "base_unit": "kg",
-      "is_active": false,
+      "is_active": true,
       "allowed_operation_types": [
         "writeoff",
         "transfer"
@@ -2622,7 +2622,7 @@
       "official_name": "Листья бамбука",
       "normalized_name": "листья бамбука",
       "base_unit": "pcs",
-      "is_active": false,
+      "is_active": true,
       "allowed_operation_types": [
         "writeoff",
         "transfer"
@@ -2642,7 +2642,7 @@
       "official_name": "Листья Скелетон уп",
       "normalized_name": "листья скелетон уп",
       "base_unit": "pcs",
-      "is_active": false,
+      "is_active": true,
       "allowed_operation_types": [
         "writeoff",
         "transfer"
@@ -2662,7 +2662,7 @@
       "official_name": "Малина сублимированая",
       "normalized_name": "малина сублимированая",
       "base_unit": "kg",
-      "is_active": false,
+      "is_active": true,
       "allowed_operation_types": [
         "writeoff",
         "transfer"
@@ -2808,7 +2808,7 @@
       "official_name": "Мед",
       "normalized_name": "мед",
       "base_unit": "kg",
-      "is_active": false,
+      "is_active": true,
       "allowed_operation_types": [
         "writeoff",
         "transfer"
@@ -3435,7 +3435,7 @@
       "official_name": "Нектарин зачистка",
       "normalized_name": "нектарин зачистка",
       "base_unit": "kg",
-      "is_active": false,
+      "is_active": true,
       "allowed_operation_types": [
         "writeoff",
         "transfer"
@@ -4457,7 +4457,7 @@
       "official_name": "Рожок вафельний для мороженого",
       "normalized_name": "рожок вафельний для мороженого",
       "base_unit": "pcs",
-      "is_active": false,
+      "is_active": true,
       "allowed_operation_types": [
         "writeoff",
         "transfer"
@@ -4783,7 +4783,7 @@
       "official_name": "Шпажки бамбук/фуршет уп",
       "normalized_name": "шпажки бамбук/фуршет уп",
       "base_unit": "pcs",
-      "is_active": false,
+      "is_active": true,
       "allowed_operation_types": [
         "writeoff",
         "transfer"
@@ -5343,7 +5343,7 @@
       "official_name": "Тарт яблочный п/ф",
       "normalized_name": "тарт яблочный п/ф",
       "base_unit": "kg",
-      "is_active": false,
+      "is_active": true,
       "allowed_operation_types": [
         "writeoff",
         "transfer"
@@ -5597,7 +5597,7 @@
       "official_name": "Цветы для украшения в ассорт. (бар)",
       "normalized_name": "цветы для украшения в ассорт. (бар",
       "base_unit": "pcs",
-      "is_active": false,
+      "is_active": true,
       "allowed_operation_types": [
         "writeoff",
         "transfer"
@@ -5618,7 +5618,7 @@
       "official_name": "Украшение гелихризум (бар)",
       "normalized_name": "украшение гелихризум (бар",
       "base_unit": "pcs",
-      "is_active": false,
+      "is_active": true,
       "allowed_operation_types": [
         "writeoff",
         "transfer"
@@ -7132,7 +7132,7 @@
       "official_name": "Вода",
       "normalized_name": "вода",
       "base_unit": "l",
-      "is_active": false,
+      "is_active": true,
       "allowed_operation_types": [
         "writeoff",
         "transfer"
@@ -7494,7 +7494,7 @@
       "official_name": "Яйца куриные",
       "normalized_name": "яйца куриные",
       "base_unit": "pcs",
-      "is_active": false,
+      "is_active": true,
       "allowed_operation_types": [
         "writeoff",
         "transfer"

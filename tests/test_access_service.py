@@ -56,6 +56,19 @@ def test_warehouse_nomenclature_is_limited_to_admins(tmp_path: Path) -> None:
         assert not access.can_manage_warehouse_nomenclature(user_id)
 
 
+def test_warehouse_operation_permissions(tmp_path: Path) -> None:
+    access, _, _ = _services(tmp_path)
+
+    for user_id in (1, 10, 20):
+        assert access.can_view_warehouse(user_id)
+        assert access.can_mutate_warehouse(user_id)
+    assert access.can_view_warehouse(50)
+    assert not access.can_mutate_warehouse(50)
+    for user_id in (30, 40):
+        assert not access.can_view_warehouse(user_id)
+        assert not access.can_mutate_warehouse(user_id)
+
+
 def test_super_admin_assigns_admin_and_admin_assigns_bartender(
     tmp_path: Path,
 ) -> None:

@@ -166,7 +166,7 @@ def test_migrates_v1_through_v2_to_v3_and_preserves_every_user_column(
     database = UserDatabase(path)
     database.initialize()
 
-    assert database.settings()["user_version"] == 3
+    assert database.settings()["user_version"] == 4
     assert _read_rows(path) == expected
     previous, updated = database.set_role(
         303,
@@ -177,7 +177,7 @@ def test_migrates_v1_through_v2_to_v3_and_preserves_every_user_column(
     assert updated.role is Role.ACCOUNTANT
 
 
-def test_repeated_initialize_on_v3_is_idempotent(tmp_path: Path) -> None:
+def test_repeated_initialize_on_v4_is_idempotent(tmp_path: Path) -> None:
     path = tmp_path / "repeat.db"
     database = UserDatabase(path)
     database.initialize()
@@ -199,12 +199,12 @@ def test_repeated_initialize_on_v3_is_idempotent(tmp_path: Path) -> None:
     assert database.count_users() == 1
 
 
-def test_fresh_database_is_created_directly_as_v3(tmp_path: Path) -> None:
+def test_fresh_database_is_created_directly_as_v4(tmp_path: Path) -> None:
     database = UserDatabase(tmp_path / "fresh.db")
 
     database.initialize()
 
-    assert database.settings()["user_version"] == 3
+    assert database.settings()["user_version"] == 4
     database.ensure_user(606)
     assert database.set_role(
         606,
@@ -270,19 +270,25 @@ def test_migrates_v2_to_v3_with_default_location_and_settings(
 
     UserDatabase(path).initialize()
 
-    assert _version(path) == 3
+    assert _version(path) == 4
     warehouse = WarehouseDatabase(path)
     locations = warehouse.list_locations()
     settings = warehouse.get_settings()
-    assert len(locations) == 1
-    assert locations[0].stable_id == "bar"
-    assert locations[0].name == "Бар"
-    assert locations[0].is_active
-    assert locations[0].can_be_source
-    assert locations[0].can_be_destination
+    assert {location.stable_id for location in locations} == {
+        "bar", "kitchen", "confectionery"
+    }
+    bar = next(location for location in locations if location.stable_id == "bar")
+    assert bar.name == "Бар"
+    assert bar.is_active
+    assert bar.can_be_source
+    assert bar.can_be_destination
+    assert all(
+        not location.can_be_source and location.can_be_destination
+        for location in locations if location.stable_id != "bar"
+    )
     assert settings.timezone == "Europe/Kyiv"
     assert settings.cutoff_local_time == "23:00"
-    assert settings.default_source_location_id == locations[0].id
+    assert settings.default_source_location_id == bar.id
 
 
 def test_v3_seed_is_idempotent(tmp_path: Path) -> None:
@@ -318,7 +324,7 @@ def test_rejects_corrupted_v3_schema(tmp_path: Path) -> None:
     with pytest.raises(SchemaValidationError, match="Индексы"):
         UserDatabase(path).initialize()
 
-    assert _version(path) == 3
+    assert _version(path) == 4
 
 
 def test_rejects_invalid_stored_role_before_migration(tmp_path: Path) -> None:

@@ -580,16 +580,32 @@ glassware | Рокс
 - замена и удаление требуют предпросмотра/подтверждения;
 - прежний текстовый fallback продолжает работать при недействительном ID.
 
-## Warehouse nomenclature foundation
+## Warehouse backend foundation
 
-Schema v3 добавляет отдельный warehouse namespace в локальную SQLite:
+Schema v3 добавила отдельный warehouse namespace в локальную SQLite:
 locations, products, aliases, допустимые типы операций и singleton settings.
 Rename сохраняет stable ID, updates используют optimistic revision check,
 а official names и aliases находятся в едином нормализованном namespace.
 Управлять справочником могут только `admin` и `super_admin`.
 
-Telegram-интерфейс склада, списания, перемещения, смены и scheduler пока не
-включены. Продукты из каталога автоматически в SQLite не импортируются.
+Schema v4 добавляет transactional foundation для смен, persistent intake
+drafts, строк разрешения, fuzzy-кандидатов, складских операций и отдельного
+warehouse audit. Business date рассчитывается в `Europe/Kyiv` с cutoff
+`23:00`; количества хранятся целыми scaled values
+(`1 base unit = 1_000_000`) и разбираются через `Decimal`, без `float`.
+
+Backend распознаёт только точные triggers первой непустой строки:
+
+```text
+списание: апельсин 0.15
+перемещение:
+кокосовое молоко 0.25 л -> кондитерка
+```
+
+Это пока internal/planned API. Telegram router, warehouse-кнопки, FSM,
+закрытие смен и scheduler ещё не подключены, поэтому пользователь production-
+бота пока не может работать с этими сообщениями. Продукты из каталога
+автоматически в SQLite не импортируются.
 
 `source/warehouse_product_candidates.json` — автоматически извлечённый
 материал для анализа, а не активная warehouse-номенклатура.
@@ -605,8 +621,8 @@ Telegram-интерфейс склада, списания, перемещени
 `source/warehouse_products_seed.json` — валидируемый утверждённый источник
 начальной номенклатуры. Он детерминированно формируется из candidate report,
 сохраняет все 412 извлечённых позиций и две отдельные owner-required позиции.
-Позиции, требующие review, присутствуют неактивными. Ни candidate report, ни
-seed сами по себе не изменяют SQLite.
+Все 414 продуктов активны; review status и warnings сохранены и не отключают
+позиции. Ни candidate report, ни seed сами по себе не изменяют SQLite.
 
 Повторная генерация seed:
 
@@ -616,7 +632,8 @@ seed сами по себе не изменяют SQLite.
   --output source/warehouse_products_seed.json
 ```
 
-Импорт требует подготовленную schema v3 и обязательный путь к базе. Без
+Импорт поддерживает подготовленную schema v3/v4 и требует обязательный путь
+к базе. Без
 `--apply` команда только валидирует seed и показывает план:
 
 ```bash
@@ -636,9 +653,10 @@ seed сами по себе не изменяют SQLite.
 `data/barbot.db` создаётся безопасно при старте. Используется стандартный
 `sqlite3`, WAL, `foreign_keys=ON`, `busy_timeout` и `PRAGMA user_version`.
 Единственный versioned migration runner создаёт новую базу сразу как schema
-v3, атомарно обновляет v1 → v2 → v3 или v2 → v3 и отклоняет неизвестную
-будущую либо несогласованную схему. Каждый migration step имеет отдельную
-транзакцию; повторная инициализация v3 только валидирует данные.
+v4, атомарно обновляет v1 → v2 → v3 → v4, v2 → v3 → v4 или v3 → v4 и
+отклоняет неизвестную будущую либо несогласованную схему. Каждый migration
+step имеет отдельную транзакцию; повторная инициализация v4 только валидирует
+данные.
 ORM, PostgreSQL, Redis и общая удалённая база не используются.
 
 Таблица `users` хранит Telegram ID как стабильный ключ, профиль Telegram,

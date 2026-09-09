@@ -13,6 +13,18 @@ from app.models.warehouse.nomenclature import (
     WarehouseSettings,
     WarehouseSettingsUpdate,
 )
+from app.models.warehouse.operations import (
+    IntakeBatch,
+    IntakeBatchStatus,
+    IntakeLine,
+    IntakeLineStatus,
+    OperationOrigin,
+    ProductCandidate,
+    ShiftStatus,
+    WarehouseOperation,
+    WarehouseOperationType,
+    WarehouseShift,
+)
 
 __all__ = [
     "BaseUnit",
@@ -26,4 +38,14 @@ __all__ = [
     "WarehouseProductUpdate",
     "WarehouseSettings",
     "WarehouseSettingsUpdate",
+    "IntakeBatch",
+    "IntakeBatchStatus",
+    "IntakeLine",
+    "IntakeLineStatus",
+    "OperationOrigin",
+    "ProductCandidate",
+    "ShiftStatus",
+    "WarehouseOperation",
+    "WarehouseOperationType",
+    "WarehouseShift",
 ]

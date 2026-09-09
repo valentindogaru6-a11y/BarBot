@@ -5,9 +5,15 @@ from app.services.warehouse.nomenclature_service import (
     WarehouseValidationError,
 )
 from app.services.warehouse.normalization import normalize_warehouse_name
+from app.services.warehouse.operations_service import (
+    WarehouseIntakeError,
+    WarehouseOperationsService,
+)
 
 __all__ = [
     "WarehouseNomenclatureService",
     "WarehouseValidationError",
     "normalize_warehouse_name",
+    "WarehouseIntakeError",
+    "WarehouseOperationsService",
 ]
