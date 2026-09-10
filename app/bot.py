@@ -8,7 +8,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 from app.config import PROJECT_ROOT, Settings
-from app.handlers import catalog, search, start, voice, warehouse
+from app.handlers import catalog, search, start, voice, warehouse, warehouse_closing
 from app.handlers.admin import router as admin_router
 from app.middlewares.user_context import UserSyncMiddleware
 from app.services.admin_service import AdminService
@@ -19,9 +19,11 @@ from app.services.speech_service import SpeechService
 from app.services.user_service import UserService
 from app.services.voice_processing_service import VoiceProcessingService
 from app.services.warehouse.operations_service import WarehouseOperationsService
+from app.services.warehouse.closing_service import WarehouseClosingService
 from app.storage.json_storage import JsonCatalogStorage
 from app.storage.user_database import UserDatabase
 from app.storage.warehouse_operations_database import WarehouseOperationsDatabase
+from app.storage.warehouse_closing_database import WarehouseClosingDatabase
 from app.telegram_commands import configure_bot_commands
 
 
@@ -34,6 +36,7 @@ def router_names(*, warehouse_enabled: bool) -> tuple[str, ...]:
     ]
     if warehouse_enabled:
         names.append("app.handlers.warehouse")
+        names.append("app.handlers.warehouse_closing")
     names.append("app.handlers.admin")
     return tuple(names)
 
@@ -53,6 +56,7 @@ def build_dispatcher(
     dispatcher.include_router(search.router)
     if warehouse_enabled:
         dispatcher.include_router(warehouse.router)
+        dispatcher.include_router(warehouse_closing.router)
     dispatcher.include_router(admin_router)
     dispatcher.errors.register(start.handle_unexpected_error)
     assert tuple(router.name for router in dispatcher.sub_routers) == router_names(
@@ -95,9 +99,15 @@ async def main() -> None:
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
     warehouse_service = None
+    warehouse_closing_service = None
     if settings.warehouse_enabled:
         warehouse_service = WarehouseOperationsService(
             WarehouseOperationsDatabase(settings.database_path),
+            auth_service,
+        )
+        warehouse_closing_service = WarehouseClosingService(
+            WarehouseClosingDatabase(settings.database_path),
+            warehouse_service,
             auth_service,
         )
     dispatcher = build_dispatcher(
@@ -122,6 +132,7 @@ async def main() -> None:
             voice_processing_service=voice_processing_service,
             warehouse_enabled=settings.warehouse_enabled,
             warehouse_service=warehouse_service,
+            warehouse_closing_service=warehouse_closing_service,
             close_bot_session=False,
         )
     finally:

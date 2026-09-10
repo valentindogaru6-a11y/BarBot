@@ -17,3 +17,18 @@ class WarehouseOperationEditStates(StatesGroup):
     destination = State()
     confirm = State()
     delete = State()
+
+
+class WarehouseClosingStates(StatesGroup):
+    quantity = State()
+    quantity_confirm = State()
+    not_applicable_reason = State()
+
+
+class WarehouseRequiredRuleStates(StatesGroup):
+    create = State()
+    question = State()
+    mode = State()
+    weekdays = State()
+    limits = State()
+    sort_order = State()

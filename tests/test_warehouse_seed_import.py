@@ -44,6 +44,7 @@ def test_dry_run_reports_creates_without_writes(prepared) -> None:
     result = WarehouseSeedImportService(database_path).run(seed_path)
 
     assert len(result.create) == 414
+    assert result.rule_create == ("daily_ground_coffee", "daily_pitcher_milk")
     assert not result.unchanged
     assert not result.conflicts
     assert not result.applied
@@ -57,10 +58,12 @@ def test_apply_imports_every_product_alias_and_operation(prepared) -> None:
     result = WarehouseSeedImportService(database_path).run(seed_path, apply=True)
 
     assert len(result.create) == 414
+    assert result.rule_create == ("daily_ground_coffee", "daily_pitcher_milk")
     assert result.applied
     assert _count(database_path, "warehouse_products") == 414
     assert _count(database_path, "warehouse_product_aliases") == 8
     assert _count(database_path, "warehouse_product_operation_types") == 828
+    assert _count(database_path, "warehouse_required_rules") == 2
     connection = sqlite3.connect(database_path)
     try:
         counts = dict(
@@ -89,6 +92,11 @@ def test_second_apply_is_fully_unchanged(prepared) -> None:
 
     assert not second.create
     assert len(second.unchanged) == 414
+    assert not second.rule_create
+    assert second.rule_unchanged == (
+        "daily_ground_coffee",
+        "daily_pitcher_milk",
+    )
     assert second.applied
     assert _count(database_path, "warehouse_products") == 414
 
@@ -124,6 +132,56 @@ def test_failure_after_inserts_rolls_back_entire_batch(
     with pytest.raises(WarehouseSeedImportError, match="simulated"):
         repository.import_seed(seed, apply=True)
     assert _count(database_path, "warehouse_products") == 0
+    assert _count(database_path, "warehouse_required_rules") == 0
+
+
+def test_required_rule_conflict_rolls_back_new_products(prepared) -> None:
+    database_path, _, seed = prepared
+    owner = next(
+        product for product in seed.products
+        if product.official_name == "Молотый кофе из гриндера"
+    )
+    connection = sqlite3.connect(database_path)
+    try:
+        connection.execute(
+            """
+            INSERT INTO warehouse_products (
+                stable_id, official_name, normalized_name, base_unit,
+                is_active, created_at_utc, updated_at_utc, revision
+            ) VALUES (?, ?, ?, 'kg', 1, 'now', 'now', 1)
+            """,
+            (owner.stable_id, owner.official_name, owner.normalized_name),
+        )
+        product_id = connection.execute(
+            "SELECT id FROM warehouse_products WHERE stable_id=?",
+            (owner.stable_id,),
+        ).fetchone()[0]
+        connection.execute(
+            """
+            INSERT INTO warehouse_required_rules (
+                stable_id, product_id, operation_type, quantity_mode,
+                suggested_quantity_scaled, base_unit, weekdays_mask,
+                question_text, sort_order, allow_not_applicable,
+                minimum_scaled, maximum_scaled, is_active, created_at_utc,
+                created_by, updated_at_utc, updated_by, revision
+            ) VALUES (
+                'daily_ground_coffee', ?, 'writeoff', 'recommended',
+                70000, 'kg', 127, 'Конфликт', 10, 1,
+                NULL, NULL, 1, 'now', NULL, 'now', NULL, 1
+            )
+            """,
+            (product_id,),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    result = WarehouseSeedDatabase(database_path).import_seed(seed, apply=True)
+
+    assert result.rule_conflicts
+    assert not result.applied
+    assert _count(database_path, "warehouse_products") == 1
+    assert _count(database_path, "warehouse_required_rules") == 1
 
 
 def test_wrong_schema_version_is_rejected(tmp_path: Path) -> None:
@@ -133,7 +191,7 @@ def test_wrong_schema_version_is_rejected(tmp_path: Path) -> None:
     connection.close()
     seed = build_warehouse_seed(CANDIDATES)
 
-    with pytest.raises(WarehouseSeedImportError, match="v3 or v4 required"):
+    with pytest.raises(WarehouseSeedImportError, match="v3, v4 or v5 required"):
         WarehouseSeedDatabase(database_path).import_seed(seed)
 
 

@@ -22,12 +22,12 @@ def _create_v3(path: Path) -> None:
         connection.close()
 
 
-def test_fresh_v4_has_operations_schema_and_locations(tmp_path: Path) -> None:
+def test_fresh_v5_has_operations_schema_and_locations(tmp_path: Path) -> None:
     path = tmp_path / "fresh.db"
     UserDatabase(path).initialize()
     connection = sqlite3.connect(path)
     try:
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 4
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 5
         tables = {
             row[0]
             for row in connection.execute(

@@ -13,6 +13,14 @@ from app.models.warehouse.nomenclature import (
     WarehouseSettings,
     WarehouseSettingsUpdate,
 )
+from app.models.warehouse.closing import (
+    ClosingSessionStatus,
+    ClosingTriggerType,
+    RequiredQuantityMode,
+    RequiredRuleInput,
+    RequiredRuleUpdate,
+    RequirementStatus,
+)
 from app.models.warehouse.operations import (
     IntakeBatch,
     IntakeBatchStatus,
@@ -28,6 +36,8 @@ from app.models.warehouse.operations import (
 
 __all__ = [
     "BaseUnit",
+    "ClosingSessionStatus",
+    "ClosingTriggerType",
     "ProductOperationType",
     "WarehouseLocation",
     "WarehouseLocationCreate",
@@ -44,6 +54,10 @@ __all__ = [
     "IntakeLineStatus",
     "OperationOrigin",
     "ProductCandidate",
+    "RequiredQuantityMode",
+    "RequiredRuleInput",
+    "RequiredRuleUpdate",
+    "RequirementStatus",
     "ShiftStatus",
     "WarehouseOperation",
     "WarehouseOperationType",

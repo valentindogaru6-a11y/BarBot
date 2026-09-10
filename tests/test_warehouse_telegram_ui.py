@@ -40,8 +40,9 @@ def test_router_order_only_contains_warehouse_when_enabled() -> None:
         "app.handlers.search",
         "app.handlers.admin",
     )
-    assert router_names(warehouse_enabled=True)[-2:] == (
+    assert router_names(warehouse_enabled=True)[-3:] == (
         "app.handlers.warehouse",
+        "app.handlers.warehouse_closing",
         "app.handlers.admin",
     )
 
@@ -85,6 +86,9 @@ def test_all_callbacks_fit_telegram_limit_with_64_bit_values() -> None:
         "h", "aw", "at", "ls", "br", "bc", "be", "bx", "rp", "rd",
         "cl", "rl", "lw", "lt", "la", "ov", "ep", "eq", "en", "ed",
         "pe", "de", "ec", "dx", "dc",
+        "cs", "cc", "cv", "qr", "qo", "qs", "qn", "qx", "cf",
+        "n1", "n2", "n3", "n4", "rm", "rv", "rn", "zq", "zm",
+        "zw", "zl", "zo", "za", "zx",
     ):
         packed = WarehouseCallback(
             action=action, object_id=maximum, aux=maximum

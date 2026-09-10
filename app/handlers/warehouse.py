@@ -51,6 +51,7 @@ from app.services.warehouse.operations_service import (
     WarehouseIntakeError,
     WarehouseOperationsService,
 )
+from app.services.warehouse.closing_service import WarehouseClosingService
 from app.services.warehouse.quantity_service import QuantityError, parse_quantity
 from app.storage.warehouse_operations_database import (
     WarehouseOperationsError,
@@ -148,6 +149,7 @@ async def show_warehouse_home(
     auth_service: AuthService,
     service: WarehouseOperationsService,
     user_id: int,
+    closing_service: WarehouseClosingService | None = None,
 ) -> None:
     context = await _thread(auth_service.get_context, user_id)
     if not context.can_view_warehouse:
@@ -157,7 +159,24 @@ async def show_warehouse_home(
     if not await _configured(message, service, context.role):
         return
     shift = await _thread(service.current_shift, actor_user_id=user_id)
-    if context.can_mutate_warehouse:
+    closing_overview = None
+    if closing_service is not None:
+        try:
+            closing_overview = await _thread(
+                closing_service.overview, actor_user_id=user_id
+            )
+            shift = closing_overview["shift"]
+        except Exception:
+            logger.exception("Warehouse closing overview failed")
+    active_closing = None
+    if closing_service is not None and shift["id"] is not None:
+        try:
+            active_closing = await _thread(
+                closing_service.active_session, actor_user_id=user_id
+            )
+        except Exception:
+            logger.exception("Warehouse closing recovery check failed")
+    if context.can_mutate_warehouse and active_closing is None:
         pending = await _thread(service.pending_batch, actor_user_id=user_id)
         if pending is not None:
             await message.answer(
@@ -165,14 +184,32 @@ async def show_warehouse_home(
                 reply_markup=recovery_keyboard(int(pending["id"])),
             )
             return
+    status_label = {
+        "open": "открыта",
+        "waiting_required": "идёт проверка",
+        "closing": "ожидает отчёта",
+    }.get(str(shift["status"]), "закрыта")
+    requirements_text = ""
+    if closing_overview is not None:
+        requirements_text = (
+            "\nОбязательные позиции: "
+            f"{closing_overview['requirements_resolved']} из "
+            f"{closing_overview['requirements_total']} заполнено"
+        )
     await edit_or_send_text(
         message,
         f"{WAREHOUSE_TITLE}\n\n"
         f"Смена: {format_business_date(str(shift['business_date']))}\n"
-        f"Статус: {'открыта' if shift['status'] == 'open' else 'закрыта'}"
-        "\n\nВыберите действие:",
+        f"Статус: {status_label}{requirements_text}\n\nВыберите действие:",
         warehouse_home_keyboard(
-            can_mutate=context.can_mutate_warehouse and shift["status"] == "open"
+            can_mutate=context.can_mutate_warehouse,
+            shift_status=str(shift["status"]),
+            active_closing_session_id=(
+                int(active_closing["id"]) if active_closing is not None else None
+            ),
+            can_manage_required_rules=(
+                context.can_manage_warehouse_required_rules
+            ),
         ),
     )
 
@@ -282,10 +319,12 @@ async def warehouse_command(
     state: FSMContext,
     auth_service: AuthService,
     warehouse_service: WarehouseOperationsService,
+    warehouse_closing_service: WarehouseClosingService,
 ) -> None:
     if message.from_user is not None:
         await show_warehouse_home(
-            message, state, auth_service, warehouse_service, message.from_user.id
+            message, state, auth_service, warehouse_service, message.from_user.id,
+            warehouse_closing_service,
         )
 
 
@@ -295,6 +334,7 @@ async def warehouse_home(
     state: FSMContext,
     auth_service: AuthService,
     warehouse_service: WarehouseOperationsService,
+    warehouse_closing_service: WarehouseClosingService,
 ) -> None:
     context = await _thread(auth_service.get_context, callback.from_user.id)
     if not context.can_view_warehouse:
@@ -305,6 +345,7 @@ async def warehouse_home(
         await show_warehouse_home(
             callback.message, state, auth_service, warehouse_service,
             callback.from_user.id,
+            warehouse_closing_service,
         )
 
 
@@ -378,12 +419,14 @@ async def intake_ui_cancel(
     state: FSMContext,
     auth_service: AuthService,
     warehouse_service: WarehouseOperationsService,
+    warehouse_closing_service: WarehouseClosingService,
 ) -> None:
     await callback.answer()
     if isinstance(callback.message, Message):
         await show_warehouse_home(
             callback.message, state, auth_service, warehouse_service,
             callback.from_user.id,
+            warehouse_closing_service,
         )
 
 
@@ -809,7 +852,10 @@ async def _show_operation(
         operation_text(operation),
         operation_keyboard(
             operation,
-            can_mutate=context.can_mutate_warehouse,
+            can_mutate=(
+                context.can_mutate_warehouse
+                and operation["shift_status"] in {"open", "waiting_required"}
+            ),
             return_page=return_page,
         ),
     )

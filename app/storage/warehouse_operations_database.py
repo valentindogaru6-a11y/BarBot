@@ -282,7 +282,7 @@ class WarehouseOperationsDatabase:
                 )
                 shift_id = int(cursor.lastrowid)
             else:
-                if shift["status"] != "open":
+                if shift["status"] not in ("open", "waiting_required"):
                     raise WarehouseOperationsError("Shift is not open")
                 shift_id = int(shift["id"])
             active = connection.execute(
@@ -526,7 +526,7 @@ class WarehouseOperationsDatabase:
             shift = connection.execute(
                 "SELECT * FROM warehouse_shifts WHERE id = ?", (batch["shift_id"],)
             ).fetchone()
-            if shift is None or shift["status"] != "open":
+            if shift is None or shift["status"] not in ("open", "waiting_required"):
                 raise WarehouseOperationsError("Shift is not open")
             lines = connection.execute(
                 "SELECT * FROM warehouse_intake_lines WHERE batch_id=? ORDER BY line_number",
@@ -664,7 +664,7 @@ class WarehouseOperationsDatabase:
                 )
                 shift_id = int(cursor.lastrowid)
             else:
-                if shift["status"] != "open":
+                if shift["status"] not in ("open", "waiting_required"):
                     raise WarehouseOperationsError("Shift is not open")
                 shift_id = int(shift["id"])
             cursor = connection.execute(
@@ -857,7 +857,7 @@ class WarehouseOperationsDatabase:
                 raise WarehouseRevisionConflict("Operation revision conflict")
             if current["is_deleted"]:
                 raise WarehouseOperationsError("Deleted operation cannot be changed")
-            if current["shift_status"] != "open":
+            if current["shift_status"] not in ("open", "waiting_required"):
                 raise WarehouseOperationsError("Shift is not open")
             proposed = self._dict(current)
             proposed.update(changes)
@@ -938,7 +938,7 @@ class WarehouseOperationsDatabase:
                 raise WarehouseRevisionConflict("Operation revision conflict")
             if current["is_deleted"]:
                 raise WarehouseOperationsError("Operation is already deleted")
-            if current["shift_status"] != "open":
+            if current["shift_status"] not in ("open", "waiting_required"):
                 raise WarehouseOperationsError("Shift is not open")
             connection.execute(
                 """

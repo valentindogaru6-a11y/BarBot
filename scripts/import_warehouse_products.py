@@ -35,14 +35,24 @@ def main(argv: list[str] | None = None) -> int:
             apply=arguments.apply,
         )
     except (WarehouseSeedValidationError, WarehouseSeedImportError) as exc:
-        print(f"create=0 unchanged=0 conflicts=0 errors=1\n{exc}")
+        print(
+            "create=0 unchanged=0 conflicts=0 "
+            "rule_create=0 rule_unchanged=0 rule_conflicts=0 errors=1\n"
+            f"{exc}"
+        )
         return 2
     print(
         f"create={len(result.create)} unchanged={len(result.unchanged)} "
-        f"conflicts={len(result.conflicts)} errors={len(result.errors)}"
+        f"conflicts={len(result.conflicts)} "
+        f"rule_create={len(result.rule_create)} "
+        f"rule_unchanged={len(result.rule_unchanged)} "
+        f"rule_conflicts={len(result.rule_conflicts)} "
+        f"errors={len(result.errors)}"
     )
     for conflict in result.conflicts:
         print(f"CONFLICT: {conflict}")
+    for conflict in result.rule_conflicts:
+        print(f"RULE CONFLICT: {conflict}")
     print("APPLIED" if result.applied else "DRY-RUN")
     return 0 if result.is_valid else 2
 

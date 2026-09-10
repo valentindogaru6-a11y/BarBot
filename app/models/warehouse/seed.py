@@ -102,9 +102,12 @@ class WarehouseSeedImportPlan(BaseModel):
     create: tuple[str, ...] = ()
     unchanged: tuple[str, ...] = ()
     conflicts: tuple[str, ...] = ()
+    rule_create: tuple[str, ...] = ()
+    rule_unchanged: tuple[str, ...] = ()
+    rule_conflicts: tuple[str, ...] = ()
     errors: tuple[str, ...] = ()
     applied: bool = False
 
     @property
     def is_valid(self) -> bool:
-        return not self.conflicts and not self.errors
+        return not self.conflicts and not self.rule_conflicts and not self.errors

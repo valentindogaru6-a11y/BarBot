@@ -9,6 +9,7 @@ from app.services.warehouse.operations_service import (
     WarehouseIntakeError,
     WarehouseOperationsService,
 )
+from app.services.warehouse.closing_service import WarehouseClosingService
 
 __all__ = [
     "WarehouseNomenclatureService",
@@ -16,4 +17,5 @@ __all__ = [
     "normalize_warehouse_name",
     "WarehouseIntakeError",
     "WarehouseOperationsService",
+    "WarehouseClosingService",
 ]

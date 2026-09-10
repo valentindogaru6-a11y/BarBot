@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 
 from app.models.warehouse.seed import (
@@ -19,6 +20,10 @@ from app.storage.warehouse_schema import (
 from app.storage.warehouse_operations_schema import (
     WarehouseOperationsSchemaError,
     validate_warehouse_operations_schema,
+)
+from app.storage.warehouse_closing_schema import (
+    WarehouseClosingSchemaError,
+    validate_warehouse_closing_schema,
 )
 from app.utils.warehouse import normalize_warehouse_name
 
@@ -55,6 +60,12 @@ class WarehouseSeedDatabase:
             plan = self._plan(connection, seed)
             if apply and plan.is_valid:
                 self._insert_products(connection, seed, set(plan.create))
+                if self._schema_version(connection) == 5:
+                    self._insert_required_rules(
+                        connection,
+                        seed,
+                        set(plan.rule_create),
+                    )
                 self._validate_final_namespace(connection)
                 connection.commit()
                 return plan.model_copy(update={"applied": True})
@@ -72,19 +83,26 @@ class WarehouseSeedDatabase:
             connection.close()
 
     @staticmethod
+    def _schema_version(connection: sqlite3.Connection) -> int:
+        return int(connection.execute("PRAGMA user_version").fetchone()[0])
+
+    @staticmethod
     def _validate_schema(connection: sqlite3.Connection) -> None:
-        version = int(connection.execute("PRAGMA user_version").fetchone()[0])
-        if version not in {3, 4}:
+        version = WarehouseSeedDatabase._schema_version(connection)
+        if version not in {3, 4, 5}:
             raise WarehouseSeedImportError(
-                f"Warehouse schema v3 or v4 required; found v{version}"
+                f"Warehouse schema v3, v4 or v5 required; found v{version}"
             )
         try:
             validate_warehouse_schema(connection)
-            if version == 4:
+            if version >= 4:
                 validate_warehouse_operations_schema(connection)
+            if version == 5:
+                validate_warehouse_closing_schema(connection)
         except (
             WarehouseSchemaValidationError,
             WarehouseOperationsSchemaError,
+            WarehouseClosingSchemaError,
         ) as exc:
             raise WarehouseSeedImportError(str(exc)) from exc
 
@@ -182,11 +200,120 @@ class WarehouseSeedDatabase:
                 )
             else:
                 creates.append(product.stable_id)
+        rule_create: list[str] = []
+        rule_unchanged: list[str] = []
+        rule_conflicts: list[str] = []
+        if self._schema_version(connection) == 5:
+            for stable_id, expected in self._required_rules(seed).items():
+                row = connection.execute(
+                    """
+                    SELECT r.*, p.stable_id AS product_stable_id
+                    FROM warehouse_required_rules r
+                    JOIN warehouse_products p ON p.id=r.product_id
+                    WHERE r.stable_id=?
+                    """,
+                    (stable_id,),
+                ).fetchone()
+                if row is None:
+                    rule_create.append(stable_id)
+                elif self._rule_matches(row, expected):
+                    rule_unchanged.append(stable_id)
+                else:
+                    rule_conflicts.append(
+                        f"required rule {stable_id} exists with different data"
+                    )
         return WarehouseSeedImportPlan(
             create=tuple(creates),
             unchanged=tuple(unchanged),
             conflicts=tuple(conflicts),
+            rule_create=tuple(rule_create),
+            rule_unchanged=tuple(rule_unchanged),
+            rule_conflicts=tuple(rule_conflicts),
         )
+
+    @staticmethod
+    def _required_rules(seed: WarehouseProductsSeed) -> dict[str, dict[str, object]]:
+        questions = {
+            "Молотый кофе из гриндера": (
+                "daily_ground_coffee",
+                "Сколько молотого кофе осталось в гриндере?",
+                10,
+            ),
+            "Остаток молока в питчерах": (
+                "daily_pitcher_milk",
+                "Сколько молока осталось в питчерах в конце смены?",
+                20,
+            ),
+        }
+        result: dict[str, dict[str, object]] = {}
+        for product in seed.products:
+            if product.owner_metadata is None or product.official_name not in questions:
+                continue
+            stable_id, question, sort_order = questions[product.official_name]
+            rule = product.owner_metadata.required_rule
+            suggested = (
+                int(Decimal(rule.quantity) * 1_000_000)
+                if rule.quantity is not None
+                else None
+            )
+            result[stable_id] = {
+                "product_stable_id": product.stable_id,
+                "operation_type": "writeoff",
+                "quantity_mode": rule.mode,
+                "suggested_quantity_scaled": suggested,
+                "base_unit": rule.unit.value,
+                "weekdays_mask": 127,
+                "question_text": question,
+                "sort_order": sort_order,
+                "allow_not_applicable": 1,
+                "minimum_scaled": None,
+                "maximum_scaled": None,
+                "is_active": 1,
+            }
+        return result
+
+    @staticmethod
+    def _rule_matches(row: sqlite3.Row, expected: dict[str, object]) -> bool:
+        return all(row[key] == value for key, value in expected.items())
+
+    @classmethod
+    def _insert_required_rules(
+        cls,
+        connection: sqlite3.Connection,
+        seed: WarehouseProductsSeed,
+        create_ids: set[str],
+    ) -> None:
+        now = _utc_now()
+        for stable_id, rule in cls._required_rules(seed).items():
+            if stable_id not in create_ids:
+                continue
+            product = connection.execute(
+                "SELECT id, base_unit FROM warehouse_products WHERE stable_id=?",
+                (rule["product_stable_id"],),
+            ).fetchone()
+            if product is None or product["base_unit"] != rule["base_unit"]:
+                raise WarehouseSeedImportError(
+                    f"Required-rule product is unavailable: {stable_id}"
+                )
+            connection.execute(
+                """
+                INSERT INTO warehouse_required_rules (
+                    stable_id, product_id, operation_type, quantity_mode,
+                    suggested_quantity_scaled, base_unit, weekdays_mask,
+                    question_text, sort_order, allow_not_applicable,
+                    minimum_scaled, maximum_scaled, is_active, created_at_utc,
+                    created_by, updated_at_utc, updated_by, revision
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, 1)
+                """,
+                (
+                    stable_id, int(product["id"]), rule["operation_type"],
+                    rule["quantity_mode"], rule["suggested_quantity_scaled"],
+                    rule["base_unit"], rule["weekdays_mask"],
+                    rule["question_text"], rule["sort_order"],
+                    rule["allow_not_applicable"], rule["minimum_scaled"],
+                    rule["maximum_scaled"], rule["is_active"], now, now,
+                ),
+            )
 
     @staticmethod
     def _insert_products(

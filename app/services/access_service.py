@@ -43,6 +43,10 @@ class UserContext:
         return self.role in {Role.SUPER_ADMIN, Role.ADMIN, Role.BARTENDER}
 
     @property
+    def can_manage_warehouse_required_rules(self) -> bool:
+        return self.role in {Role.SUPER_ADMIN, Role.ADMIN}
+
+    @property
     def can_assign_admin(self) -> bool:
         return self.role is Role.SUPER_ADMIN
 
@@ -110,6 +114,11 @@ class AccessService:
     def can_mutate_warehouse(self, telegram_user_id: int) -> bool:
         return self.get_context(telegram_user_id).can_mutate_warehouse
 
+    def can_manage_warehouse_required_rules(self, telegram_user_id: int) -> bool:
+        return self.get_context(
+            telegram_user_id
+        ).can_manage_warehouse_required_rules
+
     def require_warehouse_view(self, telegram_user_id: int) -> UserContext:
         context = self.get_context(telegram_user_id)
         if not context.can_view_warehouse:
@@ -120,6 +129,17 @@ class AccessService:
         context = self.get_context(telegram_user_id)
         if not context.can_mutate_warehouse:
             raise AccessDeniedError("Недостаточно прав для изменения склада")
+        return context
+
+    def require_warehouse_required_rule_management(
+        self,
+        telegram_user_id: int,
+    ) -> UserContext:
+        context = self.get_context(telegram_user_id)
+        if not context.can_manage_warehouse_required_rules:
+            raise AccessDeniedError(
+                "Недостаточно прав для обязательных списаний"
+            )
         return context
 
     def can_assign_admin(self, telegram_user_id: int) -> bool:
