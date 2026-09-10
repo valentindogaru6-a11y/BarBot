@@ -93,6 +93,29 @@ def test_unresolved_persists_and_can_be_corrected_or_cancelled(environment) -> N
     assert cancelled["lines"][0]["status"] == "cancelled"
 
 
+def test_syntax_error_persists_and_only_its_line_is_reparsed(environment) -> None:
+    _, _, _, service, _ = environment
+    batch = _prepare(
+        service,
+        "списание:\nапельсин много\nлайм 100 г",
+        message=222,
+    )
+    assert batch["status"] == "needs_resolution"
+    assert batch["lines"][0]["error_code"] == "invalid_line"
+    assert batch["lines"][1]["status"] == "resolved"
+
+    fixed = service.replace_line_input(
+        batch["id"],
+        batch["lines"][0]["id"],
+        "апельсин 150 г",
+        actor_user_id=20,
+    )
+    assert fixed["status"] == "ready"
+    assert fixed["lines"][0]["quantity_scaled"] == 150_000
+    assert fixed["lines"][1]["raw_line"] == "лайм 100 г"
+    service.cancel_batch(batch["id"], actor_user_id=20)
+
+
 def test_fuzzy_candidate_requires_explicit_product_resolution(environment) -> None:
     _, _, repository, service, _ = environment
     batch = _prepare(service, "списание: апелсин 1", message=22)
@@ -105,6 +128,7 @@ def test_fuzzy_candidate_requires_explicit_product_resolution(environment) -> No
     )
     assert resolved["status"] == "ready"
     assert resolved["lines"][0]["product_id"] == candidate_id
+    service.cancel_batch(batch["id"], actor_user_id=20)
 
     lime = next(item for item in repository.products() if item.normalized_name == "лайм")
     with sqlite3.connect(repository.path) as connection:
@@ -174,7 +198,7 @@ def test_transfer_destination_and_operation_edit_delete(environment) -> None:
         service, "перемещение: сахар 1 кг -> кухня (запас)", message=6
     )
     assert batch["status"] == "ready"
-    operation = service.commit_batch(batch["id"], actor_user_id=10)[0]
+    operation = service.commit_batch(batch["id"], actor_user_id=20)[0]
     assert operation["destination_location_id"] is not None
     changed = service.update_quantity(
         operation["id"], "500", "г", expected_revision=1, actor_user_id=20
@@ -233,6 +257,47 @@ def test_manual_operation_uses_manual_origin(environment) -> None:
     )
     assert operation["origin"] == "manual"
     assert operation["quantity_scaled"] == 150_000
+
+
+def test_only_one_active_batch_and_batch_ownership(environment) -> None:
+    _, _, _, service, _ = environment
+    first = _prepare(service, "списание: апельсин 1", message=70)
+    second = _prepare(service, "списание: лайм 1", message=71)
+    assert second["id"] == first["id"]
+    with pytest.raises(WarehouseOperationsError, match="another user"):
+        service.resolve_product(
+            first["id"], first["lines"][0]["id"],
+            first["lines"][0]["product_id"], actor_user_id=10,
+        )
+    service.cancel_batch(first["id"], actor_user_id=20)
+    assert service.owned_batch(first["id"], actor_user_id=20) is None
+
+
+def test_aggregates_and_pages_exclude_soft_deleted_operations(environment) -> None:
+    _, _, _, service, _ = environment
+    first = _prepare(service, "списание: апельсин 0.15", message=72)
+    operation = service.commit_batch(first["id"], actor_user_id=20)[0]
+    second = _prepare(service, "списание: апельсин 0.35", message=73)
+    service.commit_batch(second["id"], actor_user_id=20)
+    totals = service.aggregates(operation["shift_id"], actor_user_id=30)
+    orange = next(item for item in totals if item["product_name_snapshot"] == "Апельсин")
+    assert orange["quantity_scaled"] == 500_000
+    assert orange["operation_count"] == 2
+    page, total = service.operation_page(
+        operation["shift_id"], "writeoff", page=0, actor_user_id=30
+    )
+    assert len(page) == total == 2
+    service.delete_operation(
+        operation["id"], expected_revision=1, actor_user_id=20,
+        deletion_reason="тест",
+    )
+    assert service.operation_page(
+        operation["shift_id"], "writeoff", page=0, actor_user_id=30
+    )[1] == 1
+    totals = service.aggregates(operation["shift_id"], actor_user_id=30)
+    assert next(item for item in totals if item["product_name_snapshot"] == "Апельсин")[
+        "quantity_scaled"
+    ] == 350_000
 
 
 def test_closed_shift_rejects_mutation(environment) -> None:

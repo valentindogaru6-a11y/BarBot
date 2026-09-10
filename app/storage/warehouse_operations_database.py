@@ -105,6 +105,14 @@ class WarehouseOperationsDatabase:
                 )
             return tuple(result)
 
+    def active_product_count(self) -> int:
+        with self._connection() as connection:
+            return int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM warehouse_products WHERE is_active=1"
+                ).fetchone()[0]
+            )
+
     def locations(self) -> tuple[LocationOption, ...]:
         with self._connection() as connection:
             rows = connection.execute(
@@ -177,6 +185,26 @@ class WarehouseOperationsDatabase:
             ).fetchone()
             return self._load_batch(connection, int(row["id"])) if row else None
 
+    def active_batch_for_actor(
+        self,
+        actor_user_id: int,
+        source_location_id: int,
+        business_date: str,
+    ) -> dict[str, Any] | None:
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                SELECT b.id FROM warehouse_intake_batches b
+                JOIN warehouse_shifts s ON s.id=b.shift_id
+                WHERE b.actor_user_id=? AND s.source_location_id=?
+                  AND s.business_date=?
+                  AND b.status IN ('ready', 'needs_resolution')
+                ORDER BY b.id LIMIT 1
+                """,
+                (actor_user_id, source_location_id, business_date),
+            ).fetchone()
+            return self._load_batch(connection, int(row["id"])) if row else None
+
     def get_batch(self, batch_id: int) -> dict[str, Any] | None:
         with self._connection() as connection:
             return self._load_batch(connection, batch_id)
@@ -192,7 +220,14 @@ class WarehouseOperationsDatabase:
         batch = self._dict(row)
         lines: list[dict[str, Any]] = []
         for line_row in connection.execute(
-            "SELECT * FROM warehouse_intake_lines WHERE batch_id = ? ORDER BY line_number",
+            """
+            SELECT l.*, p.official_name AS product_name,
+                   d.name AS destination_name
+            FROM warehouse_intake_lines l
+            LEFT JOIN warehouse_products p ON p.id=l.product_id
+            LEFT JOIN warehouse_locations d ON d.id=l.destination_location_id
+            WHERE l.batch_id=? ORDER BY l.line_number
+            """,
             (batch_id,),
         ).fetchall():
             line = self._dict(line_row)
@@ -250,6 +285,17 @@ class WarehouseOperationsDatabase:
                 if shift["status"] != "open":
                     raise WarehouseOperationsError("Shift is not open")
                 shift_id = int(shift["id"])
+            active = connection.execute(
+                "SELECT id FROM warehouse_intake_batches "
+                "WHERE shift_id=? AND actor_user_id=? "
+                "AND status IN ('ready', 'needs_resolution') "
+                "ORDER BY id LIMIT 1",
+                (shift_id, payload["actor_user_id"]),
+            ).fetchone()
+            if active is not None:
+                result = self._load_batch(connection, int(active["id"]))
+                assert result is not None
+                return result
             cursor = connection.execute(
                 """
                 INSERT INTO warehouse_intake_batches (
@@ -302,6 +348,59 @@ class WarehouseOperationsDatabase:
                 entity_type="intake_batch", entity_id=batch_id,
                 occurred_at_utc=payload["now"], after={"status": payload["status"]},
                 source_raw_text=payload["raw_text"], correlation_id=f"batch:{batch_id}",
+            )
+            result = self._load_batch(connection, batch_id)
+            assert result is not None
+            return result
+
+    def remove_line(
+        self,
+        batch_id: int,
+        line_id: int,
+        *,
+        actor_user_id: int,
+        now: str,
+    ) -> dict[str, Any]:
+        with self._transaction() as connection:
+            batch = connection.execute(
+                "SELECT * FROM warehouse_intake_batches WHERE id=?", (batch_id,)
+            ).fetchone()
+            line = connection.execute(
+                "SELECT * FROM warehouse_intake_lines WHERE id=? AND batch_id=?",
+                (line_id, batch_id),
+            ).fetchone()
+            if batch is None or line is None:
+                raise WarehouseOperationsError("Batch line not found")
+            if batch["status"] not in ("ready", "needs_resolution"):
+                raise WarehouseOperationsError("Batch cannot be changed")
+            count = int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM warehouse_intake_lines WHERE batch_id=?",
+                    (batch_id,),
+                ).fetchone()[0]
+            )
+            if count == 1:
+                connection.execute(
+                    "UPDATE warehouse_intake_batches SET status='cancelled', "
+                    "updated_at_utc=? WHERE id=?", (now, batch_id)
+                )
+                connection.execute(
+                    "UPDATE warehouse_intake_lines SET status='cancelled', "
+                    "updated_at_utc=? WHERE id=?", (now, line_id)
+                )
+                status = "cancelled"
+            else:
+                connection.execute(
+                    "DELETE FROM warehouse_intake_lines WHERE id=?", (line_id,)
+                )
+                status = self._refresh_batch_status(connection, batch_id, now)
+            self._audit(
+                connection, shift_id=int(batch["shift_id"]), operation_id=None,
+                actor_user_id=actor_user_id, event_type="batch_line_removed",
+                entity_type="intake_line", entity_id=line_id, occurred_at_utc=now,
+                before=self._dict(line), after={"batch_status": status},
+                source_raw_text=str(line["raw_line"]),
+                correlation_id=f"batch:{batch_id}",
             )
             result = self._load_batch(connection, batch_id)
             assert result is not None
@@ -613,6 +712,7 @@ class WarehouseOperationsDatabase:
                 self._dict(row)
                 for row in connection.execute(
                     "SELECT * FROM warehouse_operations WHERE shift_id=? "
+                    "AND is_deleted=0 "
                     "ORDER BY occurred_at_utc, id", (shift_id,)
                 ).fetchall()
             ]
@@ -623,6 +723,108 @@ class WarehouseOperationsDatabase:
                 "SELECT * FROM warehouse_operations WHERE id=?", (operation_id,)
             ).fetchone()
             return self._dict(row) if row else None
+
+    def shift(self, shift_id: int) -> dict[str, Any] | None:
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                SELECT s.*, l.name AS source_location_name
+                FROM warehouse_shifts s
+                JOIN warehouse_locations l ON l.id=s.source_location_id
+                WHERE s.id=?
+                """,
+                (shift_id,),
+            ).fetchone()
+            return self._dict(row) if row else None
+
+    def shift_for_date(
+        self, source_location_id: int, business_date: str
+    ) -> dict[str, Any] | None:
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                SELECT s.*, l.name AS source_location_name
+                FROM warehouse_shifts s
+                JOIN warehouse_locations l ON l.id=s.source_location_id
+                WHERE s.source_location_id=? AND s.business_date=?
+                """,
+                (source_location_id, business_date),
+            ).fetchone()
+            return self._dict(row) if row else None
+
+    def operation_view(self, operation_id: int) -> dict[str, Any] | None:
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                SELECT o.*, s.status AS shift_status,
+                       src.name AS source_location_name,
+                       dst.name AS destination_location_name
+                FROM warehouse_operations o
+                JOIN warehouse_shifts s ON s.id=o.shift_id
+                JOIN warehouse_locations src ON src.id=o.source_location_id
+                LEFT JOIN warehouse_locations dst ON dst.id=o.destination_location_id
+                WHERE o.id=?
+                """,
+                (operation_id,),
+            ).fetchone()
+            return self._dict(row) if row else None
+
+    def operation_page(
+        self,
+        shift_id: int,
+        operation_type: str,
+        *,
+        page: int,
+        page_size: int = 8,
+    ) -> tuple[list[dict[str, Any]], int]:
+        offset = max(page, 0) * page_size
+        with self._connection() as connection:
+            total = int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM warehouse_operations "
+                    "WHERE shift_id=? AND operation_type=? AND is_deleted=0",
+                    (shift_id, operation_type),
+                ).fetchone()[0]
+            )
+            rows = connection.execute(
+                """
+                SELECT o.*, src.name AS source_location_name,
+                       dst.name AS destination_location_name
+                FROM warehouse_operations o
+                JOIN warehouse_locations src ON src.id=o.source_location_id
+                LEFT JOIN warehouse_locations dst ON dst.id=o.destination_location_id
+                WHERE o.shift_id=? AND o.operation_type=? AND o.is_deleted=0
+                ORDER BY o.occurred_at_utc, o.id LIMIT ? OFFSET ?
+                """,
+                (shift_id, operation_type, page_size, offset),
+            ).fetchall()
+            return [self._dict(row) for row in rows], total
+
+    def aggregates(self, shift_id: int) -> list[dict[str, Any]]:
+        with self._connection() as connection:
+            rows = connection.execute(
+                """
+                SELECT o.operation_type, o.product_id, o.product_name_snapshot,
+                       o.base_unit, o.source_location_id,
+                       o.destination_location_id,
+                       src.name AS source_location_name,
+                       dst.name AS destination_location_name,
+                       SUM(o.quantity_scaled) AS quantity_scaled,
+                       COUNT(*) AS operation_count
+                FROM warehouse_operations o
+                JOIN warehouse_locations src ON src.id=o.source_location_id
+                LEFT JOIN warehouse_locations dst
+                  ON dst.id=o.destination_location_id
+                WHERE o.shift_id=? AND o.is_deleted=0 AND o.quantity_scaled>0
+                GROUP BY o.operation_type, o.product_id, o.product_name_snapshot,
+                         o.base_unit, o.source_location_id,
+                         o.destination_location_id
+                ORDER BY o.operation_type, o.product_name_snapshot,
+                         o.destination_location_id
+                """,
+                (shift_id,),
+            ).fetchall()
+            return [self._dict(row) for row in rows]
 
     def update_operation(
         self,

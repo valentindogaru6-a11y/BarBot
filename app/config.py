@@ -76,6 +76,7 @@ class Settings(BaseSettings):
     voice_max_file_size_mb: int = Field(default=10, gt=0)
     voice_max_concurrent: int = Field(default=1, gt=0)
     voice_debug_transcripts: bool = False
+    warehouse_enabled: bool = False
 
     @field_validator("super_admin_ids", mode="before")
     @classmethod

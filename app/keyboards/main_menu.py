@@ -5,12 +5,14 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.keyboards.callbacks import MainCallback, SearchCallback
 from app.keyboards.admin_callbacks import AdminPanelCallback
+from app.keyboards.warehouse_callbacks import WarehouseCallback
 
 
 def build_main_menu_keyboard(
     *,
     can_view_catalog: bool = True,
     can_manage_catalog: bool = False,
+    can_view_warehouse: bool = False,
 ) -> InlineKeyboardMarkup | None:
     """Build the static top-level menu without catalog business logic."""
 
@@ -29,7 +31,12 @@ def build_main_menu_keyboard(
             text="🛠 Управление каталогом",
             callback_data=AdminPanelCallback(action="o"),
         )
-    if not can_view_catalog and not can_manage_catalog:
+    if can_view_warehouse:
+        builder.button(
+            text="📦 Списание / перемещение",
+            callback_data=WarehouseCallback(action="h"),
+        )
+    if not can_view_catalog and not can_manage_catalog and not can_view_warehouse:
         return None
     builder.adjust(1)
     return builder.as_markup()

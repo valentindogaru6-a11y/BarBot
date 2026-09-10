@@ -53,12 +53,27 @@ ACCOUNTANT_HELP_TEXT = (
     "Каталог, поиск и административные функции недоступны. Просмотр отчётов "
     "будет добавлен вместе со складским модулем."
 )
+ACCOUNTANT_WAREHOUSE_WELCOME_TEXT = (
+    "🧾 <b>BarBot для бухгалтера</b>\n\n"
+    "Доступен просмотр записей и итогов текущей смены. Изменение и удаление "
+    "операций для этой роли закрыто.\n\n"
+    "Выберите действие:"
+)
+ACCOUNTANT_WAREHOUSE_HELP_TEXT = (
+    "<b>Помощь</b>\n\n"
+    "Откройте «📦 Списание / перемещение», чтобы посмотреть записи и итоги "
+    "текущей смены. Добавление, изменение и удаление недоступны."
+)
 
 
-def _main_menu_for(context: UserContext) -> InlineKeyboardMarkup | None:
+def _main_menu_for(
+    context: UserContext,
+    warehouse_enabled: bool = False,
+) -> InlineKeyboardMarkup | None:
     return build_main_menu_keyboard(
         can_view_catalog=context.can_view_catalog,
         can_manage_catalog=context.can_manage_catalog,
+        can_view_warehouse=warehouse_enabled and context.can_view_warehouse,
     )
 
 
@@ -68,6 +83,7 @@ async def handle_start(
     state: FSMContext,
     auth_service: AuthService,
     bot: Bot,
+    warehouse_enabled: bool = False,
 ) -> None:
     """Show the main menu and reset an unfinished interaction."""
 
@@ -82,18 +98,22 @@ async def handle_start(
     if user is None:
         return
     context = auth_service.get_context(user.id)
-    await update_user_commands(bot, user.id, context.role)
+    await update_user_commands(
+        bot, user.id, context.role, warehouse_enabled=warehouse_enabled
+    )
     if context.role is Role.BLOCKED:
         await message.answer(BLOCKED_TEXT)
         return
-    text = (
-        ACCOUNTANT_WELCOME_TEXT
-        if context.role is Role.ACCOUNTANT
-        else WELCOME_TEXT
-    )
+    text = WELCOME_TEXT
+    if context.role is Role.ACCOUNTANT:
+        text = (
+            ACCOUNTANT_WAREHOUSE_WELCOME_TEXT
+            if warehouse_enabled
+            else ACCOUNTANT_WELCOME_TEXT
+        )
     await message.answer(
         text,
-        reply_markup=_main_menu_for(context),
+        reply_markup=_main_menu_for(context, warehouse_enabled),
     )
 
 
@@ -110,6 +130,7 @@ async def handle_help(
     message: Message,
     state: FSMContext,
     auth_service: AuthService,
+    warehouse_enabled: bool = False,
 ) -> None:
     """Show concise usage help and the role-aware main menu."""
 
@@ -126,7 +147,13 @@ async def handle_help(
         await message.answer(BLOCKED_TEXT)
         return
     if context and context.role is Role.ACCOUNTANT:
-        await message.answer(ACCOUNTANT_HELP_TEXT)
+        if warehouse_enabled:
+            await message.answer(
+                ACCOUNTANT_WAREHOUSE_HELP_TEXT,
+                reply_markup=_main_menu_for(context, warehouse_enabled),
+            )
+        else:
+            await message.answer(ACCOUNTANT_HELP_TEXT)
         return
     text = HELP_TEXT
     if context and context.can_manage_catalog:
@@ -137,7 +164,7 @@ async def handle_help(
     await message.answer(
         text,
         reply_markup=(
-            _main_menu_for(context)
+            _main_menu_for(context, warehouse_enabled)
             if context is not None
             else build_main_menu_keyboard()
         ),
@@ -149,6 +176,7 @@ async def handle_home(
     callback: CallbackQuery,
     state: FSMContext,
     auth_service: AuthService,
+    warehouse_enabled: bool = False,
 ) -> None:
     """Return to the main menu."""
 
@@ -172,11 +200,13 @@ async def handle_home(
         await edit_or_send_text(
             callback.message,
             (
-                ACCOUNTANT_WELCOME_TEXT
+                ACCOUNTANT_WAREHOUSE_WELCOME_TEXT
+                if context.role is Role.ACCOUNTANT and warehouse_enabled
+                else ACCOUNTANT_WELCOME_TEXT
                 if context.role is Role.ACCOUNTANT
                 else WELCOME_TEXT
             ),
-            _main_menu_for(context),
+            _main_menu_for(context, warehouse_enabled),
         )
 
 

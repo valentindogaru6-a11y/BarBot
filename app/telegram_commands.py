@@ -37,9 +37,31 @@ BLOCKED_COMMANDS = (
     BotCommand(command="help", description="Помощь"),
     BotCommand(command="myid", description="Показать мой Telegram ID"),
 )
+WAREHOUSE_COMMAND = BotCommand(
+    command="warehouse",
+    description="Списание и перемещение",
+)
 
 
-def commands_for_role(role: Role) -> tuple[BotCommand, ...]:
+def commands_for_role(
+    role: Role,
+    *,
+    warehouse_enabled: bool = False,
+) -> tuple[BotCommand, ...]:
+    if warehouse_enabled and role in {
+        Role.SUPER_ADMIN,
+        Role.ADMIN,
+        Role.BARTENDER,
+        Role.ACCOUNTANT,
+    }:
+        base = (
+            ADMIN_COMMANDS
+            if role in {Role.SUPER_ADMIN, Role.ADMIN}
+            else ACCOUNTANT_COMMANDS
+            if role is Role.ACCOUNTANT
+            else USER_COMMANDS
+        )
+        return base[:3] + (WAREHOUSE_COMMAND,) + base[3:]
     if role in {Role.SUPER_ADMIN, Role.ADMIN}:
         return ADMIN_COMMANDS
     if role is Role.ACCOUNTANT:
@@ -53,12 +75,16 @@ async def update_user_commands(
     bot: Bot,
     telegram_user_id: int,
     role: Role,
+    *,
+    warehouse_enabled: bool = False,
 ) -> bool:
     """Update one private chat scope without exposing its ID in logs."""
 
     try:
         await bot.set_my_commands(
-            commands=list(commands_for_role(role)),
+            commands=list(
+                commands_for_role(role, warehouse_enabled=warehouse_enabled)
+            ),
             scope=BotCommandScopeChat(chat_id=telegram_user_id),
         )
         return True
@@ -67,7 +93,12 @@ async def update_user_commands(
         return False
 
 
-async def configure_bot_commands(bot: Bot, auth_service: AuthService) -> None:
+async def configure_bot_commands(
+    bot: Bot,
+    auth_service: AuthService,
+    *,
+    warehouse_enabled: bool = False,
+) -> None:
     """Register defaults and scopes for known privileged/blocked users."""
 
     try:
@@ -84,7 +115,12 @@ async def configure_bot_commands(bot: Bot, auth_service: AuthService) -> None:
         for user_id in auth_service.super_admin_ids
     }
     if auth_service.user_service is not None:
-        for role in (Role.ADMIN, Role.ACCOUNTANT, Role.BLOCKED):
+        for role in (
+            Role.ADMIN,
+            Role.BARTENDER,
+            Role.ACCOUNTANT,
+            Role.BLOCKED,
+        ):
             users, _, _ = auth_service.user_service.list_users(
                 role=role,
                 page_size=100_000,
@@ -92,4 +128,9 @@ async def configure_bot_commands(bot: Bot, auth_service: AuthService) -> None:
             for user in users:
                 scoped.setdefault(user.telegram_user_id, role)
     for user_id, role in scoped.items():
-        await update_user_commands(bot, user_id, role)
+        await update_user_commands(
+            bot,
+            user_id,
+            role,
+            warehouse_enabled=warehouse_enabled,
+        )

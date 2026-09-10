@@ -513,6 +513,7 @@ async def role_change_confirm(
     auth_service: AuthService,
     user_service: UserService,
     bot: Bot,
+    warehouse_enabled: bool = False,
 ) -> None:
     if not await _require_callback(callback, auth_service):
         return
@@ -530,7 +531,12 @@ async def role_change_confirm(
             await callback.message.answer("Недостаточно прав")
         return
     await state.clear()
-    await update_user_commands(bot, updated.telegram_user_id, role)
+    await update_user_commands(
+        bot,
+        updated.telegram_user_id,
+        role,
+        warehouse_enabled=warehouse_enabled,
+    )
     if isinstance(callback.message, Message):
         text = "✅ Роль сохранена."
         if not updated.has_started:

@@ -97,6 +97,8 @@ async def handle_admin_cancel_command(
     current_state = await state.get_state()
     if current_state is None:
         return
+    if current_state.startswith("Warehouse"):
+        return
     if not await require_admin_message(message, auth_service):
         return
     await state.clear()

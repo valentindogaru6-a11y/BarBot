@@ -8,7 +8,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 from app.config import PROJECT_ROOT, Settings
-from app.handlers import catalog, search, start, voice
+from app.handlers import catalog, search, start, voice, warehouse
 from app.handlers.admin import router as admin_router
 from app.middlewares.user_context import UserSyncMiddleware
 from app.services.admin_service import AdminService
@@ -18,9 +18,47 @@ from app.services.auth_service import AuthService
 from app.services.speech_service import SpeechService
 from app.services.user_service import UserService
 from app.services.voice_processing_service import VoiceProcessingService
+from app.services.warehouse.operations_service import WarehouseOperationsService
 from app.storage.json_storage import JsonCatalogStorage
 from app.storage.user_database import UserDatabase
+from app.storage.warehouse_operations_database import WarehouseOperationsDatabase
 from app.telegram_commands import configure_bot_commands
+
+
+def router_names(*, warehouse_enabled: bool) -> tuple[str, ...]:
+    names = [
+        "app.handlers.start",
+        "app.handlers.catalog",
+        "app.handlers.voice",
+        "app.handlers.search",
+    ]
+    if warehouse_enabled:
+        names.append("app.handlers.warehouse")
+    names.append("app.handlers.admin")
+    return tuple(names)
+
+
+def build_dispatcher(
+    user_service: UserService,
+    *,
+    warehouse_enabled: bool = False,
+) -> Dispatcher:
+    """Build routers in conflict-safe order without starting Telegram polling."""
+
+    dispatcher = Dispatcher()
+    dispatcher.update.outer_middleware(UserSyncMiddleware(user_service))
+    dispatcher.include_router(start.router)
+    dispatcher.include_router(catalog.router)
+    dispatcher.include_router(voice.router)
+    dispatcher.include_router(search.router)
+    if warehouse_enabled:
+        dispatcher.include_router(warehouse.router)
+    dispatcher.include_router(admin_router)
+    dispatcher.errors.register(start.handle_unexpected_error)
+    assert tuple(router.name for router in dispatcher.sub_routers) == router_names(
+        warehouse_enabled=warehouse_enabled
+    )
+    return dispatcher
 
 
 async def main() -> None:
@@ -56,17 +94,23 @@ async def main() -> None:
         token=settings.bot_token.get_secret_value(),
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
-    dispatcher = Dispatcher()
-    dispatcher.update.outer_middleware(UserSyncMiddleware(user_service))
-    dispatcher.include_router(start.router)
-    dispatcher.include_router(catalog.router)
-    dispatcher.include_router(voice.router)
-    dispatcher.include_router(search.router)
-    dispatcher.include_router(admin_router)
-    dispatcher.errors.register(start.handle_unexpected_error)
+    warehouse_service = None
+    if settings.warehouse_enabled:
+        warehouse_service = WarehouseOperationsService(
+            WarehouseOperationsDatabase(settings.database_path),
+            auth_service,
+        )
+    dispatcher = build_dispatcher(
+        user_service,
+        warehouse_enabled=settings.warehouse_enabled,
+    )
 
     try:
-        await configure_bot_commands(bot, auth_service)
+        await configure_bot_commands(
+            bot,
+            auth_service,
+            warehouse_enabled=settings.warehouse_enabled,
+        )
         await bot.delete_webhook(drop_pending_updates=False)
         await dispatcher.start_polling(
             bot,
@@ -76,6 +120,8 @@ async def main() -> None:
             user_service=user_service,
             settings=settings,
             voice_processing_service=voice_processing_service,
+            warehouse_enabled=settings.warehouse_enabled,
+            warehouse_service=warehouse_service,
             close_bot_session=False,
         )
     finally:

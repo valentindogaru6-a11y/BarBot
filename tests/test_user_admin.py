@@ -12,6 +12,8 @@ from app.handlers.admin import users as user_handlers
 from app.handlers.admin.users import picker_users_shared
 from app.handlers.start import (
     ACCOUNTANT_HELP_TEXT,
+    ACCOUNTANT_WAREHOUSE_HELP_TEXT,
+    ACCOUNTANT_WAREHOUSE_WELCOME_TEXT,
     ACCOUNTANT_WELCOME_TEXT,
     handle_help,
     handle_myid,
@@ -276,6 +278,51 @@ def test_accountant_start_and_help_have_no_action_keyboard(tmp_path: Path) -> No
     assert message.answer.await_args_list[0].kwargs["reply_markup"] is None
     assert message.answer.await_args_list[1].args[0] == ACCOUNTANT_HELP_TEXT
     assert "reply_markup" not in message.answer.await_args_list[1].kwargs
+
+
+def test_accountant_gets_read_only_warehouse_menu_when_enabled(
+    tmp_path: Path,
+) -> None:
+    access, users = _services(tmp_path)
+    users.ensure_user(62)
+    users.set_role(62, Role.ACCOUNTANT, actor_user_id=1)
+    message = SimpleNamespace(
+        from_user=User(id=62, is_bot=False, first_name="Accountant"),
+        answer=AsyncMock(),
+    )
+    bot = SimpleNamespace(set_my_commands=AsyncMock())
+
+    asyncio.run(
+        handle_start(
+            message,
+            _State({}),
+            access,
+            bot,
+            warehouse_enabled=True,
+        )
+    )
+    asyncio.run(
+        handle_help(
+            message,
+            _State({}),
+            access,
+            warehouse_enabled=True,
+        )
+    )
+
+    assert message.answer.await_args_list[0].args[0] == (
+        ACCOUNTANT_WAREHOUSE_WELCOME_TEXT
+    )
+    assert message.answer.await_args_list[1].args[0] == (
+        ACCOUNTANT_WAREHOUSE_HELP_TEXT
+    )
+    for call in message.answer.await_args_list:
+        texts = [
+            button.text
+            for row in call.kwargs["reply_markup"].inline_keyboard
+            for button in row
+        ]
+        assert texts == ["📦 Списание / перемещение"]
 
 
 def test_accountant_catalog_filter_rejects_message_and_forged_callback(
