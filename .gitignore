@@ -17,6 +17,9 @@ logs/
 # Backups
 backups/
 
+# Generated reports
+reports/
+
 # Databases
 *.db
 *.sqlite3

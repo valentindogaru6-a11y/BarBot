@@ -26,8 +26,14 @@ from app.storage.warehouse_closing_schema import (
     validate_warehouse_closing_schema,
     warehouse_closing_schema_is_absent,
 )
+from app.storage.warehouse_reports_schema import (
+    WarehouseReportsSchemaError,
+    create_warehouse_reports_schema,
+    validate_warehouse_reports_schema,
+    warehouse_reports_schema_is_absent,
+)
 
-CURRENT_SCHEMA_VERSION = 5
+CURRENT_SCHEMA_VERSION = 6
 
 USER_COLUMNS = (
     "telegram_user_id",
@@ -305,6 +311,7 @@ def _validate_schema(connection: sqlite3.Connection, version: int) -> None:
             not warehouse_schema_is_absent(connection)
             or not warehouse_operations_schema_is_absent(connection)
             or not warehouse_closing_schema_is_absent(connection)
+            or not warehouse_reports_schema_is_absent(connection)
         ):
             raise SchemaValidationError(
                 "Warehouse tables не должны существовать в schema v1"
@@ -316,6 +323,7 @@ def _validate_schema(connection: sqlite3.Connection, version: int) -> None:
             not warehouse_schema_is_absent(connection)
             or not warehouse_operations_schema_is_absent(connection)
             or not warehouse_closing_schema_is_absent(connection)
+            or not warehouse_reports_schema_is_absent(connection)
         ):
             raise SchemaValidationError(
                 "Warehouse tables не должны существовать в schema v2"
@@ -335,6 +343,10 @@ def _validate_schema(connection: sqlite3.Connection, version: int) -> None:
             raise SchemaValidationError(
                 "Warehouse closing tables не должны существовать в schema v3"
             )
+        if not warehouse_reports_schema_is_absent(connection):
+            raise SchemaValidationError(
+                "Warehouse report tables не должны существовать в schema v3"
+            )
         return
     if version == 4:
         validate_users_schema(connection, 2)
@@ -350,6 +362,10 @@ def _validate_schema(connection: sqlite3.Connection, version: int) -> None:
             raise SchemaValidationError(
                 "Warehouse closing tables не должны существовать в schema v4"
             )
+        if not warehouse_reports_schema_is_absent(connection):
+            raise SchemaValidationError(
+                "Warehouse report tables не должны существовать в schema v4"
+            )
         return
     if version == 5:
         validate_users_schema(connection, 2)
@@ -361,6 +377,25 @@ def _validate_schema(connection: sqlite3.Connection, version: int) -> None:
             WarehouseSchemaValidationError,
             WarehouseOperationsSchemaError,
             WarehouseClosingSchemaError,
+        ) as exc:
+            raise SchemaValidationError(str(exc)) from exc
+        if not warehouse_reports_schema_is_absent(connection):
+            raise SchemaValidationError(
+                "Warehouse report tables не должны существовать в schema v5"
+            )
+        return
+    if version == 6:
+        validate_users_schema(connection, 2)
+        try:
+            validate_warehouse_schema(connection)
+            validate_warehouse_operations_schema(connection)
+            validate_warehouse_closing_schema(connection)
+            validate_warehouse_reports_schema(connection)
+        except (
+            WarehouseSchemaValidationError,
+            WarehouseOperationsSchemaError,
+            WarehouseClosingSchemaError,
+            WarehouseReportsSchemaError,
         ) as exc:
             raise SchemaValidationError(str(exc)) from exc
         return
@@ -392,7 +427,14 @@ def _migrate_v4_to_v5(connection: sqlite3.Connection) -> None:
     _validate_schema(connection, 5)
 
 
-def _create_fresh_v5(connection: sqlite3.Connection) -> None:
+def _migrate_v5_to_v6(connection: sqlite3.Connection) -> None:
+    _validate_schema(connection, 5)
+    create_warehouse_reports_schema(connection)
+    connection.execute("PRAGMA user_version = 6")
+    _validate_schema(connection, 6)
+
+
+def _create_fresh_v6(connection: sqlite3.Connection) -> None:
     if _table_sql(connection, "users") is not None:
         raise SchemaValidationError(
             "Таблица users существует при нулевой версии схемы"
@@ -405,6 +447,7 @@ def _create_fresh_v5(connection: sqlite3.Connection) -> None:
         not warehouse_schema_is_absent(connection)
         or not warehouse_operations_schema_is_absent(connection)
         or not warehouse_closing_schema_is_absent(connection)
+        or not warehouse_reports_schema_is_absent(connection)
     ):
         raise SchemaValidationError(
             "Warehouse tables существуют при нулевой версии схемы"
@@ -415,8 +458,9 @@ def _create_fresh_v5(connection: sqlite3.Connection) -> None:
     seed_v4_locations(connection)
     create_warehouse_operations_schema(connection)
     create_warehouse_closing_schema(connection)
-    connection.execute("PRAGMA user_version = 5")
-    _validate_schema(connection, 5)
+    create_warehouse_reports_schema(connection)
+    connection.execute("PRAGMA user_version = 6")
+    _validate_schema(connection, 6)
 
 
 Migration = Callable[[sqlite3.Connection], None]
@@ -425,6 +469,7 @@ MIGRATIONS: dict[int, Migration] = {
     2: _migrate_v2_to_v3,
     3: _migrate_v3_to_v4,
     4: _migrate_v4_to_v5,
+    5: _migrate_v5_to_v6,
 }
 
 
@@ -465,7 +510,7 @@ def run_migrations(connection: sqlite3.Connection) -> None:
         )
 
     if version == 0:
-        _run_atomic_step(connection, _create_fresh_v5)
+        _run_atomic_step(connection, _create_fresh_v6)
         return
     if version == CURRENT_SCHEMA_VERSION:
         _run_atomic_step(

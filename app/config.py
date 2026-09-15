@@ -11,6 +11,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CATALOG_PATH = PROJECT_ROOT / "data" / "catalog.json"
 DEFAULT_DATABASE_PATH = PROJECT_ROOT / "data" / "barbot.db"
 DEFAULT_VOSK_MODEL_PATH = PROJECT_ROOT / "models" / "vosk-model-small-ru-0.22"
+DEFAULT_WAREHOUSE_REPORTS_PATH = PROJECT_ROOT / "reports" / "warehouse"
 ENV_FILE = PROJECT_ROOT / ".env"
 logger = logging.getLogger(__name__)
 
@@ -77,6 +78,10 @@ class Settings(BaseSettings):
     voice_max_concurrent: int = Field(default=1, gt=0)
     voice_debug_transcripts: bool = False
     warehouse_enabled: bool = False
+    warehouse_reports_path: Path = Field(
+        default=Path("reports/warehouse"),
+        validate_default=True,
+    )
 
     @field_validator("super_admin_ids", mode="before")
     @classmethod
@@ -119,6 +124,22 @@ class Settings(BaseSettings):
         except ValueError as exc:
             raise ValueError(
                 "VOSK_MODEL_PATH должен находиться внутри каталога проекта"
+            ) from exc
+        return resolved
+
+    @field_validator("warehouse_reports_path")
+    @classmethod
+    def resolve_warehouse_reports_path(cls, path: Path) -> Path:
+        """Keep generated warehouse reports inside the project directory."""
+
+        if path.is_absolute():
+            raise ValueError("WAREHOUSE_REPORTS_PATH должен быть относительным")
+        resolved = (PROJECT_ROOT / path).resolve()
+        try:
+            resolved.relative_to(PROJECT_ROOT)
+        except ValueError as exc:
+            raise ValueError(
+                "WAREHOUSE_REPORTS_PATH должен находиться внутри каталога проекта"
             ) from exc
         return resolved
 

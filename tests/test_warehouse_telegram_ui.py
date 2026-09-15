@@ -40,9 +40,10 @@ def test_router_order_only_contains_warehouse_when_enabled() -> None:
         "app.handlers.search",
         "app.handlers.admin",
     )
-    assert router_names(warehouse_enabled=True)[-3:] == (
+    assert router_names(warehouse_enabled=True)[-4:] == (
         "app.handlers.warehouse",
         "app.handlers.warehouse_closing",
+        "app.handlers.warehouse_reports",
         "app.handlers.admin",
     )
 
@@ -59,6 +60,8 @@ def test_main_menu_uses_ready_capability_flag() -> None:
 def test_warehouse_home_is_read_only_for_accountant() -> None:
     assert _texts(warehouse_home_keyboard(can_mutate=False)) == [
         "📋 Записи текущей смены",
+        "📄 Скачать текущий Excel",
+        "📁 История отчётов",
         "🏠 Главное меню",
     ]
     assert "➕ Добавить списание" in _texts(
@@ -89,6 +92,7 @@ def test_all_callbacks_fit_telegram_limit_with_64_bit_values() -> None:
         "cs", "cc", "cv", "qr", "qo", "qs", "qn", "qx", "cf",
         "n1", "n2", "n3", "n4", "rm", "rv", "rn", "zq", "zm",
         "zw", "zl", "zo", "za", "zx",
+        "df", "hl", "hv", "hd", "fr", "ce",
     ):
         packed = WarehouseCallback(
             action=action, object_id=maximum, aux=maximum

@@ -9,6 +9,7 @@ from app.config import (
     DEFAULT_CATALOG_PATH,
     DEFAULT_DATABASE_PATH,
     DEFAULT_VOSK_MODEL_PATH,
+    DEFAULT_WAREHOUSE_REPORTS_PATH,
     PROJECT_ROOT,
     Settings,
 )
@@ -104,6 +105,7 @@ def test_voice_search_defaults_are_safe_and_project_relative() -> None:
     assert settings.voice_max_file_size_bytes == 10 * 1024 * 1024
     assert settings.voice_max_concurrent == 1
     assert settings.voice_debug_transcripts is False
+    assert settings.warehouse_reports_path == DEFAULT_WAREHOUSE_REPORTS_PATH
 
 
 def test_relative_vosk_path_is_resolved_from_project_root() -> None:
@@ -132,6 +134,23 @@ def test_absolute_vosk_path_cannot_escape_project(tmp_path: Path) -> None:
             bot_token="test-token",
             vosk_model_path=tmp_path / "outside-model",
         )
+
+
+def test_warehouse_reports_path_is_contained_in_project(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        bot_token="test-token",
+        warehouse_reports_path=Path("reports/custom"),
+    )
+    assert settings.warehouse_reports_path == PROJECT_ROOT / "reports" / "custom"
+
+    for invalid in (Path("../outside"), tmp_path / "absolute"):
+        with pytest.raises(ValidationError, match="WAREHOUSE_REPORTS_PATH"):
+            Settings(
+                _env_file=None,
+                bot_token="test-token",
+                warehouse_reports_path=invalid,
+            )
 
 
 @pytest.mark.parametrize(

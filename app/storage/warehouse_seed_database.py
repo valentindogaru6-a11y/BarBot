@@ -25,6 +25,10 @@ from app.storage.warehouse_closing_schema import (
     WarehouseClosingSchemaError,
     validate_warehouse_closing_schema,
 )
+from app.storage.warehouse_reports_schema import (
+    WarehouseReportsSchemaError,
+    validate_warehouse_reports_schema,
+)
 from app.utils.warehouse import normalize_warehouse_name
 
 
@@ -60,7 +64,7 @@ class WarehouseSeedDatabase:
             plan = self._plan(connection, seed)
             if apply and plan.is_valid:
                 self._insert_products(connection, seed, set(plan.create))
-                if self._schema_version(connection) == 5:
+                if self._schema_version(connection) >= 5:
                     self._insert_required_rules(
                         connection,
                         seed,
@@ -89,9 +93,9 @@ class WarehouseSeedDatabase:
     @staticmethod
     def _validate_schema(connection: sqlite3.Connection) -> None:
         version = WarehouseSeedDatabase._schema_version(connection)
-        if version not in {3, 4, 5}:
+        if version not in {3, 4, 5, 6}:
             raise WarehouseSeedImportError(
-                f"Warehouse schema v3, v4 or v5 required; found v{version}"
+                f"Warehouse schema v3, v4, v5 or v6 required; found v{version}"
             )
         try:
             validate_warehouse_schema(connection)
@@ -99,10 +103,14 @@ class WarehouseSeedDatabase:
                 validate_warehouse_operations_schema(connection)
             if version == 5:
                 validate_warehouse_closing_schema(connection)
+            if version == 6:
+                validate_warehouse_closing_schema(connection)
+                validate_warehouse_reports_schema(connection)
         except (
             WarehouseSchemaValidationError,
             WarehouseOperationsSchemaError,
             WarehouseClosingSchemaError,
+            WarehouseReportsSchemaError,
         ) as exc:
             raise WarehouseSeedImportError(str(exc)) from exc
 
@@ -203,7 +211,7 @@ class WarehouseSeedDatabase:
         rule_create: list[str] = []
         rule_unchanged: list[str] = []
         rule_conflicts: list[str] = []
-        if self._schema_version(connection) == 5:
+        if self._schema_version(connection) >= 5:
             for stable_id, expected in self._required_rules(seed).items():
                 row = connection.execute(
                     """

@@ -35,6 +35,15 @@ def warehouse_home_keyboard(
             text="✅ Обязательные списания",
             callback_data=WarehouseCallback(action="rm"),
         )
+    if shift_status in {"open", "waiting_required", "closing"}:
+        builder.button(
+            text="📄 Скачать текущий Excel",
+            callback_data=WarehouseCallback(action="df"),
+        )
+    builder.button(
+        text="📁 История отчётов",
+        callback_data=WarehouseCallback(action="hl"),
+    )
     builder.button(text="🏠 Главное меню", callback_data=MainCallback(action="home"))
     builder.adjust(1)
     return builder.as_markup()
@@ -144,12 +153,19 @@ def closing_not_applicable_keyboard(
     return builder.as_markup()
 
 
-def closing_final_keyboard(session_id: int, revision: int) -> InlineKeyboardMarkup:
+def closing_final_keyboard(
+    session_id: int,
+    revision: int,
+    *,
+    allow_empty: bool = False,
+) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(
         text="✅ Да, завершить",
         callback_data=WarehouseCallback(
-            action="cf", object_id=session_id, aux=revision
+            action="ce" if allow_empty else "cf",
+            object_id=session_id,
+            aux=revision,
         ),
     )
     builder.button(text="📋 Проверить записи", callback_data=WarehouseCallback(action="ls"))
@@ -157,6 +173,87 @@ def closing_final_keyboard(session_id: int, revision: int) -> InlineKeyboardMark
         text="❌ Отменить",
         callback_data=WarehouseCallback(action="qx", object_id=session_id),
     )
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def report_ready_keyboard(report_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text="📄 Скачать ещё раз",
+        callback_data=WarehouseCallback(action="hd", object_id=report_id),
+    )
+    builder.button(
+        text="📁 История отчётов",
+        callback_data=WarehouseCallback(action="hl"),
+    )
+    builder.button(text="🏠 Главное меню", callback_data=MainCallback(action="home"))
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def report_retry_keyboard(shift_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text="🔄 Повторить",
+        callback_data=WarehouseCallback(action="fr", object_id=shift_id),
+    )
+    builder.button(
+        text="⬅️ К складу",
+        callback_data=WarehouseCallback(action="h"),
+    )
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def report_history_keyboard(
+    reports: list[dict],
+    *,
+    page: int,
+    total: int,
+    page_size: int = 8,
+) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for report in reports:
+        day, month, year = str(report["business_date"]).split("-")[::-1]
+        builder.button(
+            text=f"{day}.{month}.{year} — версия {report['version']} — готов",
+            callback_data=WarehouseCallback(
+                action="hv", object_id=int(report["id"]), aux=page
+            ),
+        )
+    if page > 0:
+        builder.button(
+            text="⬅️",
+            callback_data=WarehouseCallback(action="hl", object_id=page - 1),
+        )
+    if (page + 1) * page_size < total:
+        builder.button(
+            text="➡️",
+            callback_data=WarehouseCallback(action="hl", object_id=page + 1),
+        )
+    builder.button(
+        text="⬅️ К складу",
+        callback_data=WarehouseCallback(action="h"),
+    )
+    builder.button(text="🏠 Главное меню", callback_data=MainCallback(action="home"))
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def report_card_keyboard(report_id: int, *, return_page: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text="📥 Скачать",
+        callback_data=WarehouseCallback(
+            action="hd", object_id=report_id, aux=return_page
+        ),
+    )
+    builder.button(
+        text="⬅️ Назад",
+        callback_data=WarehouseCallback(action="hl", object_id=return_page),
+    )
+    builder.button(text="🏠 Главное меню", callback_data=MainCallback(action="home"))
     builder.adjust(1)
     return builder.as_markup()
 

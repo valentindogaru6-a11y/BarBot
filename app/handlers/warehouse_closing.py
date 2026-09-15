@@ -13,6 +13,7 @@ from aiogram.types import CallbackQuery, Message
 from pydantic import ValidationError
 
 from app.handlers.common import edit_or_send_text
+from app.handlers.warehouse_reports import build_and_send_final_report
 from app.handlers.warehouse_states import (
     WarehouseClosingStates,
     WarehouseRequiredRuleStates,
@@ -31,6 +32,7 @@ from app.models.warehouse.closing import RequiredQuantityMode, RequiredRuleInput
 from app.models.warehouse.nomenclature import BaseUnit
 from app.services.access_service import AccessDeniedError
 from app.services.warehouse.closing_service import WarehouseClosingService
+from app.services.warehouse.report_service import WarehouseReportService
 from app.services.warehouse.formatting import (
     format_business_date,
     format_scaled,
@@ -141,13 +143,24 @@ async def _show_session(
     if requirement is None:
         await state.clear()
         overview = await _thread(service.overview, actor_user_id=user_id)
+        is_empty = overview["writeoffs"] == 0 and overview["transfers"] == 0
+        if is_empty:
+            text = "В смене нет операций для отчёта. Закрыть её с пустым Excel?"
+        else:
+            text = (
+                "✅ <b>Обязательные позиции заполнены</b>\n\n"
+                f"Списание: {overview['writeoffs']} записей\n"
+                f"Перемещение: {overview['transfers']} записей\n\n"
+                "Подготовить смену к формированию отчёта?"
+            )
         await edit_or_send_text(
             message,
-            "✅ <b>Обязательные позиции заполнены</b>\n\n"
-            f"Списание: {overview['writeoffs']} записей\n"
-            f"Перемещение: {overview['transfers']} записей\n\n"
-            "Подготовить смену к формированию отчёта?",
-            closing_final_keyboard(int(session["id"]), int(session["revision"])),
+            text,
+            closing_final_keyboard(
+                int(session["id"]),
+                int(session["revision"]),
+                allow_empty=is_empty,
+            ),
         )
         return
     await state.clear()
@@ -522,15 +535,34 @@ async def closing_cancel(
         )
 
 
-@router.callback_query(WarehouseCallback.filter(F.action == "cf"))
+@router.callback_query(WarehouseCallback.filter(F.action.in_({"cf", "ce"})))
 async def closing_finalize(
     callback: CallbackQuery,
     callback_data: WarehouseCallback,
     state: FSMContext,
     warehouse_closing_service: WarehouseClosingService,
+    warehouse_report_service: WarehouseReportService,
 ) -> None:
     try:
-        await _thread(
+        overview = await _thread(
+            warehouse_closing_service.overview,
+            actor_user_id=callback.from_user.id,
+        )
+        is_empty = overview["writeoffs"] == 0 and overview["transfers"] == 0
+        if is_empty and callback_data.action != "ce":
+            if isinstance(callback.message, Message):
+                await edit_or_send_text(
+                    callback.message,
+                    "В смене нет операций для отчёта. Закрыть её с пустым Excel?",
+                    closing_final_keyboard(
+                        callback_data.object_id,
+                        callback_data.aux,
+                        allow_empty=True,
+                    ),
+                )
+            await callback.answer()
+            return
+        result = await _thread(
             warehouse_closing_service.finalize,
             callback_data.object_id,
             expected_revision=callback_data.aux,
@@ -542,9 +574,16 @@ async def closing_finalize(
     await state.clear()
     await callback.answer()
     if isinstance(callback.message, Message):
-        await edit_or_send_text(
+        await build_and_send_final_report(
             callback.message,
-            "✅ Смена проверена и подготовлена к формированию отчёта.",
+            warehouse_report_service,
+            shift_id=int(
+                result["shift"]["id"]
+                if "shift" in result
+                else result["shift_id"]
+            ),
+            actor_user_id=callback.from_user.id,
+            allow_empty=is_empty,
         )
 
 

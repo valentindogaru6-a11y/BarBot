@@ -33,6 +33,12 @@ from app.models.warehouse.operations import (
     WarehouseOperationType,
     WarehouseShift,
 )
+from app.models.warehouse.reports import (
+    WarehouseReportArtifact,
+    WarehouseReportLine,
+    WarehouseReportSheet,
+    WarehouseReportStatus,
+)
 
 __all__ = [
     "BaseUnit",
@@ -61,5 +67,9 @@ __all__ = [
     "ShiftStatus",
     "WarehouseOperation",
     "WarehouseOperationType",
+    "WarehouseReportArtifact",
+    "WarehouseReportLine",
+    "WarehouseReportSheet",
+    "WarehouseReportStatus",
     "WarehouseShift",
 ]

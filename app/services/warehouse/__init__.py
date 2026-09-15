@@ -10,6 +10,7 @@ from app.services.warehouse.operations_service import (
     WarehouseOperationsService,
 )
 from app.services.warehouse.closing_service import WarehouseClosingService
+from app.services.warehouse.report_service import WarehouseReportService
 
 __all__ = [
     "WarehouseNomenclatureService",
@@ -18,4 +19,5 @@ __all__ = [
     "WarehouseIntakeError",
     "WarehouseOperationsService",
     "WarehouseClosingService",
+    "WarehouseReportService",
 ]

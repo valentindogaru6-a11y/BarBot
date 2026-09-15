@@ -35,6 +35,8 @@ def test_home_close_recovery_and_rule_controls_are_capability_aware() -> None:
 
     accountant = _texts(warehouse_home_keyboard(can_mutate=False))
     assert "✅ Закрыть смену" not in accountant
+    assert "📄 Скачать текущий Excel" in accountant
+    assert "📁 История отчётов" in accountant
 
 
 def test_summary_checklist_not_applicable_and_final_copy() -> None:
@@ -96,6 +98,7 @@ def test_all_new_callbacks_fit_telegram_64_byte_limit() -> None:
         "cs", "cc", "cv", "qr", "qo", "qs", "qn", "qx", "cf",
         "n1", "n2", "n3", "n4", "rm", "rv", "rn", "zq", "zm",
         "zw", "zl", "zo", "za", "zx",
+        "df", "hl", "hv", "hd", "fr", "ce",
     ):
         packed = WarehouseCallback(
             action=action, object_id=maximum, aux=maximum

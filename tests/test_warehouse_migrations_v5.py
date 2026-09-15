@@ -19,6 +19,8 @@ def _version(path: Path) -> int:
 def _make_v4(path: Path) -> None:
     UserDatabase(path).initialize()
     with sqlite3.connect(path) as connection:
+        connection.execute("DROP TABLE warehouse_report_lines")
+        connection.execute("DROP TABLE warehouse_reports")
         connection.execute("DROP TRIGGER trg_warehouse_products_required_rule_unit")
         connection.execute("DROP TABLE warehouse_closing_sessions")
         connection.execute("DROP TABLE warehouse_shift_requirements")
@@ -27,13 +29,15 @@ def _make_v4(path: Path) -> None:
         connection.commit()
 
 
-def test_fresh_database_is_v5_and_repeat_is_idempotent(tmp_path: Path) -> None:
+def test_fresh_database_contains_v5_schema_and_repeat_is_idempotent(
+    tmp_path: Path,
+) -> None:
     path = tmp_path / "fresh.db"
     database = UserDatabase(path)
     database.initialize()
     database.initialize()
 
-    assert _version(path) == 5
+    assert _version(path) == 6
     with sqlite3.connect(path) as connection:
         tables = {
             row[0]
@@ -60,7 +64,7 @@ def test_sequential_v4_to_v5_preserves_existing_rows(tmp_path: Path) -> None:
 
     UserDatabase(path).initialize()
 
-    assert _version(path) == 5
+    assert _version(path) == 6
     with sqlite3.connect(path) as connection:
         assert connection.execute(
             "SELECT role FROM users WHERE telegram_user_id=42"

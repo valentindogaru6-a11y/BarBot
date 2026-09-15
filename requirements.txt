@@ -4,3 +4,4 @@ pydantic-settings>=2.2,<3
 pytest>=8,<9
 xlrd>=2.0.2,<3
 vosk>=0.3.45,<0.4
+XlsxWriter>=3.2,<4

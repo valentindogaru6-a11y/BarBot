@@ -166,7 +166,7 @@ def test_migrates_v1_through_v2_to_v3_and_preserves_every_user_column(
     database = UserDatabase(path)
     database.initialize()
 
-    assert database.settings()["user_version"] == 5
+    assert database.settings()["user_version"] == 6
     assert _read_rows(path) == expected
     previous, updated = database.set_role(
         303,
@@ -177,7 +177,7 @@ def test_migrates_v1_through_v2_to_v3_and_preserves_every_user_column(
     assert updated.role is Role.ACCOUNTANT
 
 
-def test_repeated_initialize_on_v5_is_idempotent(tmp_path: Path) -> None:
+def test_repeated_initialize_on_v6_is_idempotent(tmp_path: Path) -> None:
     path = tmp_path / "repeat.db"
     database = UserDatabase(path)
     database.initialize()
@@ -199,12 +199,12 @@ def test_repeated_initialize_on_v5_is_idempotent(tmp_path: Path) -> None:
     assert database.count_users() == 1
 
 
-def test_fresh_database_is_created_directly_as_v5(tmp_path: Path) -> None:
+def test_fresh_database_is_created_directly_as_v6(tmp_path: Path) -> None:
     database = UserDatabase(tmp_path / "fresh.db")
 
     database.initialize()
 
-    assert database.settings()["user_version"] == 5
+    assert database.settings()["user_version"] == 6
     database.ensure_user(606)
     assert database.set_role(
         606,
@@ -270,7 +270,7 @@ def test_migrates_v2_to_v3_with_default_location_and_settings(
 
     UserDatabase(path).initialize()
 
-    assert _version(path) == 5
+    assert _version(path) == 6
     warehouse = WarehouseDatabase(path)
     locations = warehouse.list_locations()
     settings = warehouse.get_settings()
@@ -324,7 +324,7 @@ def test_rejects_corrupted_v3_schema(tmp_path: Path) -> None:
     with pytest.raises(SchemaValidationError, match="Индексы"):
         UserDatabase(path).initialize()
 
-    assert _version(path) == 5
+    assert _version(path) == 6
 
 
 def test_rejects_invalid_stored_role_before_migration(tmp_path: Path) -> None:
