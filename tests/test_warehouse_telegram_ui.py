@@ -53,8 +53,8 @@ def test_main_menu_uses_ready_capability_flag() -> None:
     warehouse = build_main_menu_keyboard(
         can_view_catalog=False, can_view_warehouse=True
     )
-    assert "📦 Списание / перемещение" not in _texts(regular)
-    assert _texts(warehouse) == ["📦 Списание / перемещение"]
+    assert "📦 Складские операции" not in _texts(regular)
+    assert _texts(warehouse) == ["📦 Складские операции"]
 
 
 def test_warehouse_home_is_read_only_for_accountant() -> None:
@@ -65,6 +65,9 @@ def test_warehouse_home_is_read_only_for_accountant() -> None:
         "🏠 Главное меню",
     ]
     assert "➕ Добавить списание" in _texts(
+        warehouse_home_keyboard(can_mutate=True)
+    )
+    assert "🧪 Добавить проработку" in _texts(
         warehouse_home_keyboard(can_mutate=True)
     )
 
@@ -88,7 +91,7 @@ def test_all_callbacks_fit_telegram_limit_with_64_bit_values() -> None:
     for action in (
         "h", "aw", "at", "ls", "br", "bc", "be", "bx", "rp", "rd",
         "cl", "rl", "lw", "lt", "la", "ov", "ep", "eq", "en", "ed",
-        "pe", "de", "ec", "dx", "dc",
+        "pe", "de", "ec", "dx", "dc", "ad", "dr", "dy", "ld", "eg",
         "cs", "cc", "cv", "qr", "qo", "qs", "qn", "qx", "cf",
         "n1", "n2", "n3", "n4", "rm", "rv", "rn", "zq", "zm",
         "zw", "zl", "zo", "za", "zx",
@@ -108,9 +111,12 @@ def test_trigger_filter_is_anchored_and_rejects_commands() -> None:
 
     assert asyncio.run(accepted("списание: апельсин 1"))
     assert asyncio.run(accepted("\nПеремещение:\nсахар 1 кг -> кухня"))
+    assert asyncio.run(accepted("проработка: Новый чай\nлимон 0.1 кг"))
+    assert asyncio.run(accepted("перемещение на кухню:\nмолоко 1 л"))
     assert not asyncio.run(accepted("нужно сделать списание: апельсин 1"))
     assert not asyncio.run(accepted("/списание: апельсин 1"))
     assert not asyncio.run(accepted("обычный текст"))
+    assert not asyncio.run(accepted("сегодня была проработка нового чая"))
     assert not asyncio.run(accepted(None))
 
 
@@ -192,6 +198,27 @@ def test_operation_card_returns_to_the_same_filtered_page() -> None:
     )
     assert card_markup.inline_keyboard[0][0].callback_data == WarehouseCallback(
         action="lw", object_id=7, aux=3
+    ).pack()
+
+
+def test_development_card_has_group_title_edit_and_returns_to_list() -> None:
+    operation = {
+        "id": 99,
+        "shift_id": 7,
+        "operation_type": "development",
+        "development_title": "Новый чай",
+        "product_name_snapshot": "Лимон",
+        "quantity_scaled": 100_000,
+        "base_unit": "kg",
+        "comment_text": "кислотность",
+        "is_deleted": 0,
+        "revision": 2,
+    }
+    assert "Новый чай" in operation_text(operation)
+    markup = operation_keyboard(operation, can_mutate=True, return_page=2)
+    assert "🧪 Переименовать всю проработку" in _texts(markup)
+    assert markup.inline_keyboard[-1][0].callback_data == WarehouseCallback(
+        action="ld", object_id=7, aux=2
     ).pack()
 
 

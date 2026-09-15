@@ -322,7 +322,7 @@ def test_accountant_gets_read_only_warehouse_menu_when_enabled(
             for row in call.kwargs["reply_markup"].inline_keyboard
             for button in row
         ]
-        assert texts == ["📦 Списание / перемещение"]
+        assert texts == ["📦 Складские операции"]
 
 
 def test_accountant_catalog_filter_rejects_message_and_forged_callback(

@@ -49,6 +49,8 @@ def _ready_caption(report: dict) -> str:
         "✅ <b>Смена закрыта</b>\n\n"
         f"Списание: {report['writeoff_count']} итоговых позиций\n"
         f"Перемещение: {report['transfer_count']} итоговые позиции\n"
+        f"Проработка: {report.get('development_count', 0)} позиций в "
+        f"{report.get('development_group_count', 0)} проработках\n"
         f"Версия отчёта: {report['version']}"
     )
 
@@ -201,7 +203,9 @@ async def report_card(
             f"Версия: {report['version']}\n"
             "Статус: готов\n"
             f"Списание: {report['writeoff_count']} позиций\n"
-            f"Перемещение: {report['transfer_count']} позиции",
+            f"Перемещение: {report['transfer_count']} позиции\n"
+            f"Проработка: {report.get('development_count', 0)} позиций в "
+            f"{report.get('development_group_count', 0)} проработках",
             report_card_keyboard(
                 int(report["id"]), return_page=callback_data.aux
             ),

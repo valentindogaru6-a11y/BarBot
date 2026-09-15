@@ -65,7 +65,14 @@ def split_telegram_lines(
 
 
 def batch_preview(batch: dict) -> list[str]:
-    title = "♻️ Списание" if batch["operation_type"] == "writeoff" else "🚚 Перемещение"
+    kind = str(batch["operation_type"])
+    title = (
+        f"🧪 Проработка: {escape(str(batch['development_title']))}"
+        if kind == "development"
+        else "♻️ Списание"
+        if kind == "writeoff"
+        else "🚚 Перемещение"
+    )
     lines = ["<b>Проверьте записи:</b>", "", title, ""]
     for number, line in enumerate(batch["lines"], start=1):
         name = escape(str(line.get("product_name") or line.get("product_text") or "—"))
@@ -85,9 +92,21 @@ def batch_preview(batch: dict) -> list[str]:
 
 def operation_text(operation: dict) -> str:
     transfer = operation["operation_type"] == "transfer"
+    development = operation["operation_type"] == "development"
     lines = [
-        "🚚 <b>Перемещение</b>" if transfer else "♻️ <b>Списание</b>",
+        (
+            "🚚 <b>Перемещение</b>"
+            if transfer
+            else "🧪 <b>Проработка</b>"
+            if development
+            else "♻️ <b>Списание</b>"
+        ),
         "",
+        *(
+            [f"Название: {escape(str(operation['development_title']))}"]
+            if development
+            else []
+        ),
         f"Продукт: {escape(str(operation['product_name_snapshot']))}",
         f"Количество: {format_scaled(int(operation['quantity_scaled']), str(operation['base_unit']))}",
     ]
@@ -98,10 +117,14 @@ def operation_text(operation: dict) -> str:
                 f"Куда: {escape(str(operation.get('destination_location_name') or '—'))}",
             )
         )
-    note = operation.get("comment_text") if transfer else operation.get("reason_text")
+    note = (
+        operation.get("comment_text")
+        if transfer or development
+        else operation.get("reason_text")
+    )
     if note:
         lines.append(
-            f"{'Комментарий' if transfer else 'Причина'}: {escape(str(note))}"
+            f"{'Комментарий' if transfer or development else 'Причина'}: {escape(str(note))}"
         )
     lines.append(f"Статус: {'удалено' if operation.get('is_deleted') else 'активно'}")
     return "\n".join(lines)
@@ -114,7 +137,11 @@ def operations_list_text(
     business_date: str,
     offset: int,
 ) -> str:
-    title = "♻️ Списания" if operation_type == "writeoff" else "🚚 Перемещения"
+    title = {
+        "writeoff": "♻️ Списания",
+        "transfer": "🚚 Перемещения",
+        "development": "🧪 Проработки",
+    }[operation_type]
     lines = [f"<b>{title}</b>", format_business_date(business_date), ""]
     if not operations:
         lines.append("Записей пока нет.")
@@ -131,7 +158,9 @@ def aggregates_text(rows: list[dict], business_date: str) -> list[str]:
     if not rows:
         lines.append("Нет активных записей.")
     for row in rows:
-        icon = "♻️" if row["operation_type"] == "writeoff" else "🚚"
+        icon = {"writeoff": "♻️", "transfer": "🚚", "development": "🧪"}[
+            str(row["operation_type"])
+        ]
         line = (
             f"{icon} {escape(str(row['product_name_snapshot']))} — "
             f"{format_scaled(int(row['quantity_scaled']), str(row['base_unit']))} "
@@ -143,5 +172,7 @@ def aggregates_text(rows: list[dict], business_date: str) -> list[str]:
                 str(row.get("destination_location_name") or "—")
             )
             line += f"\n   {source} → {destination}"
+        elif row["operation_type"] == "development":
+            line += f"\n   {escape(str(row['development_title']))}"
         lines.append(line)
     return split_telegram_lines(lines)

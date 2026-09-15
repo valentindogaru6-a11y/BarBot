@@ -438,21 +438,66 @@ def _compact_sql(value: str) -> str:
     )
 
 
-def validate_warehouse_operations_schema(connection: sqlite3.Connection) -> None:
+def validate_warehouse_operations_schema(
+    connection: sqlite3.Connection,
+    *,
+    allow_development: bool = False,
+) -> None:
     """Validate concrete v4 tables, columns, indexes, FKs, and CHECK clauses."""
 
     for table in WAREHOUSE_OPERATION_TABLES:
         table_sql = _table_sql(connection, table)
         if table_sql is None:
             raise WarehouseOperationsSchemaError(f"Missing v4 table: {table}")
-        if _columns(connection, table) != _EXPECTED_COLUMNS[table]:
+        expected_columns = _EXPECTED_COLUMNS[table]
+        if allow_development and table == "warehouse_intake_batches":
+            expected_columns = expected_columns[:6] + (
+                "development_title",
+            ) + expected_columns[6:]
+        if allow_development and table == "warehouse_operations":
+            expected_columns = expected_columns[:3] + (
+                "development_title",
+                "development_group_id",
+            ) + expected_columns[3:]
+        if _columns(connection, table) != expected_columns:
             raise WarehouseOperationsSchemaError(f"Invalid columns: {table}")
-        if _indexes(connection, table) != _EXPECTED_INDEXES[table]:
+        expected_indexes = _EXPECTED_INDEXES[table]
+        if allow_development and table == "warehouse_operations":
+            expected_indexes = {
+                **expected_indexes,
+                "ix_warehouse_operations_development_group": 0,
+            }
+        if _indexes(connection, table) != expected_indexes:
             raise WarehouseOperationsSchemaError(f"Invalid indexes: {table}")
-        if _foreign_keys(connection, table) != _EXPECTED_FOREIGN_KEYS[table]:
+        expected_foreign_keys = _EXPECTED_FOREIGN_KEYS[table]
+        if allow_development and table == "warehouse_operations":
+            expected_foreign_keys = expected_foreign_keys | {
+                (
+                    "development_group_id",
+                    "warehouse_intake_batches",
+                    "id",
+                    "RESTRICT",
+                    "RESTRICT",
+                )
+            }
+        if _foreign_keys(connection, table) != expected_foreign_keys:
             raise WarehouseOperationsSchemaError(f"Invalid foreign keys: {table}")
         compact = _compact_sql(table_sql)
-        if any(fragment not in compact for fragment in _REQUIRED_CHECKS[table]):
+        fragments = _REQUIRED_CHECKS[table]
+        if allow_development and table == "warehouse_intake_batches":
+            fragments = fragments + (
+                "operation_typein('writeoff','transfer','development')",
+                "operation_type='development'",
+                "length(development_title)<=200",
+            )
+        if allow_development and table == "warehouse_operations":
+            fragments = fragments + (
+                "operation_type='development'anddestination_location_idisnull",
+                "development_titleisnotnull",
+                "development_group_idisnotnull",
+                "length(development_title)<=200",
+            )
+        if any(fragment not in compact for fragment in fragments):
             raise WarehouseOperationsSchemaError(f"Invalid CHECK clauses: {table}")
 
     rows = connection.execute(

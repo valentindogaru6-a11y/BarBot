@@ -22,6 +22,7 @@ class BaseUnit(StrEnum):
 class ProductOperationType(StrEnum):
     PRODUCT_WRITEOFF = "product_writeoff"
     TRANSFER = "transfer"
+    DEVELOPMENT = "development"
 
 
 class WarehouseLocation(BaseModel):

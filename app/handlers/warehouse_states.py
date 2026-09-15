@@ -6,6 +6,9 @@ from aiogram.fsm.state import State, StatesGroup
 class WarehouseIntakeStates(StatesGroup):
     writeoff = State()
     transfer = State()
+    development_title = State()
+    development_body = State()
+    missing_development_title = State()
     resolving = State()
     correcting_line = State()
 
@@ -15,6 +18,7 @@ class WarehouseOperationEditStates(StatesGroup):
     quantity = State()
     note = State()
     destination = State()
+    development_title = State()
     confirm = State()
     delete = State()
 

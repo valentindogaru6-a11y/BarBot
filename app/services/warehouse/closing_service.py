@@ -77,6 +77,8 @@ class WarehouseClosingService:
                     "shift": shift,
                     "writeoffs": 0,
                     "transfers": 0,
+                    "developments": 0,
+                    "development_groups": 0,
                     "requirements_total": 0,
                     "requirements_resolved": 0,
                 }
@@ -90,6 +92,16 @@ class WarehouseClosingService:
             "shift": shift,
             "writeoffs": sum(row["operation_type"] == "writeoff" for row in operations),
             "transfers": sum(row["operation_type"] == "transfer" for row in operations),
+            "developments": sum(
+                row["operation_type"] == "development" for row in operations
+            ),
+            "development_groups": len(
+                {
+                    int(row["development_group_id"])
+                    for row in operations
+                    if row["operation_type"] == "development"
+                }
+            ),
             "requirements_total": len(requirements),
             "requirements_resolved": sum(
                 row["status"] != "pending" for row in requirements

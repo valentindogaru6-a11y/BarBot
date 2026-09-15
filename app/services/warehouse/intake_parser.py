@@ -1,4 +1,4 @@
-"""Strict free-text grammar for warehouse intake messages."""
+"""Strict anchored grammar for warehouse intake messages."""
 
 from __future__ import annotations
 
@@ -12,7 +12,14 @@ MAX_LINE_LENGTH = 2_000
 MAX_NAME_LENGTH = 200
 MAX_NOTE_LENGTH = 500
 
-_TRIGGER_RE = re.compile(r"^(списание|перемещение):(?:\s*(.*))?$", re.IGNORECASE)
+_BASIC_TRIGGER_RE = re.compile(
+    r"^(?P<kind>списание|перемещение|проработка):(?P<tail>.*)$",
+    re.IGNORECASE,
+)
+_TRANSFER_HEADER_RE = re.compile(
+    r"^перемещение\s+(?:на|в)\s+(?P<destination>.+?):\s*$",
+    re.IGNORECASE,
+)
 _UNIT_PATTERN = (
     r"кг|kg|килограмм(?:а|ов)?|г|гр|g|грамм(?:а|ов)?|"
     r"л|l|литр(?:а|ов)?|мл|ml|миллилитр(?:а|ов)?|"
@@ -26,10 +33,24 @@ _LEFT_RE = re.compile(
 
 
 class IntakeParseError(ValueError):
-    def __init__(self, code: str, message: str, *, line_number: int | None = None) -> None:
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        *,
+        line_number: int | None = None,
+    ) -> None:
         super().__init__(message)
         self.code = code
         self.line_number = line_number
+
+
+@dataclass(frozen=True, slots=True)
+class ParsedIntakeHeader:
+    operation_type: WarehouseOperationType
+    development_title: str | None = None
+    header_destination_text: str | None = None
+    inline_body: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,6 +70,67 @@ class ParsedIntakeMessage:
     operation_type: WarehouseOperationType
     raw_text: str
     lines: tuple[ParsedIntakeLine, ...]
+    development_title: str | None = None
+    header_destination_text: str | None = None
+
+
+def parse_intake_header(value: str) -> ParsedIntakeHeader:
+    """Parse only a complete first-line trigger without guessing intent."""
+
+    text = value.strip()
+    transfer = _TRANSFER_HEADER_RE.fullmatch(text)
+    if transfer is not None:
+        destination = transfer.group("destination").strip()
+        if not destination or len(destination) > MAX_NAME_LENGTH:
+            raise IntakeParseError(
+                "invalid_destination",
+                "Некорректное место назначения",
+            )
+        return ParsedIntakeHeader(
+            WarehouseOperationType.TRANSFER,
+            header_destination_text=destination,
+        )
+
+    trigger = _BASIC_TRIGGER_RE.fullmatch(text)
+    if trigger is None:
+        raise IntakeParseError(
+            "not_trigger",
+            "Первая строка не является точным trigger",
+        )
+    kind = trigger.group("kind").casefold()
+    tail = trigger.group("tail").strip()
+    if kind == "списание":
+        return ParsedIntakeHeader(
+            WarehouseOperationType.WRITEOFF,
+            inline_body=tail or None,
+        )
+    if kind == "перемещение":
+        return ParsedIntakeHeader(
+            WarehouseOperationType.TRANSFER,
+            inline_body=tail or None,
+        )
+    if not tail:
+        raise IntakeParseError(
+            "missing_development_title",
+            "Укажите название проработки после двоеточия",
+        )
+    if len(tail) > MAX_NAME_LENGTH:
+        raise IntakeParseError(
+            "development_title_too_long",
+            "Название проработки слишком длинное",
+        )
+    return ParsedIntakeHeader(
+        WarehouseOperationType.DEVELOPMENT,
+        development_title=tail,
+    )
+
+
+def is_warehouse_trigger_header(value: str) -> bool:
+    try:
+        parse_intake_header(value)
+    except IntakeParseError as exc:
+        return exc.code == "missing_development_title"
+    return True
 
 
 def _extract_final_note(value: str, line_number: int) -> tuple[str, str | None]:
@@ -63,9 +145,17 @@ def _extract_final_note(value: str, line_number: int) -> tuple[str, str | None]:
         )
     note = match.group(1).strip()
     if not note:
-        raise IntakeParseError("empty_note", "Пустой комментарий", line_number=line_number)
+        raise IntakeParseError(
+            "empty_note",
+            "Пустой комментарий",
+            line_number=line_number,
+        )
     if len(note) > MAX_NOTE_LENGTH:
-        raise IntakeParseError("note_too_long", "Комментарий слишком длинный", line_number=line_number)
+        raise IntakeParseError(
+            "note_too_long",
+            "Комментарий слишком длинный",
+            line_number=line_number,
+        )
     return value[: match.start()].rstrip(), note
 
 
@@ -79,56 +169,85 @@ def _parse_left(value: str, line_number: int) -> tuple[str, str, str | None]:
         )
     product = match.group("product").strip()
     if not product or len(product) > MAX_NAME_LENGTH:
-        raise IntakeParseError("invalid_product", "Некорректное название продукта", line_number=line_number)
+        raise IntakeParseError(
+            "invalid_product",
+            "Некорректное название продукта",
+            line_number=line_number,
+        )
     return product, match.group("quantity"), match.group("unit")
 
 
 def parse_intake_message(raw_text: str) -> ParsedIntakeMessage:
     if not isinstance(raw_text, str) or not raw_text.strip():
-        raise IntakeParseError("not_trigger", "Сообщение не содержит складской команды")
+        raise IntakeParseError(
+            "not_trigger",
+            "Сообщение не содержит складской команды",
+        )
     if len(raw_text) > MAX_RAW_TEXT_LENGTH:
         raise IntakeParseError("message_too_long", "Сообщение слишком длинное")
-    lines = raw_text.splitlines()
-    first_index = next((index for index, line in enumerate(lines) if line.strip()), None)
-    if first_index is None:
-        raise IntakeParseError("not_trigger", "Сообщение не содержит складской команды")
-    trigger = _TRIGGER_RE.fullmatch(lines[first_index].strip())
-    if trigger is None:
-        raise IntakeParseError("not_trigger", "Первая строка не является точным trigger")
-    operation_type = (
-        WarehouseOperationType.WRITEOFF
-        if trigger.group(1).casefold() == "списание"
-        else WarehouseOperationType.TRANSFER
+    source_lines = raw_text.splitlines()
+    first_index = next(
+        (index for index, line in enumerate(source_lines) if line.strip()),
+        None,
     )
+    if first_index is None:
+        raise IntakeParseError(
+            "not_trigger",
+            "Сообщение не содержит складской команды",
+        )
+    header = parse_intake_header(source_lines[first_index])
     body: list[str] = []
-    inline = (trigger.group(2) or "").strip()
-    if inline:
-        body.append(inline)
-    body.extend(line.strip() for line in lines[first_index + 1 :] if line.strip())
+    if header.inline_body:
+        body.append(header.inline_body)
+    body.extend(
+        line.strip()
+        for line in source_lines[first_index + 1 :]
+        if line.strip()
+    )
     if not body:
         raise IntakeParseError("empty_body", "После trigger нет позиций")
 
     parsed: list[ParsedIntakeLine] = []
     for line_number, raw_line in enumerate(body, start=1):
         if len(raw_line) > MAX_LINE_LENGTH:
-            raise IntakeParseError("line_too_long", "Строка слишком длинная", line_number=line_number)
+            raise IntakeParseError(
+                "line_too_long",
+                "Строка слишком длинная",
+                line_number=line_number,
+            )
         core, note = _extract_final_note(raw_line, line_number)
         destination: str | None = None
-        if operation_type is WarehouseOperationType.TRANSFER:
-            if core.count("->") != 1:
-                raise IntakeParseError(
-                    "invalid_transfer_arrow",
-                    "Перемещение требует ровно одну стрелку ->",
-                    line_number=line_number,
-                )
-            left, destination = (part.strip() for part in core.split("->"))
-            if not destination or len(destination) > MAX_NAME_LENGTH:
-                raise IntakeParseError(
-                    "invalid_destination", "Некорректное место назначения", line_number=line_number
-                )
+        if header.operation_type is WarehouseOperationType.TRANSFER:
+            if header.header_destination_text is not None:
+                if "->" in core:
+                    raise IntakeParseError(
+                        "header_destination_conflict",
+                        "Не используйте стрелку, если место указано в заголовке",
+                        line_number=line_number,
+                    )
+                left = core
+                destination = header.header_destination_text
+            else:
+                if core.count("->") != 1:
+                    raise IntakeParseError(
+                        "invalid_transfer_arrow",
+                        "Перемещение требует ровно одну стрелку ->",
+                        line_number=line_number,
+                    )
+                left, destination = (part.strip() for part in core.split("->"))
+                if not destination or len(destination) > MAX_NAME_LENGTH:
+                    raise IntakeParseError(
+                        "invalid_destination",
+                        "Некорректное место назначения",
+                        line_number=line_number,
+                    )
         else:
             if "->" in core:
-                raise IntakeParseError("unexpected_arrow", "Стрелка допустима только для перемещения", line_number=line_number)
+                raise IntakeParseError(
+                    "unexpected_arrow",
+                    "Стрелка допустима только для перемещения",
+                    line_number=line_number,
+                )
             left = core
         product, quantity, unit = _parse_left(left, line_number)
         parsed.append(
@@ -139,8 +258,26 @@ def parse_intake_message(raw_text: str) -> ParsedIntakeMessage:
                 quantity_text=quantity,
                 unit_text=unit,
                 destination_text=destination,
-                reason_text=note if operation_type is WarehouseOperationType.WRITEOFF else None,
-                comment_text=note if operation_type is WarehouseOperationType.TRANSFER else None,
+                reason_text=(
+                    note
+                    if header.operation_type is WarehouseOperationType.WRITEOFF
+                    else None
+                ),
+                comment_text=(
+                    note
+                    if header.operation_type
+                    in {
+                        WarehouseOperationType.TRANSFER,
+                        WarehouseOperationType.DEVELOPMENT,
+                    }
+                    else None
+                ),
             )
         )
-    return ParsedIntakeMessage(operation_type, raw_text, tuple(parsed))
+    return ParsedIntakeMessage(
+        header.operation_type,
+        raw_text,
+        tuple(parsed),
+        development_title=header.development_title,
+        header_destination_text=header.header_destination_text,
+    )

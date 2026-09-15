@@ -145,6 +145,40 @@ def test_report_row_order_is_normalized_and_deterministic() -> None:
     ]
 
 
+def test_development_aggregation_stays_inside_stable_group() -> None:
+    def operation(group_id: int, quantity: int, comment: str | None) -> dict:
+        return {
+            "operation_type": "development",
+            "development_group_id": group_id,
+            "development_title": "Одинаковое название",
+            "product_id": 1,
+            "product_name_snapshot": "Лимон",
+            "quantity_scaled": quantity,
+            "base_unit": "kg",
+            "source_location_id": 1,
+            "source_location_name": "Бар",
+            "destination_location_id": None,
+            "destination_location_name": None,
+            "comment_text": comment,
+        }
+
+    lines = aggregate_report_lines(
+        [
+            operation(11, 100_000, "кислота"),
+            operation(11, 50_000, "кислота"),
+            operation(11, 25_000, "текстура"),
+            operation(12, 200_000, None),
+        ],
+        business_date="2026-09-10",
+    )
+    assert len(lines) == 2
+    assert [(line["development_group_id"], line["quantity_scaled"]) for line in lines] == [
+        (11, 175_000),
+        (12, 200_000),
+    ]
+    assert lines[0]["reason_or_comment"] == "кислота; текстура"
+
+
 def test_final_snapshot_exact_aggregation_and_closing_to_closed(environment) -> None:
     path, _, _, operations, closing, reports = environment
     orange = _product(operations, "Апельсин")
@@ -222,6 +256,36 @@ def test_final_snapshot_exact_aggregation_and_closing_to_closed(environment) -> 
             "SELECT COUNT(*) FROM warehouse_audit_events "
             "WHERE event_type='warehouse_report_ready'"
         ).fetchone()[0] == 1
+
+
+def test_final_report_contains_separate_development_groups(environment) -> None:
+    _, _, _, operations, closing, reports = environment
+    first = operations.prepare_batch(
+        actor_user_id=20,
+        source_chat_id=777,
+        source_message_id=901,
+        raw_text="проработка: Чай А\nапельсин 0.1 кг\nапельсин 0.05 кг",
+    )
+    operations.commit_batch(int(first["id"]), actor_user_id=20)
+    second = operations.prepare_batch(
+        actor_user_id=20,
+        source_chat_id=777,
+        source_message_id=902,
+        raw_text="проработка: Чай А\nапельсин 0.2 кг",
+    )
+    operations.commit_batch(int(second["id"]), actor_user_id=20)
+
+    result = reports.build_final(_close(closing), actor_user_id=20)
+    report = result["report"]
+    developments = [
+        line for line in report["lines"] if line["sheet_type"] == "development"
+    ]
+    assert report["development_count"] == 2
+    assert report["development_group_count"] == 2
+    assert {line["development_group_id"] for line in developments} == {
+        first["id"], second["id"]
+    }
+    assert {line["quantity_scaled"] for line in developments} == {150_000, 200_000}
 
 
 def test_snapshot_is_immutable_and_independent_of_future_renames(environment) -> None:

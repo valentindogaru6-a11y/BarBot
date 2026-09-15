@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Callable
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator
@@ -185,6 +186,244 @@ class WarehouseOperationsDatabase:
             ).fetchone()
             return self._load_batch(connection, int(row["id"])) if row else None
 
+    def development_draft_by_message(
+        self, chat_id: int, message_id: int
+    ) -> dict[str, Any] | None:
+        with self._connection() as connection:
+            row = connection.execute(
+                "SELECT * FROM warehouse_development_title_drafts "
+                "WHERE source_chat_id=? AND source_message_id=?",
+                (chat_id, message_id),
+            ).fetchone()
+            return self._dict(row) if row else None
+
+    def active_development_draft_for_actor(
+        self,
+        actor_user_id: int,
+        source_location_id: int,
+        business_date: str,
+    ) -> dict[str, Any] | None:
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                SELECT d.* FROM warehouse_development_title_drafts d
+                JOIN warehouse_shifts s ON s.id=d.shift_id
+                WHERE d.actor_user_id=? AND s.source_location_id=?
+                  AND s.business_date=?
+                  AND d.status IN ('needs_title', 'needs_ingredients')
+                ORDER BY d.id LIMIT 1
+                """,
+                (actor_user_id, source_location_id, business_date),
+            ).fetchone()
+            return self._dict(row) if row else None
+
+    def create_development_title_draft(
+        self, payload: dict[str, Any]
+    ) -> dict[str, Any]:
+        with self._transaction() as connection:
+            existing = connection.execute(
+                "SELECT * FROM warehouse_development_title_drafts "
+                "WHERE source_chat_id=? AND source_message_id=?",
+                (payload["source_chat_id"], payload["source_message_id"]),
+            ).fetchone()
+            if existing is not None:
+                return self._dict(existing)
+            shift_id = self._ensure_open_shift(connection, payload)
+            active = connection.execute(
+                "SELECT * FROM warehouse_development_title_drafts "
+                "WHERE shift_id=? AND actor_user_id=? "
+                "AND status IN ('needs_title', 'needs_ingredients') "
+                "ORDER BY id LIMIT 1",
+                (shift_id, payload["actor_user_id"]),
+            ).fetchone()
+            if active is not None:
+                return self._dict(active)
+            cursor = connection.execute(
+                """
+                INSERT INTO warehouse_development_title_drafts (
+                    shift_id, actor_user_id, source_chat_id, source_message_id,
+                    raw_text, development_title, ingredients_text, status, batch_id,
+                    created_at_utc, updated_at_utc
+                ) VALUES (?, ?, ?, ?, ?, NULL, ?, 'needs_title', NULL, ?, ?)
+                """,
+                (
+                    shift_id, payload["actor_user_id"], payload["source_chat_id"],
+                    payload["source_message_id"], payload["raw_text"],
+                    payload["ingredients_text"], payload["now"], payload["now"],
+                ),
+            )
+            draft_id = int(cursor.lastrowid)
+            self._audit(
+                connection, shift_id=shift_id, operation_id=None,
+                actor_user_id=payload["actor_user_id"],
+                event_type="development_title_requested",
+                entity_type="development_draft", entity_id=draft_id,
+                occurred_at_utc=payload["now"], after={"status": "needs_title"},
+                source_raw_text=payload["raw_text"],
+                correlation_id=f"development-draft:{draft_id}",
+            )
+            row = connection.execute(
+                "SELECT * FROM warehouse_development_title_drafts WHERE id=?",
+                (draft_id,),
+            ).fetchone()
+            assert row is not None
+            return self._dict(row)
+
+    def create_development_ingredients_draft(
+        self, payload: dict[str, Any]
+    ) -> dict[str, Any]:
+        with self._transaction() as connection:
+            existing = connection.execute(
+                "SELECT * FROM warehouse_development_title_drafts "
+                "WHERE source_chat_id=? AND source_message_id=?",
+                (payload["source_chat_id"], payload["source_message_id"]),
+            ).fetchone()
+            if existing is not None:
+                return self._dict(existing)
+            shift_id = self._ensure_open_shift(connection, payload)
+            active = connection.execute(
+                "SELECT * FROM warehouse_development_title_drafts "
+                "WHERE shift_id=? AND actor_user_id=? "
+                "AND status IN ('needs_title', 'needs_ingredients') "
+                "ORDER BY id LIMIT 1",
+                (shift_id, payload["actor_user_id"]),
+            ).fetchone()
+            if active is not None:
+                return self._dict(active)
+            cursor = connection.execute(
+                """
+                INSERT INTO warehouse_development_title_drafts (
+                    shift_id, actor_user_id, source_chat_id, source_message_id,
+                    raw_text, development_title, ingredients_text, status,
+                    batch_id, created_at_utc, updated_at_utc
+                ) VALUES (?, ?, ?, ?, ?, ?, NULL, 'needs_ingredients', NULL, ?, ?)
+                """,
+                (
+                    shift_id, payload["actor_user_id"], payload["source_chat_id"],
+                    payload["source_message_id"], payload["raw_text"],
+                    payload["development_title"], payload["now"], payload["now"],
+                ),
+            )
+            draft_id = int(cursor.lastrowid)
+            self._audit(
+                connection, shift_id=shift_id, operation_id=None,
+                actor_user_id=payload["actor_user_id"],
+                event_type="development_ingredients_requested",
+                entity_type="development_draft", entity_id=draft_id,
+                occurred_at_utc=payload["now"],
+                after={
+                    "status": "needs_ingredients",
+                    "development_title": payload["development_title"],
+                },
+                source_raw_text=payload["raw_text"],
+                correlation_id=f"development-draft:{draft_id}",
+            )
+            row = connection.execute(
+                "SELECT * FROM warehouse_development_title_drafts WHERE id=?",
+                (draft_id,),
+            ).fetchone()
+            assert row is not None
+            return self._dict(row)
+
+    def promote_development_title_draft(
+        self,
+        draft_id: int,
+        batch_payload: dict[str, Any],
+        *,
+        actor_user_id: int,
+    ) -> dict[str, Any]:
+        """Atomically turn a missing-title draft into a normal intake batch."""
+
+        with self._transaction() as connection:
+            draft = connection.execute(
+                "SELECT * FROM warehouse_development_title_drafts WHERE id=?",
+                (draft_id,),
+            ).fetchone()
+            if draft is None or int(draft["actor_user_id"]) != actor_user_id:
+                raise WarehouseOperationsError("Development draft not found")
+            if draft["status"] == "promoted" and draft["batch_id"] is not None:
+                result = self._load_batch(connection, int(draft["batch_id"]))
+                assert result is not None
+                return result
+            if draft["status"] not in ("needs_title", "needs_ingredients"):
+                raise WarehouseOperationsError("Development draft is not active")
+            shift = connection.execute(
+                "SELECT status FROM warehouse_shifts WHERE id=?",
+                (draft["shift_id"],),
+            ).fetchone()
+            if shift is None or shift["status"] not in ("open", "waiting_required"):
+                raise WarehouseOperationsError("Shift is not open")
+            batch_id = self._insert_batch(
+                connection,
+                batch_payload,
+                shift_id=int(draft["shift_id"]),
+            )
+            connection.execute(
+                "UPDATE warehouse_development_title_drafts SET status='promoted', "
+                "development_title=?, ingredients_text=?, batch_id=?, "
+                "updated_at_utc=? WHERE id=? "
+                "AND status IN ('needs_title', 'needs_ingredients')",
+                (
+                    batch_payload["development_title"],
+                    batch_payload["ingredients_text"],
+                    batch_id,
+                    batch_payload["now"],
+                    draft_id,
+                ),
+            )
+            self._audit(
+                connection, shift_id=int(draft["shift_id"]), operation_id=None,
+                actor_user_id=actor_user_id,
+                event_type=(
+                    "development_ingredients_supplied"
+                    if draft["status"] == "needs_ingredients"
+                    else "development_title_supplied"
+                ),
+                entity_type="development_draft", entity_id=draft_id,
+                occurred_at_utc=batch_payload["now"],
+                before={"status": str(draft["status"])},
+                after={"status": "promoted", "batch_id": batch_id},
+                source_raw_text=str(draft["raw_text"]),
+                correlation_id=f"batch:{batch_id}",
+            )
+            result = self._load_batch(connection, batch_id)
+            assert result is not None
+            return result
+
+    def cancel_development_title_draft(
+        self, draft_id: int, *, actor_user_id: int, now: str
+    ) -> dict[str, Any]:
+        with self._transaction() as connection:
+            draft = connection.execute(
+                "SELECT * FROM warehouse_development_title_drafts WHERE id=?",
+                (draft_id,),
+            ).fetchone()
+            if draft is None or int(draft["actor_user_id"]) != actor_user_id:
+                raise WarehouseOperationsError("Development draft not found")
+            if draft["status"] not in ("needs_title", "needs_ingredients"):
+                raise WarehouseOperationsError("Development draft is not active")
+            connection.execute(
+                "UPDATE warehouse_development_title_drafts SET status='cancelled', "
+                "updated_at_utc=? WHERE id=?",
+                (now, draft_id),
+            )
+            self._audit(
+                connection, shift_id=int(draft["shift_id"]), operation_id=None,
+                actor_user_id=actor_user_id,
+                event_type="development_draft_cancelled",
+                entity_type="development_draft", entity_id=draft_id,
+                occurred_at_utc=now, before={"status": str(draft["status"])},
+                after={"status": "cancelled"},
+                source_raw_text=str(draft["raw_text"]),
+                correlation_id=f"development-draft:{draft_id}",
+            )
+            updated = connection.execute(
+                "SELECT * FROM warehouse_development_title_drafts WHERE id=?",
+                (draft_id,),
+            ).fetchone()
+            assert updated is not None
+            return self._dict(updated)
+
     def active_batch_for_actor(
         self,
         actor_user_id: int,
@@ -247,6 +486,107 @@ class WarehouseOperationsDatabase:
         batch["lines"] = lines
         return batch
 
+    @staticmethod
+    def _ensure_open_shift(
+        connection: sqlite3.Connection, payload: dict[str, Any]
+    ) -> int:
+        shift = connection.execute(
+            "SELECT id, status FROM warehouse_shifts WHERE source_location_id=? "
+            "AND business_date=?",
+            (payload["source_location_id"], payload["business_date"]),
+        ).fetchone()
+        if shift is not None:
+            if shift["status"] not in ("open", "waiting_required"):
+                raise WarehouseOperationsError("Shift is not open")
+            return int(shift["id"])
+        cursor = connection.execute(
+            """
+            INSERT INTO warehouse_shifts (
+                source_location_id, business_date, timezone_snapshot,
+                cutoff_snapshot, status, started_at_utc,
+                scheduled_close_at_utc, closed_at_utc, closed_by, revision,
+                created_at_utc, updated_at_utc
+            ) VALUES (?, ?, ?, ?, 'open', ?, ?, NULL, NULL, 1, ?, ?)
+            """,
+            (
+                payload["source_location_id"], payload["business_date"],
+                payload["timezone"], payload["cutoff"], payload["started_at_utc"],
+                payload["scheduled_close_at_utc"], payload["now"], payload["now"],
+            ),
+        )
+        return int(cursor.lastrowid)
+
+    def _insert_batch(
+        self,
+        connection: sqlite3.Connection,
+        payload: dict[str, Any],
+        *,
+        shift_id: int,
+    ) -> int:
+        cursor = connection.execute(
+            """
+            INSERT INTO warehouse_intake_batches (
+                shift_id, actor_user_id, source_chat_id, source_message_id,
+                operation_type, development_title, raw_text, status,
+                created_at_utc, updated_at_utc, committed_at_utc
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+            """,
+            (
+                shift_id, payload["actor_user_id"], payload["source_chat_id"],
+                payload["source_message_id"], payload["operation_type"],
+                payload.get("development_title"), payload["raw_text"],
+                payload["status"], payload["now"], payload["now"],
+            ),
+        )
+        batch_id = int(cursor.lastrowid)
+        for line in payload["lines"]:
+            cursor = connection.execute(
+                """
+                INSERT INTO warehouse_intake_lines (
+                    batch_id, line_number, raw_line, status, product_text,
+                    product_id, input_quantity_text, input_unit_text,
+                    quantity_scaled, base_unit, reason_text, comment_text,
+                    destination_text, destination_location_id, error_code,
+                    created_at_utc, updated_at_utc
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    batch_id, line["line_number"], line["raw_line"], line["status"],
+                    line["product_text"], line.get("product_id"),
+                    line["input_quantity_text"], line.get("input_unit_text"),
+                    line.get("quantity_scaled"), line.get("base_unit"),
+                    line.get("reason_text"), line.get("comment_text"),
+                    line.get("destination_text"), line.get("destination_location_id"),
+                    line.get("error_code"), payload["now"], payload["now"],
+                ),
+            )
+            line_id = int(cursor.lastrowid)
+            connection.executemany(
+                "INSERT INTO warehouse_intake_candidates "
+                "(line_id, product_id, score_scaled, rank) VALUES (?, ?, ?, ?)",
+                [
+                    (line_id, item[0], item[2], rank)
+                    for rank, item in enumerate(line.get("candidates", ()), start=1)
+                ],
+            )
+        event = (
+            "development_batch_created"
+            if payload["operation_type"] == "development"
+            else "batch_prepared"
+        )
+        self._audit(
+            connection, shift_id=shift_id, operation_id=None,
+            actor_user_id=payload["actor_user_id"], event_type=event,
+            entity_type="intake_batch", entity_id=batch_id,
+            occurred_at_utc=payload["now"],
+            after={
+                "status": payload["status"],
+                "development_title": payload.get("development_title"),
+            },
+            source_raw_text=payload["raw_text"], correlation_id=f"batch:{batch_id}",
+        )
+        return batch_id
+
     def create_batch(self, payload: dict[str, Any]) -> dict[str, Any]:
         with self._transaction() as connection:
             existing = connection.execute(
@@ -258,33 +598,7 @@ class WarehouseOperationsDatabase:
                 result = self._load_batch(connection, int(existing["id"]))
                 assert result is not None
                 return result
-            shift = connection.execute(
-                "SELECT id, status FROM warehouse_shifts WHERE source_location_id = ? "
-                "AND business_date = ?",
-                (payload["source_location_id"], payload["business_date"]),
-            ).fetchone()
-            if shift is None:
-                cursor = connection.execute(
-                    """
-                    INSERT INTO warehouse_shifts (
-                        source_location_id, business_date, timezone_snapshot,
-                        cutoff_snapshot, status, started_at_utc,
-                        scheduled_close_at_utc, closed_at_utc, closed_by, revision,
-                        created_at_utc, updated_at_utc
-                    ) VALUES (?, ?, ?, ?, 'open', ?, ?, NULL, NULL, 1, ?, ?)
-                    """,
-                    (
-                        payload["source_location_id"], payload["business_date"],
-                        payload["timezone"], payload["cutoff"],
-                        payload["started_at_utc"], payload["scheduled_close_at_utc"],
-                        payload["now"], payload["now"],
-                    ),
-                )
-                shift_id = int(cursor.lastrowid)
-            else:
-                if shift["status"] not in ("open", "waiting_required"):
-                    raise WarehouseOperationsError("Shift is not open")
-                shift_id = int(shift["id"])
+            shift_id = self._ensure_open_shift(connection, payload)
             active = connection.execute(
                 "SELECT id FROM warehouse_intake_batches "
                 "WHERE shift_id=? AND actor_user_id=? "
@@ -296,59 +610,7 @@ class WarehouseOperationsDatabase:
                 result = self._load_batch(connection, int(active["id"]))
                 assert result is not None
                 return result
-            cursor = connection.execute(
-                """
-                INSERT INTO warehouse_intake_batches (
-                    shift_id, actor_user_id, source_chat_id, source_message_id,
-                    operation_type, raw_text, status, created_at_utc, updated_at_utc,
-                    committed_at_utc
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
-                """,
-                (
-                    shift_id, payload["actor_user_id"], payload["source_chat_id"],
-                    payload["source_message_id"], payload["operation_type"],
-                    payload["raw_text"], payload["status"], payload["now"], payload["now"],
-                ),
-            )
-            batch_id = int(cursor.lastrowid)
-            for line in payload["lines"]:
-                cursor = connection.execute(
-                    """
-                    INSERT INTO warehouse_intake_lines (
-                        batch_id, line_number, raw_line, status, product_text,
-                        product_id, input_quantity_text, input_unit_text,
-                        quantity_scaled, base_unit, reason_text, comment_text,
-                        destination_text, destination_location_id, error_code,
-                        created_at_utc, updated_at_utc
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        batch_id, line["line_number"], line["raw_line"], line["status"],
-                        line["product_text"], line.get("product_id"),
-                        line["input_quantity_text"], line.get("input_unit_text"),
-                        line.get("quantity_scaled"), line.get("base_unit"),
-                        line.get("reason_text"), line.get("comment_text"),
-                        line.get("destination_text"),
-                        line.get("destination_location_id"), line.get("error_code"),
-                        payload["now"], payload["now"],
-                    ),
-                )
-                line_id = int(cursor.lastrowid)
-                connection.executemany(
-                    "INSERT INTO warehouse_intake_candidates "
-                    "(line_id, product_id, score_scaled, rank) VALUES (?, ?, ?, ?)",
-                    [
-                        (line_id, item[0], item[2], rank)
-                        for rank, item in enumerate(line.get("candidates", ()), start=1)
-                    ],
-                )
-            self._audit(
-                connection, shift_id=shift_id, operation_id=None,
-                actor_user_id=payload["actor_user_id"], event_type="batch_prepared",
-                entity_type="intake_batch", entity_id=batch_id,
-                occurred_at_utc=payload["now"], after={"status": payload["status"]},
-                source_raw_text=payload["raw_text"], correlation_id=f"batch:{batch_id}",
-            )
+            batch_id = self._insert_batch(connection, payload, shift_id=shift_id)
             result = self._load_batch(connection, batch_id)
             assert result is not None
             return result
@@ -477,9 +739,17 @@ class WarehouseOperationsDatabase:
                 ],
             )
             status = self._refresh_batch_status(connection, batch_id, now)
+            if batch["operation_type"] == "development":
+                event_type = (
+                    "development_product_resolved"
+                    if current["status"] == "ambiguous"
+                    else "development_batch_line_changed"
+                )
+            else:
+                event_type = "batch_line_changed"
             self._audit(
                 connection, shift_id=int(batch["shift_id"]), operation_id=None,
-                actor_user_id=actor_user_id, event_type="batch_line_changed",
+                actor_user_id=actor_user_id, event_type=event_type,
                 entity_type="intake_line", entity_id=line_id, occurred_at_utc=now,
                 before=self._dict(current), after={"status": line["status"]},
                 source_raw_text=line["raw_line"], correlation_id=f"batch:{batch_id}",
@@ -507,7 +777,12 @@ class WarehouseOperationsDatabase:
             )
             self._audit(
                 connection, shift_id=int(batch["shift_id"]), operation_id=None,
-                actor_user_id=actor_user_id, event_type="batch_cancelled",
+                actor_user_id=actor_user_id,
+                event_type=(
+                    "development_draft_cancelled"
+                    if batch["operation_type"] == "development"
+                    else "batch_cancelled"
+                ),
                 entity_type="intake_batch", entity_id=batch_id, occurred_at_utc=now,
                 before={"status": batch["status"]}, after={"status": "cancelled"},
                 source_raw_text=str(batch["raw_text"]), correlation_id=f"batch:{batch_id}",
@@ -516,8 +791,17 @@ class WarehouseOperationsDatabase:
             assert result is not None
             return result
 
-    def commit_batch(self, batch_id: int, *, actor_user_id: int, now: str) -> list[dict[str, Any]]:
+    def commit_batch(
+        self,
+        batch_id: int,
+        *,
+        actor_user_id: int,
+        now: str,
+        authorize: Callable[[], None] | None = None,
+    ) -> list[dict[str, Any]]:
         with self._transaction() as connection:
+            if authorize is not None:
+                authorize()
             batch = connection.execute(
                 "SELECT * FROM warehouse_intake_batches WHERE id = ?", (batch_id,)
             ).fetchone()
@@ -536,8 +820,17 @@ class WarehouseOperationsDatabase:
                 raise WarehouseOperationsError("Batch contains unresolved lines")
             operations: list[dict[str, Any]] = []
             required_type = (
-                "product_writeoff" if batch["operation_type"] == "writeoff" else "transfer"
+                "product_writeoff"
+                if batch["operation_type"] == "writeoff"
+                else str(batch["operation_type"])
             )
+            development_title = batch["development_title"]
+            if batch["operation_type"] == "development" and (
+                development_title is None
+                or not str(development_title).strip()
+                or len(str(development_title)) > 200
+            ):
+                raise WarehouseOperationsError("Development title is invalid")
             for line in lines:
                 product = connection.execute(
                     """
@@ -561,17 +854,20 @@ class WarehouseOperationsDatabase:
                 cursor = connection.execute(
                     """
                     INSERT INTO warehouse_operations (
-                        shift_id, operation_type, product_id, product_name_snapshot,
+                        shift_id, operation_type, development_title,
+                        development_group_id, product_id, product_name_snapshot,
                         quantity_scaled, base_unit, input_quantity_text, input_unit_text,
                         source_location_id, destination_location_id, reason_text,
                         comment_text, raw_text, author_user_id, occurred_at_utc,
                         intake_line_id, origin, is_deleted, deleted_at_utc, deleted_by,
                         deletion_reason, created_at_utc, updated_at_utc, revision
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'message',
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'message',
                               0, NULL, NULL, NULL, ?, ?, 1)
                     """,
                     (
-                        shift["id"], batch["operation_type"], product["id"],
+                        shift["id"], batch["operation_type"], development_title,
+                        batch_id if batch["operation_type"] == "development" else None,
+                        product["id"],
                         product["official_name"], line["quantity_scaled"],
                         line["base_unit"], line["input_quantity_text"],
                         line["input_unit_text"], shift["source_location_id"],
@@ -588,7 +884,12 @@ class WarehouseOperationsDatabase:
                 operations.append(operation)
                 self._audit(
                     connection, shift_id=int(shift["id"]), operation_id=operation_id,
-                    actor_user_id=actor_user_id, event_type="operation_created",
+                    actor_user_id=actor_user_id,
+                    event_type=(
+                        "development_operation_created"
+                        if batch["operation_type"] == "development"
+                        else "operation_created"
+                    ),
                     entity_type="operation", entity_id=operation_id,
                     occurred_at_utc=now, after=operation,
                     source_raw_text=str(line["raw_line"]),
@@ -604,7 +905,12 @@ class WarehouseOperationsDatabase:
             )
             self._audit(
                 connection, shift_id=int(shift["id"]), operation_id=None,
-                actor_user_id=actor_user_id, event_type="batch_committed",
+                actor_user_id=actor_user_id,
+                event_type=(
+                    "development_batch_committed"
+                    if batch["operation_type"] == "development"
+                    else "batch_committed"
+                ),
                 entity_type="intake_batch", entity_id=batch_id, occurred_at_utc=now,
                 before={"status": "ready"}, after={"status": "committed"},
                 source_raw_text=str(batch["raw_text"]), correlation_id=f"batch:{batch_id}",
@@ -807,6 +1113,7 @@ class WarehouseOperationsDatabase:
                 SELECT o.operation_type, o.product_id, o.product_name_snapshot,
                        o.base_unit, o.source_location_id,
                        o.destination_location_id,
+                       o.development_title, o.development_group_id,
                        src.name AS source_location_name,
                        dst.name AS destination_location_name,
                        SUM(o.quantity_scaled) AS quantity_scaled,
@@ -818,9 +1125,10 @@ class WarehouseOperationsDatabase:
                 WHERE o.shift_id=? AND o.is_deleted=0 AND o.quantity_scaled>0
                 GROUP BY o.operation_type, o.product_id, o.product_name_snapshot,
                          o.base_unit, o.source_location_id,
-                         o.destination_location_id
+                         o.destination_location_id, o.development_title,
+                         o.development_group_id
                 ORDER BY o.operation_type, o.product_name_snapshot,
-                         o.destination_location_id
+                         o.destination_location_id, o.development_group_id
                 """,
                 (shift_id,),
             ).fetchall()
@@ -835,6 +1143,7 @@ class WarehouseOperationsDatabase:
         actor_user_id: int,
         now: str,
         reason_text: str | None = None,
+        authorize: Callable[[], None] | None = None,
     ) -> dict[str, Any]:
         allowed = {
             "product_id", "product_name_snapshot", "quantity_scaled", "base_unit",
@@ -844,6 +1153,8 @@ class WarehouseOperationsDatabase:
         if not changes or not set(changes) <= allowed:
             raise WarehouseOperationsError("Invalid operation changes")
         with self._transaction() as connection:
+            if authorize is not None:
+                authorize()
             current = connection.execute(
                 """
                 SELECT o.*, s.status AS shift_status FROM warehouse_operations o
@@ -863,7 +1174,8 @@ class WarehouseOperationsDatabase:
             proposed.update(changes)
             required_type = (
                 "product_writeoff"
-                if proposed["operation_type"] == "writeoff" else "transfer"
+                if proposed["operation_type"] == "writeoff"
+                else str(proposed["operation_type"])
             )
             valid_product = connection.execute(
                 """
@@ -877,9 +1189,11 @@ class WarehouseOperationsDatabase:
             if valid_product is None:
                 raise WarehouseOperationsError("Invalid operation product")
             destination_id = proposed["destination_location_id"]
-            if proposed["operation_type"] == "writeoff":
+            if proposed["operation_type"] in {"writeoff", "development"}:
                 if destination_id is not None:
-                    raise WarehouseOperationsError("Writeoff cannot have destination")
+                    raise WarehouseOperationsError(
+                        "Writeoff/development cannot have destination"
+                    )
             else:
                 destination = connection.execute(
                     "SELECT 1 FROM warehouse_locations WHERE id=? AND is_active=1 "
@@ -904,7 +1218,11 @@ class WarehouseOperationsDatabase:
             self._audit(
                 connection, shift_id=int(current["shift_id"]),
                 operation_id=operation_id, actor_user_id=actor_user_id,
-                event_type="operation_updated", entity_type="operation",
+                event_type=(
+                    "development_operation_updated"
+                    if current["operation_type"] == "development"
+                    else "operation_updated"
+                ), entity_type="operation",
                 entity_id=operation_id, occurred_at_utc=now, before=before,
                 after=updated, reason_text=reason_text,
                 source_raw_text=str(current["raw_text"]),
@@ -920,11 +1238,14 @@ class WarehouseOperationsDatabase:
         actor_user_id: int,
         deletion_reason: str,
         now: str,
+        authorize: Callable[[], None] | None = None,
     ) -> dict[str, Any]:
         reason = deletion_reason.strip()
         if not reason:
             raise WarehouseOperationsError("Deletion reason is required")
         with self._transaction() as connection:
+            if authorize is not None:
+                authorize()
             current = connection.execute(
                 """
                 SELECT o.*, s.status AS shift_status FROM warehouse_operations o
@@ -959,10 +1280,78 @@ class WarehouseOperationsDatabase:
             self._audit(
                 connection, shift_id=int(current["shift_id"]),
                 operation_id=operation_id, actor_user_id=actor_user_id,
-                event_type="operation_deleted", entity_type="operation",
+                event_type=(
+                    "development_operation_deleted"
+                    if current["operation_type"] == "development"
+                    else "operation_deleted"
+                ), entity_type="operation",
                 entity_id=operation_id, occurred_at_utc=now, before=before,
                 after=updated, reason_text=reason,
                 source_raw_text=str(current["raw_text"]),
                 correlation_id=f"operation:{operation_id}:r{updated['revision']}",
             )
             return updated
+
+    def rename_development_group(
+        self,
+        operation_id: int,
+        title: str,
+        *,
+        expected_revision: int,
+        actor_user_id: int,
+        now: str,
+        authorize: Callable[[], None] | None = None,
+    ) -> dict[str, Any]:
+        cleaned = title.strip()
+        if not cleaned or len(cleaned) > 200:
+            raise WarehouseOperationsError("Development title is invalid")
+        with self._transaction() as connection:
+            if authorize is not None:
+                authorize()
+            current = connection.execute(
+                """
+                SELECT o.*, s.status AS shift_status
+                FROM warehouse_operations o
+                JOIN warehouse_shifts s ON s.id=o.shift_id
+                WHERE o.id=?
+                """,
+                (operation_id,),
+            ).fetchone()
+            if current is None or current["operation_type"] != "development":
+                raise WarehouseOperationsError("Development operation not found")
+            if int(current["revision"]) != expected_revision:
+                raise WarehouseRevisionConflict("Operation revision conflict")
+            if current["is_deleted"]:
+                raise WarehouseOperationsError("Deleted operation cannot be changed")
+            if current["shift_status"] not in ("open", "waiting_required"):
+                raise WarehouseOperationsError("Shift is not open")
+            group_id = int(current["development_group_id"])
+            before_title = str(current["development_title"])
+            connection.execute(
+                "UPDATE warehouse_operations SET development_title=?, "
+                "updated_at_utc=?, revision=revision+1 "
+                "WHERE development_group_id=? AND operation_type='development'",
+                (cleaned, now, group_id),
+            )
+            connection.execute(
+                "UPDATE warehouse_intake_batches SET development_title=?, "
+                "updated_at_utc=? WHERE id=? AND operation_type='development'",
+                (cleaned, now, group_id),
+            )
+            updated = connection.execute(
+                "SELECT * FROM warehouse_operations WHERE id=?",
+                (operation_id,),
+            ).fetchone()
+            assert updated is not None
+            self._audit(
+                connection, shift_id=int(current["shift_id"]),
+                operation_id=operation_id, actor_user_id=actor_user_id,
+                event_type="development_group_renamed",
+                entity_type="development_group", entity_id=group_id,
+                occurred_at_utc=now,
+                before={"development_title": before_title},
+                after={"development_title": cleaned},
+                source_raw_text=str(current["raw_text"]),
+                correlation_id=f"development-group:{group_id}",
+            )
+            return self._dict(updated)

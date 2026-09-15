@@ -20,6 +20,7 @@ def warehouse_home_keyboard(
     if can_mutate and shift_status in {"open", "waiting_required"}:
         builder.button(text="➕ Добавить списание", callback_data=WarehouseCallback(action="aw"))
         builder.button(text="🚚 Добавить перемещение", callback_data=WarehouseCallback(action="at"))
+        builder.button(text="🧪 Добавить проработку", callback_data=WarehouseCallback(action="ad"))
     builder.button(text="📋 Записи текущей смены", callback_data=WarehouseCallback(action="ls"))
     if active_closing_session_id is not None and can_mutate:
         builder.button(
@@ -312,6 +313,26 @@ def recovery_keyboard(batch_id: int) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
+def development_draft_keyboard(
+    draft_id: int, *, needs_ingredients: bool = False
+) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text=(
+            "▶️ Ввести ингредиенты"
+            if needs_ingredients
+            else "▶️ Указать название"
+        ),
+        callback_data=WarehouseCallback(action="dr", object_id=draft_id),
+    )
+    builder.button(
+        text="🗑 Отменить",
+        callback_data=WarehouseCallback(action="dy", object_id=draft_id),
+    )
+    builder.adjust(1)
+    return builder.as_markup()
+
+
 def batch_keyboard(batch_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="✅ Подтвердить", callback_data=WarehouseCallback(action="bc", object_id=batch_id))
@@ -370,6 +391,7 @@ def records_keyboard(shift_id: int | None) -> InlineKeyboardMarkup:
     if shift_id is not None:
         builder.button(text="♻️ Списание", callback_data=WarehouseCallback(action="lw", object_id=shift_id))
         builder.button(text="🚚 Перемещение", callback_data=WarehouseCallback(action="lt", object_id=shift_id))
+        builder.button(text="🧪 Проработка", callback_data=WarehouseCallback(action="ld", object_id=shift_id))
         builder.button(text="📊 Итоги", callback_data=WarehouseCallback(action="la", object_id=shift_id))
     builder.button(text="⬅️ Назад", callback_data=WarehouseCallback(action="h"))
     builder.button(text="🏠 Главное меню", callback_data=MainCallback(action="home"))
@@ -394,7 +416,9 @@ def operation_list_keyboard(
                 action="ov", object_id=int(operation["id"]), aux=page
             ),
         )
-    action = "lw" if operation_type == "writeoff" else "lt"
+    action = {"writeoff": "lw", "transfer": "lt", "development": "ld"}[
+        operation_type
+    ]
     pages = max(1, ceil(total / page_size))
     if page > 0:
         builder.button(text="⬅️", callback_data=WarehouseCallback(action=action, object_id=shift_id, aux=page - 1))
@@ -420,11 +444,15 @@ def operation_keyboard(
         builder.button(text="📝 Изменить причину/комментарий", callback_data=WarehouseCallback(action="en", object_id=operation_id, aux=revision))
         if operation["operation_type"] == "transfer":
             builder.button(text="📍 Изменить направление", callback_data=WarehouseCallback(action="ed", object_id=operation_id, aux=revision))
+        if operation["operation_type"] == "development":
+            builder.button(text="🧪 Переименовать всю проработку", callback_data=WarehouseCallback(action="eg", object_id=operation_id, aux=revision))
         builder.button(text="🗑 Удалить", callback_data=WarehouseCallback(action="dx", object_id=operation_id, aux=revision))
     builder.button(
         text="⬅️ Назад",
         callback_data=WarehouseCallback(
-            action="lw" if operation["operation_type"] == "writeoff" else "lt",
+            action={"writeoff": "lw", "transfer": "lt", "development": "ld"}[
+                str(operation["operation_type"])
+            ],
             object_id=int(operation["shift_id"]),
             aux=max(return_page, 0),
         ),

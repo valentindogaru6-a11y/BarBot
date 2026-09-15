@@ -45,6 +45,20 @@ def _report() -> dict:
                 "destination_location_name": "=Кухня",
                 "business_date": "2026-09-10",
             },
+            {
+                "sheet_type": "development",
+                "row_number": 1,
+                "product_id": 3,
+                "product_name": "Лимон",
+                "quantity_scaled": 100_000,
+                "base_unit": "kg",
+                "reason_or_comment": "=опасный комментарий",
+                "source_location_name": "Бар",
+                "destination_location_name": None,
+                "development_title": "+Новый сауэр",
+                "development_group_id": 12,
+                "business_date": "2026-09-10",
+            },
         ],
     }
 
@@ -89,9 +103,10 @@ def test_exact_sheets_columns_numeric_date_and_formatting(tmp_path: Path) -> Non
             sheet.attrib["name"]
             for sheet in workbook.findall(".//x:sheet", NS)
         ]
-        assert names == ["Списание", "Перемещение"]
+        assert names == ["Списание", "Перемещение", "Проработка"]
         writeoff = _cells(archive, "xl/worksheets/sheet1.xml")
         transfer = _cells(archive, "xl/worksheets/sheet2.xml")
+        development = _cells(archive, "xl/worksheets/sheet3.xml")
         assert [writeoff[f"{column}1"][1] for column in "ABCDE"] == [
             "Продукт", "Количество", "Единица", "Причина", "Дата смены"
         ]
@@ -99,6 +114,16 @@ def test_exact_sheets_columns_numeric_date_and_formatting(tmp_path: Path) -> Non
             "Продукт", "Количество", "Единица", "Откуда", "Куда",
             "Комментарий", "Дата смены",
         ]
+        assert [development[f"{column}1"][1] for column in "ABCDEF"] == [
+            "Дата", "Название проработки", "Продукт", "Количество",
+            "Единица", "Комментарий",
+        ]
+        assert development["A2"][0] is None
+        assert development["A2"][2] is not None
+        assert development["B2"][1] == "'+Новый сауэр"
+        assert development["D2"][0] is None
+        assert float(development["D2"][1]) == 0.1
+        assert development["F2"][1] == "'=опасный комментарий"
         assert writeoff["B2"][0] is None and float(writeoff["B2"][1]) == 0.5
         assert writeoff["E2"][0] is None
         assert writeoff["E2"][2] is not None
@@ -106,6 +131,7 @@ def test_exact_sheets_columns_numeric_date_and_formatting(tmp_path: Path) -> Non
         assert all(b"<f" not in archive.read(name) for name in (
             "xl/worksheets/sheet1.xml",
             "xl/worksheets/sheet2.xml",
+            "xl/worksheets/sheet3.xml",
         ))
 
         first_sheet = archive.read("xl/worksheets/sheet1.xml")
@@ -161,6 +187,9 @@ def test_empty_workbook_keeps_both_header_only_sheets(tmp_path: Path) -> None:
         }
         assert set(_cells(archive, "xl/worksheets/sheet2.xml")) == {
             f"{column}1" for column in "ABCDEFG"
+        }
+        assert set(_cells(archive, "xl/worksheets/sheet3.xml")) == {
+            f"{column}1" for column in "ABCDEF"
         }
 
 

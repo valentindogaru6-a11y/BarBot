@@ -128,6 +128,16 @@ class WarehouseReportsDatabase:
         report["transfer_count"] = sum(
             line["sheet_type"] == "transfer" for line in lines
         )
+        report["development_count"] = sum(
+            line["sheet_type"] == "development" for line in lines
+        )
+        report["development_group_count"] = len(
+            {
+                int(line["development_group_id"])
+                for line in lines
+                if line["sheet_type"] == "development"
+            }
+        )
         return report
 
     def get_report(self, report_id: int) -> dict[str, Any] | None:
@@ -243,8 +253,9 @@ class WarehouseReportsDatabase:
                 INSERT INTO warehouse_report_lines (
                     report_id, sheet_type, row_number, product_id, product_name,
                     quantity_scaled, base_unit, reason_or_comment,
-                    source_location_name, destination_location_name, business_date
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    source_location_name, destination_location_name,
+                    development_title, development_group_id, business_date
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 [
                     (
@@ -258,6 +269,8 @@ class WarehouseReportsDatabase:
                         line["reason_or_comment"],
                         line["source_location_name"],
                         line["destination_location_name"],
+                        line.get("development_title"),
+                        line.get("development_group_id"),
                         line["business_date"],
                     )
                     for line in lines
@@ -424,7 +437,14 @@ class WarehouseReportsDatabase:
                             AS writeoff_count,
                        (SELECT COUNT(*) FROM warehouse_report_lines l
                         WHERE l.report_id=r.id AND l.sheet_type='transfer')
-                            AS transfer_count
+                            AS transfer_count,
+                       (SELECT COUNT(*) FROM warehouse_report_lines l
+                        WHERE l.report_id=r.id AND l.sheet_type='development')
+                            AS development_count,
+                       (SELECT COUNT(DISTINCT l.development_group_id)
+                        FROM warehouse_report_lines l
+                        WHERE l.report_id=r.id AND l.sheet_type='development')
+                            AS development_group_count
                 FROM warehouse_reports r
                 JOIN warehouse_shifts s ON s.id=r.shift_id
                 WHERE r.status='ready' AND s.source_location_id=?

@@ -17,8 +17,9 @@ def _version(path: Path) -> int:
 
 
 def _make_v5(path: Path) -> None:
-    UserDatabase(path).initialize()
     with sqlite3.connect(path) as connection:
+        connection.execute("BEGIN")
+        migrations._create_fresh_v6(connection)
         connection.execute("DROP TABLE warehouse_report_lines")
         connection.execute("DROP TABLE warehouse_reports")
         connection.execute("PRAGMA user_version=5")
@@ -31,7 +32,7 @@ def test_fresh_v6_and_repeated_initialization(tmp_path: Path) -> None:
     database.initialize()
     database.initialize()
 
-    assert _version(path) == 6
+    assert _version(path) == 7
     with sqlite3.connect(path) as connection:
         tables = {
             row[0]
@@ -58,7 +59,7 @@ def test_v5_to_v6_preserves_existing_rows(tmp_path: Path) -> None:
 
     UserDatabase(path).initialize()
 
-    assert _version(path) == 6
+    assert _version(path) == 7
     with sqlite3.connect(path) as connection:
         assert connection.execute(
             "SELECT role FROM users WHERE telegram_user_id=42"

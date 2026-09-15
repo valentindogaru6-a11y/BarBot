@@ -24,13 +24,16 @@ def aggregate_report_lines(
 
     writeoffs: dict[tuple[int, str], dict[str, Any]] = {}
     transfers: dict[tuple[int, str, int, int], dict[str, Any]] = {}
+    developments: dict[tuple[int, int, str], dict[str, Any]] = {}
     for operation in operations:
         if operation["operation_type"] == "writeoff":
             key = (int(operation["product_id"]), str(operation["base_unit"]))
             groups = writeoffs
             destination = None
             note = operation.get("reason_text")
-        else:
+            title = None
+            development_group_id = None
+        elif operation["operation_type"] == "transfer":
             destination_id = operation.get("destination_location_id")
             if destination_id is None:
                 continue
@@ -43,6 +46,23 @@ def aggregate_report_lines(
             groups = transfers
             destination = operation.get("destination_location_name")
             note = operation.get("comment_text")
+            title = None
+            development_group_id = None
+        elif operation["operation_type"] == "development":
+            development_group_id = operation.get("development_group_id")
+            title = operation.get("development_title")
+            if development_group_id is None or not str(title or "").strip():
+                continue
+            key = (
+                int(development_group_id),
+                int(operation["product_id"]),
+                str(operation["base_unit"]),
+            )
+            groups = developments
+            destination = None
+            note = operation.get("comment_text")
+        else:
+            continue
         group = groups.get(key)
         if group is None:
             group = {
@@ -56,20 +76,24 @@ def aggregate_report_lines(
                 "destination_location_name": (
                     str(destination) if destination is not None else None
                 ),
+                "development_title": str(title) if title is not None else None,
+                "development_group_id": development_group_id,
                 "business_date": business_date,
             }
             groups[key] = group
         group["quantity_scaled"] += int(operation["quantity_scaled"])
         _append_unique(group["notes"], note)
 
-    def sort_key(line: dict[str, Any]) -> tuple[str, str, str, int]:
+    def sort_key(line: dict[str, Any]) -> tuple[str, str, str, str, int, int]:
         return (
+            normalize_warehouse_name(str(line.get("development_title") or "")),
             normalize_warehouse_name(str(line["product_name"])),
             normalize_warehouse_name(str(line["source_location_name"])),
             normalize_warehouse_name(
                 str(line.get("destination_location_name") or "")
             ),
             int(line["product_id"]),
+            int(line.get("development_group_id") or 0),
         )
 
     result: list[dict[str, Any]] = []
@@ -91,7 +115,29 @@ def aggregate_report_lines(
                     "destination_location_name": group[
                         "destination_location_name"
                     ],
+                    "development_title": group["development_title"],
+                    "development_group_id": group["development_group_id"],
                     "business_date": group["business_date"],
                 }
             )
+    for row_number, group in enumerate(
+        sorted(developments.values(), key=sort_key),
+        start=1,
+    ):
+        result.append(
+            {
+                "sheet_type": group["sheet_type"],
+                "row_number": row_number,
+                "product_id": group["product_id"],
+                "product_name": group["product_name"],
+                "quantity_scaled": group["quantity_scaled"],
+                "base_unit": group["base_unit"],
+                "reason_or_comment": "; ".join(group["notes"]) or None,
+                "source_location_name": group["source_location_name"],
+                "destination_location_name": None,
+                "development_title": group["development_title"],
+                "development_group_id": group["development_group_id"],
+                "business_date": group["business_date"],
+            }
+        )
     return result

@@ -51,7 +51,7 @@ def resolve_product(
     required_operation = (
         "product_writeoff"
         if operation_type is WarehouseOperationType.WRITEOFF
-        else "transfer"
+        else operation_type.value
     )
     eligible = tuple(
         product for product in products if required_operation in product.operation_types
@@ -95,14 +95,27 @@ def resolve_destination(
 ) -> Resolution:
     normalized = normalize_warehouse_name(text)
     eligible = tuple(location for location in locations if location.can_be_destination)
-    exact = [location for location in eligible if location.normalized_name == normalized]
+    def variants(location: LocationOption) -> frozenset[str]:
+        base = location.normalized_name
+        inflected = (
+            base[:-1] + ("ю" if base.endswith("я") else "у")
+            if base.endswith(("а", "я"))
+            else base
+        )
+        return frozenset({base, inflected})
+
+    exact = [location for location in eligible if normalized in variants(location)]
     if len(exact) == 1:
         if exact[0].id == source_location_id:
             return Resolution(None, (), "same_source_destination")
         return Resolution(exact[0].id, (), None)
     ranked = sorted(
         (
-            (location.id, location.name, _score(normalized, location.normalized_name))
+            (
+                location.id,
+                location.name,
+                max(_score(normalized, variant) for variant in variants(location)),
+            )
             for location in eligible
             if location.id != source_location_id
         ),

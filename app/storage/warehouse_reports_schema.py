@@ -281,21 +281,41 @@ def _foreign_keys(
     }
 
 
-def validate_warehouse_reports_schema(connection: sqlite3.Connection) -> None:
+def validate_warehouse_reports_schema(
+    connection: sqlite3.Connection,
+    *,
+    allow_development: bool = False,
+) -> None:
     """Validate v6 tables, indexes, FKs, CHECK clauses, and immutability."""
 
     for table in WAREHOUSE_REPORT_TABLES:
         sql = _table_sql(connection, table)
         if sql is None:
             raise WarehouseReportsSchemaError(f"Missing v6 table: {table}")
-        if _columns(connection, table) != _EXPECTED_COLUMNS[table]:
+        expected_columns = _EXPECTED_COLUMNS[table]
+        if allow_development and table == "warehouse_report_lines":
+            expected_columns = expected_columns[:-1] + (
+                "development_title",
+                "development_group_id",
+                expected_columns[-1],
+            )
+        if _columns(connection, table) != expected_columns:
             raise WarehouseReportsSchemaError(f"Invalid columns: {table}")
         if _indexes(connection, table) != _EXPECTED_INDEXES[table]:
             raise WarehouseReportsSchemaError(f"Invalid indexes: {table}")
         if _foreign_keys(connection, table) != _EXPECTED_FOREIGN_KEYS[table]:
             raise WarehouseReportsSchemaError(f"Invalid foreign keys: {table}")
         compact = _compact(sql)
-        if any(value not in compact for value in _REQUIRED_CHECKS[table]):
+        fragments = _REQUIRED_CHECKS[table]
+        if allow_development and table == "warehouse_report_lines":
+            fragments = fragments[1:] + (
+                "sheet_typein('writeoff','transfer','development')",
+                "sheet_type='development'",
+                "development_titleisnotnull",
+                "development_group_idisnotnull",
+                "length(development_title)<=200",
+            )
+        if any(value not in compact for value in fragments):
             raise WarehouseReportsSchemaError(f"Invalid CHECK clauses: {table}")
 
     triggers = {

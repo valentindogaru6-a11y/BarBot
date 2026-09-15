@@ -1,7 +1,11 @@
 import pytest
 
 from app.models.warehouse.operations import WarehouseOperationType
-from app.services.warehouse.intake_parser import IntakeParseError, parse_intake_message
+from app.services.warehouse.intake_parser import (
+    IntakeParseError,
+    is_warehouse_trigger_header,
+    parse_intake_message,
+)
 
 
 def test_one_line_and_multiline_writeoff() -> None:
@@ -52,3 +56,56 @@ def test_reason_and_raw_length_limits() -> None:
         parse_intake_message("списание: сахар 1 (" + "x" * 501 + ")")
     with pytest.raises(IntakeParseError, match="длин"):
         parse_intake_message("списание: " + "x" * 2001)
+
+
+def test_development_trigger_title_body_and_comment() -> None:
+    parsed = parse_intake_message(
+        "ПрОрАбОтКа: Новый чай\n"
+        "облепиха 0.25 кг\n"
+        "сахарный сироп 0.15 л (баланс сладости)"
+    )
+    assert parsed.operation_type is WarehouseOperationType.DEVELOPMENT
+    assert parsed.development_title == "Новый чай"
+    assert len(parsed.lines) == 2
+    assert parsed.lines[1].comment_text == "баланс сладости"
+    assert parsed.lines[1].reason_text is None
+
+
+@pytest.mark.parametrize(
+    ("text", "code"),
+    [
+        ("проработка:\nапельсин 0.2 кг", "missing_development_title"),
+        ("проработка: Чай", "empty_body"),
+        ("нужно сделать проработку: Чай", "not_trigger"),
+        ("сегодня была проработка нового чая", "not_trigger"),
+        ("/проработка", "not_trigger"),
+    ],
+)
+def test_development_trigger_is_strict(text: str, code: str) -> None:
+    with pytest.raises(IntakeParseError) as caught:
+        parse_intake_message(text)
+    assert caught.value.code == code
+
+
+def test_transfer_header_destination_and_arrow_conflict() -> None:
+    moved = parse_intake_message(
+        "перемещение на кухню:\nмолоко 1 л\nсахар 0.5 кг"
+    )
+    assert moved.operation_type is WarehouseOperationType.TRANSFER
+    assert moved.header_destination_text == "кухню"
+    assert {line.destination_text for line in moved.lines} == {"кухню"}
+    into = parse_intake_message("ПЕРЕМЕЩЕНИЕ В кондитерку:\nмолоко 1 л")
+    assert into.lines[0].destination_text == "кондитерку"
+    with pytest.raises(IntakeParseError) as caught:
+        parse_intake_message("перемещение на кухню:\nмолоко 1 л -> кухня")
+    assert caught.value.code == "header_destination_conflict"
+    assert parse_intake_message(
+        "перемещение:\nмолоко 1 л -> кухня"
+    ).lines[0].destination_text == "кухня"
+
+
+def test_trigger_filter_helper_does_not_guess() -> None:
+    assert is_warehouse_trigger_header("проработка: Чай")
+    assert is_warehouse_trigger_header("проработка:")
+    assert is_warehouse_trigger_header("перемещение в кухню:")
+    assert not is_warehouse_trigger_header("сегодня была проработка")

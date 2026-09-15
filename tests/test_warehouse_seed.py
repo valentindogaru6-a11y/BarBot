@@ -98,6 +98,7 @@ def test_namespace_ids_and_operations_are_complete(seed) -> None:
         assert {value.value for value in product.allowed_operation_types} == {
             "writeoff",
             "transfer",
+            "development",
         }
         for alias in product.aliases:
             normalized = normalize_warehouse_name(alias)

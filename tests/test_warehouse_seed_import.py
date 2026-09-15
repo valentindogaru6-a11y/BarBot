@@ -62,7 +62,7 @@ def test_apply_imports_every_product_alias_and_operation(prepared) -> None:
     assert result.applied
     assert _count(database_path, "warehouse_products") == 414
     assert _count(database_path, "warehouse_product_aliases") == 8
-    assert _count(database_path, "warehouse_product_operation_types") == 828
+    assert _count(database_path, "warehouse_product_operation_types") == 1242
     assert _count(database_path, "warehouse_required_rules") == 2
     connection = sqlite3.connect(database_path)
     try:
@@ -193,7 +193,7 @@ def test_wrong_schema_version_is_rejected(tmp_path: Path) -> None:
 
     with pytest.raises(
         WarehouseSeedImportError,
-        match="v3, v4, v5 or v6 required",
+        match="v3, v4, v5, v6 or v7 required",
     ):
         WarehouseSeedDatabase(database_path).import_seed(seed)
 

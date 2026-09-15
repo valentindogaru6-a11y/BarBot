@@ -29,6 +29,10 @@ from app.storage.warehouse_reports_schema import (
     WarehouseReportsSchemaError,
     validate_warehouse_reports_schema,
 )
+from app.storage.warehouse_v7_schema import (
+    WarehouseV7SchemaError,
+    validate_warehouse_v7_schema,
+)
 from app.utils.warehouse import normalize_warehouse_name
 
 
@@ -41,7 +45,11 @@ def _utc_now() -> str:
 
 
 def _operation_value(value: SeedOperationType) -> str:
-    return "product_writeoff" if value is SeedOperationType.WRITEOFF else "transfer"
+    return (
+        "product_writeoff"
+        if value is SeedOperationType.WRITEOFF
+        else value.value
+    )
 
 
 class WarehouseSeedDatabase:
@@ -93,24 +101,32 @@ class WarehouseSeedDatabase:
     @staticmethod
     def _validate_schema(connection: sqlite3.Connection) -> None:
         version = WarehouseSeedDatabase._schema_version(connection)
-        if version not in {3, 4, 5, 6}:
+        if version not in {3, 4, 5, 6, 7}:
             raise WarehouseSeedImportError(
-                f"Warehouse schema v3, v4, v5 or v6 required; found v{version}"
+                f"Warehouse schema v3, v4, v5, v6 or v7 required; found v{version}"
             )
         try:
-            validate_warehouse_schema(connection)
+            validate_warehouse_schema(
+                connection, allow_development=version == 7
+            )
             if version >= 4:
-                validate_warehouse_operations_schema(connection)
+                validate_warehouse_operations_schema(
+                    connection, allow_development=version == 7
+                )
             if version == 5:
                 validate_warehouse_closing_schema(connection)
             if version == 6:
                 validate_warehouse_closing_schema(connection)
                 validate_warehouse_reports_schema(connection)
+            if version == 7:
+                validate_warehouse_closing_schema(connection)
+                validate_warehouse_v7_schema(connection)
         except (
             WarehouseSchemaValidationError,
             WarehouseOperationsSchemaError,
             WarehouseClosingSchemaError,
             WarehouseReportsSchemaError,
+            WarehouseV7SchemaError,
         ) as exc:
             raise WarehouseSeedImportError(str(exc)) from exc
 
@@ -123,8 +139,9 @@ class WarehouseSeedDatabase:
             "SELECT * FROM warehouse_products WHERE stable_id = ?", (stable_id,)
         ).fetchone()
 
-    @staticmethod
+    @classmethod
     def _matches(
+        cls,
         connection: sqlite3.Connection,
         row: sqlite3.Row,
         product: WarehouseSeedProduct,
@@ -147,7 +164,10 @@ class WarehouseSeedDatabase:
             key=lambda value: value[1],
         )
         expected_operations = sorted(
-            _operation_value(value) for value in product.allowed_operation_types
+            _operation_value(value)
+            for value in product.allowed_operation_types
+            if cls._schema_version(connection) >= 7
+            or value is not SeedOperationType.DEVELOPMENT
         )
         return (
             row["official_name"] == product.official_name
@@ -323,8 +343,9 @@ class WarehouseSeedDatabase:
                 ),
             )
 
-    @staticmethod
+    @classmethod
     def _insert_products(
+        cls,
         connection: sqlite3.Connection,
         seed: WarehouseProductsSeed,
         create_ids: set[str],
@@ -369,6 +390,8 @@ class WarehouseSeedDatabase:
                 [
                     (product_id, _operation_value(operation))
                     for operation in product.allowed_operation_types
+                    if cls._schema_version(connection) >= 7
+                    or operation is not SeedOperationType.DEVELOPMENT
                 ],
             )
 

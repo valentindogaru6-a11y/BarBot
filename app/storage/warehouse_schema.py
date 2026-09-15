@@ -338,7 +338,11 @@ def warehouse_schema_is_absent(connection: sqlite3.Connection) -> bool:
     return all(_table_sql(connection, table) is None for table in WAREHOUSE_TABLES)
 
 
-def validate_warehouse_schema(connection: sqlite3.Connection) -> None:
+def validate_warehouse_schema(
+    connection: sqlite3.Connection,
+    *,
+    allow_development: bool = False,
+) -> None:
     for table in WAREHOUSE_TABLES:
         sql = _table_sql(connection, table)
         if sql is None:
@@ -358,10 +362,12 @@ def validate_warehouse_schema(connection: sqlite3.Connection) -> None:
                 f"Foreign keys таблицы {table} не соответствуют schema v3"
             )
         compact = _compact_sql(sql)
-        if any(
-            fragment not in compact
-            for fragment in _REQUIRED_SQL_FRAGMENTS[table]
-        ):
+        fragments = _REQUIRED_SQL_FRAGMENTS[table]
+        if table == "warehouse_product_operation_types" and allow_development:
+            fragments = (
+                "check(operation_typein('product_writeoff','transfer','development'))",
+            )
+        if any(fragment not in compact for fragment in fragments):
             raise WarehouseSchemaValidationError(
                 f"CHECK constraints таблицы {table} не соответствуют schema v3"
             )

@@ -166,6 +166,16 @@ class WarehouseReportService:
             "transfer_count": sum(
                 line["sheet_type"] == "transfer" for line in lines
             ),
+            "development_count": sum(
+                line["sheet_type"] == "development" for line in lines
+            ),
+            "development_group_count": len(
+                {
+                    int(line["development_group_id"])
+                    for line in lines
+                    if line["sheet_type"] == "development"
+                }
+            ),
         }
 
     def history(

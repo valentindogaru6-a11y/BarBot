@@ -33,7 +33,7 @@ def build_main_menu_keyboard(
         )
     if can_view_warehouse:
         builder.button(
-            text="📦 Списание / перемещение",
+            text="📦 Складские операции",
             callback_data=WarehouseCallback(action="h"),
         )
     if not can_view_catalog and not can_manage_catalog and not can_view_warehouse:

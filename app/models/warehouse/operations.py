@@ -2,7 +2,7 @@
 
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.models.warehouse.nomenclature import BaseUnit
 
@@ -10,6 +10,7 @@ from app.models.warehouse.nomenclature import BaseUnit
 class WarehouseOperationType(StrEnum):
     WRITEOFF = "writeoff"
     TRANSFER = "transfer"
+    DEVELOPMENT = "development"
 
 
 class ShiftStatus(StrEnum):
@@ -100,12 +101,22 @@ class IntakeBatch(BaseModel):
     source_chat_id: int
     source_message_id: int
     operation_type: WarehouseOperationType
+    development_title: str | None = Field(default=None, max_length=200)
     raw_text: str
     status: IntakeBatchStatus
     created_at_utc: str
     updated_at_utc: str
     committed_at_utc: str | None = None
     lines: tuple[IntakeLine, ...]
+
+    @model_validator(mode="after")
+    def validate_development_title(self) -> "IntakeBatch":
+        if self.operation_type is WarehouseOperationType.DEVELOPMENT:
+            if not (self.development_title or "").strip():
+                raise ValueError("development title is required")
+        elif self.development_title is not None:
+            raise ValueError("development title is only valid for development")
+        return self
 
 
 class WarehouseOperation(BaseModel):
@@ -114,6 +125,8 @@ class WarehouseOperation(BaseModel):
     id: int = Field(gt=0)
     shift_id: int = Field(gt=0)
     operation_type: WarehouseOperationType
+    development_title: str | None = Field(default=None, max_length=200)
+    development_group_id: int | None = Field(default=None, gt=0)
     product_id: int = Field(gt=0)
     product_name_snapshot: str
     quantity_scaled: int = Field(gt=0)
@@ -136,3 +149,17 @@ class WarehouseOperation(BaseModel):
     created_at_utc: str
     updated_at_utc: str
     revision: int = Field(gt=0)
+
+    @model_validator(mode="after")
+    def validate_operation_metadata(self) -> "WarehouseOperation":
+        if self.operation_type is WarehouseOperationType.DEVELOPMENT:
+            if not (self.development_title or "").strip():
+                raise ValueError("development title is required")
+            if self.development_group_id is None:
+                raise ValueError("development group is required")
+            if self.destination_location_id is not None:
+                raise ValueError("development cannot have a destination")
+        else:
+            if self.development_title is not None or self.development_group_id is not None:
+                raise ValueError("development metadata is only valid for development")
+        return self

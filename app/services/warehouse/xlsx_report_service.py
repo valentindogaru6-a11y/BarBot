@@ -130,6 +130,15 @@ def _write_workbook(
                 ),
                 (32, 14, 12, 22, 22, 45, 15),
             ),
+            (
+                "development",
+                "Проработка",
+                (
+                    "Дата", "Название проработки", "Продукт",
+                    "Количество", "Единица", "Комментарий",
+                ),
+                (15, 34, 32, 14, 12, 45),
+            ),
         )
         excel_date = datetime.combine(date.fromisoformat(business_date), time.min)
         for sheet_type, sheet_name, headings, widths in specifications:
@@ -171,7 +180,7 @@ def _write_workbook(
                     worksheet.write_datetime(
                         excel_row, 4, excel_date, date_format
                     )
-                else:
+                elif sheet_type == "transfer":
                     worksheet.write_string(
                         excel_row,
                         3,
@@ -192,6 +201,37 @@ def _write_workbook(
                     )
                     worksheet.write_datetime(
                         excel_row, 6, excel_date, date_format
+                    )
+                else:
+                    worksheet.write_datetime(
+                        excel_row, 0, excel_date, date_format
+                    )
+                    worksheet.write_string(
+                        excel_row,
+                        1,
+                        safe_excel_text(line.get("development_title") or ""),
+                        wrap_format,
+                    )
+                    worksheet.write_string(
+                        excel_row,
+                        2,
+                        safe_excel_text(line["product_name"]),
+                        text_format,
+                    )
+                    worksheet.write_number(
+                        excel_row, 3, quantity, quantity_format
+                    )
+                    worksheet.write_string(
+                        excel_row,
+                        4,
+                        safe_excel_text(_UNIT_LABELS[str(line["base_unit"])]),
+                        text_format,
+                    )
+                    worksheet.write_string(
+                        excel_row,
+                        5,
+                        safe_excel_text(line.get("reason_or_comment") or ""),
+                        wrap_format,
                     )
     finally:
         workbook.close()

@@ -165,6 +165,16 @@ def test_wrong_type_does_not_satisfy_requirement(environment) -> None:
         quantity_text="0.1",
         destination_location_id=destination.id,
     )
+    batch = operations.prepare_batch(
+        actor_user_id=20,
+        source_chat_id=777,
+        source_message_id=157,
+        raw_text=(
+            "проработка: Тест кофе\n"
+            f"{coffee.official_name} 0.05 кг"
+        ),
+    )
+    operations.commit_batch(int(batch["id"]), actor_user_id=20)
     session = closing.start(actor_user_id=20)
     assert _requirement(session, coffee.official_name)["status"] == "pending"
 

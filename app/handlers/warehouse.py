@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import re
 from html import escape
 
 from aiogram import F, Router
@@ -22,6 +21,7 @@ from app.keyboards.warehouse import (
     batch_lines_keyboard,
     confirm_edit_keyboard,
     delete_keyboard,
+    development_draft_keyboard,
     edit_destination_candidates,
     edit_product_candidates,
     intake_prompt_keyboard,
@@ -46,7 +46,11 @@ from app.services.warehouse.formatting import (
     operations_list_text,
     split_telegram_lines,
 )
-from app.services.warehouse.intake_parser import IntakeParseError, parse_intake_message
+from app.services.warehouse.intake_parser import (
+    IntakeParseError,
+    is_warehouse_trigger_header,
+    parse_intake_message,
+)
 from app.services.warehouse.operations_service import (
     WarehouseIntakeError,
     WarehouseOperationsService,
@@ -61,7 +65,7 @@ from app.storage.warehouse_operations_database import (
 router = Router(name=__name__)
 logger = logging.getLogger(__name__)
 
-WAREHOUSE_TITLE = "📦 <b>Списание / перемещение</b>"
+WAREHOUSE_TITLE = "📦 <b>Складские операции</b>"
 WRITEOFF_PROMPT = (
     "Отправьте одну или несколько позиций, каждую с новой строки.\n\n"
     "Пример:\nапельсин 0.15\nморковь 300 г (сгнила)\n\n"
@@ -73,7 +77,11 @@ TRANSFER_PROMPT = (
     "Пример:\nкокосовое молоко 0.25 л -> кондитерка\n"
     "сахар 1 кг -> кухня"
 )
-_TRIGGER = re.compile(r"^(списание|перемещение):", re.IGNORECASE)
+DEVELOPMENT_BODY_PROMPT = (
+    "Отправьте ингредиенты проработки построчно.\n\n"
+    "Пример:\nоблепиха 0.25 кг\nпюре маракуйя 0.1 кг\n"
+    "сироп сахарный 0.15 л"
+)
 
 
 class WarehouseTriggerFilter(BaseFilter):
@@ -84,7 +92,7 @@ class WarehouseTriggerFilter(BaseFilter):
             (line.strip() for line in message.text.splitlines() if line.strip()),
             "",
         )
-        return bool(_TRIGGER.match(first))
+        return is_warehouse_trigger_header(first)
 
 
 def _error_text(error: Exception) -> str:
@@ -177,11 +185,28 @@ async def show_warehouse_home(
         except Exception:
             logger.exception("Warehouse closing recovery check failed")
     if context.can_mutate_warehouse and active_closing is None:
-        pending = await _thread(service.pending_batch, actor_user_id=user_id)
+        pending = await _thread(service.pending_intake, actor_user_id=user_id)
         if pending is not None:
+            is_title_draft = bool(pending.get("needs_development_title"))
+            is_ingredients_draft = bool(
+                pending.get("needs_development_ingredients")
+            )
             await message.answer(
-                "У вас есть незавершённая запись.",
-                reply_markup=recovery_keyboard(int(pending["id"])),
+                (
+                    "У вас есть проработка без названия."
+                    if is_title_draft
+                    else "У вас есть незавершённая проработка."
+                    if is_ingredients_draft
+                    else "У вас есть незавершённая запись."
+                ),
+                reply_markup=(
+                    development_draft_keyboard(
+                        int(pending["id"]),
+                        needs_ingredients=is_ingredients_draft,
+                    )
+                    if is_title_draft or is_ingredients_draft
+                    else recovery_keyboard(int(pending["id"]))
+                ),
             )
             return
     status_label = {
@@ -271,6 +296,9 @@ async def _show_batch(
         "invalid_line": "не найдено корректное количество",
         "invalid_transfer_arrow": "нужна ровно одна стрелка -> и место назначения",
         "invalid_destination": "не указано корректное место назначения",
+        "header_destination_conflict": (
+            "место уже указано в заголовке — уберите стрелку из строки"
+        ),
         "malformed_parentheses": "комментарий должен быть в одной паре скобок в конце",
         "incompatible_unit": "единица несовместима с основной единицей продукта",
         "unsupported_unit": "единица измерения не поддерживается",
@@ -309,6 +337,27 @@ async def _prepare(
     except Exception:
         logger.exception("Warehouse batch preparation failed")
         await message.answer("Временная ошибка базы. Попробуйте позже.")
+        return
+    if batch.get("needs_development_title") or batch.get(
+        "needs_development_ingredients"
+    ):
+        needs_ingredients = bool(batch.get("needs_development_ingredients"))
+        await state.set_state(
+            WarehouseIntakeStates.development_body
+            if needs_ingredients
+            else WarehouseIntakeStates.missing_development_title
+        )
+        await state.update_data(development_draft_id=int(batch["id"]))
+        await message.answer(
+            (
+                DEVELOPMENT_BODY_PROMPT
+                if needs_ingredients
+                else "🧪 Укажите название проработки (до 200 символов)."
+            ),
+            reply_markup=development_draft_keyboard(
+                int(batch["id"]), needs_ingredients=needs_ingredients
+            ),
+        )
         return
     await _show_batch(message, state, service, batch, message.from_user.id)
 
@@ -349,7 +398,7 @@ async def warehouse_home(
         )
 
 
-@router.callback_query(WarehouseCallback.filter(F.action.in_({"aw", "at"})))
+@router.callback_query(WarehouseCallback.filter(F.action.in_({"aw", "at", "ad"})))
 async def intake_start(
     callback: CallbackQuery,
     callback_data: WarehouseCallback,
@@ -367,23 +416,39 @@ async def intake_start(
     ):
         return
     pending = await _thread(
-        warehouse_service.pending_batch, actor_user_id=callback.from_user.id
+        warehouse_service.pending_intake, actor_user_id=callback.from_user.id
     )
     if isinstance(callback.message, Message) and pending is not None:
         await callback.message.answer(
             "У вас есть незавершённая запись.",
-            reply_markup=recovery_keyboard(int(pending["id"])),
+            reply_markup=(
+                development_draft_keyboard(
+                    int(pending["id"]),
+                    needs_ingredients=bool(
+                        pending.get("needs_development_ingredients")
+                    ),
+                )
+                if pending.get("needs_development_title")
+                or pending.get("needs_development_ingredients")
+                else recovery_keyboard(int(pending["id"]))
+            ),
         )
         return
-    state_value = (
-        WarehouseIntakeStates.writeoff
-        if callback_data.action == "aw"
-        else WarehouseIntakeStates.transfer
-    )
+    state_value = {
+        "aw": WarehouseIntakeStates.writeoff,
+        "at": WarehouseIntakeStates.transfer,
+        "ad": WarehouseIntakeStates.development_title,
+    }[callback_data.action]
     await state.set_state(state_value)
     if isinstance(callback.message, Message):
         await callback.message.answer(
-            WRITEOFF_PROMPT if callback_data.action == "aw" else TRANSFER_PROMPT,
+            (
+                WRITEOFF_PROMPT
+                if callback_data.action == "aw"
+                else TRANSFER_PROMPT
+                if callback_data.action == "at"
+                else "🧪 Введите название проработки (до 200 символов)."
+            ),
             reply_markup=intake_prompt_keyboard(),
         )
 
@@ -400,14 +465,24 @@ async def warehouse_cancel_command(
         return
     try:
         pending = await _thread(
-            warehouse_service.pending_batch, actor_user_id=message.from_user.id
+            warehouse_service.pending_intake, actor_user_id=message.from_user.id
         )
     except AccessDeniedError:
         pending = None
     if pending:
         await message.answer(
             "Действие закрыто, но незавершённая запись сохранена.",
-            reply_markup=recovery_keyboard(int(pending["id"])),
+            reply_markup=(
+                development_draft_keyboard(
+                    int(pending["id"]),
+                    needs_ingredients=bool(
+                        pending.get("needs_development_ingredients")
+                    ),
+                )
+                if pending.get("needs_development_title")
+                or pending.get("needs_development_ingredients")
+                else recovery_keyboard(int(pending["id"]))
+            ),
         )
     else:
         await message.answer("Действие отменено.")
@@ -443,6 +518,137 @@ async def intake_text(
         else "перемещение:"
     )
     await _prepare(message, state, warehouse_service, f"{trigger}\n{message.text or ''}")
+
+
+@router.message(WarehouseIntakeStates.development_title, F.text)
+async def development_title_text(
+    message: Message,
+    state: FSMContext,
+    warehouse_service: WarehouseOperationsService,
+) -> None:
+    if message.from_user is None:
+        return
+    title = (message.text or "").strip()
+    if not title or len(title) > 200:
+        await message.answer("Название должно содержать от 1 до 200 символов.")
+        return
+    try:
+        draft = await _thread(
+            warehouse_service.start_development_draft,
+            title,
+            actor_user_id=message.from_user.id,
+            source_chat_id=message.chat.id,
+            source_message_id=message.message_id,
+        )
+    except Exception as exc:
+        await message.answer(_error_text(exc))
+        return
+    if draft.get("needs_development_title"):
+        await state.set_state(WarehouseIntakeStates.missing_development_title)
+        await state.update_data(development_draft_id=int(draft["id"]))
+        await message.answer("Сначала завершите предыдущую проработку.")
+        return
+    await state.set_state(WarehouseIntakeStates.development_body)
+    await state.update_data(development_draft_id=int(draft["id"]))
+    await message.answer(DEVELOPMENT_BODY_PROMPT, reply_markup=intake_prompt_keyboard())
+
+
+@router.message(WarehouseIntakeStates.development_body, F.text)
+async def development_body_text(
+    message: Message,
+    state: FSMContext,
+    warehouse_service: WarehouseOperationsService,
+) -> None:
+    data = await state.get_data()
+    if message.from_user is None:
+        return
+    try:
+        batch = await _thread(
+            warehouse_service.complete_development_ingredients,
+            int(data.get("development_draft_id", 0)),
+            message.text or "",
+            actor_user_id=message.from_user.id,
+        )
+    except Exception as exc:
+        await message.answer(_error_text(exc))
+        return
+    await _show_batch(message, state, warehouse_service, batch, message.from_user.id)
+
+
+@router.callback_query(WarehouseCallback.filter(F.action == "dr"))
+async def development_draft_resume(
+    callback: CallbackQuery,
+    callback_data: WarehouseCallback,
+    state: FSMContext,
+    warehouse_service: WarehouseOperationsService,
+) -> None:
+    await callback.answer()
+    pending = await _thread(
+        warehouse_service.pending_intake,
+        actor_user_id=callback.from_user.id,
+    )
+    needs_ingredients = bool(
+        pending
+        and int(pending["id"]) == callback_data.object_id
+        and pending.get("needs_development_ingredients")
+    )
+    await state.set_state(
+        WarehouseIntakeStates.development_body
+        if needs_ingredients
+        else WarehouseIntakeStates.missing_development_title
+    )
+    await state.update_data(development_draft_id=callback_data.object_id)
+    if isinstance(callback.message, Message):
+        await callback.message.answer(
+            DEVELOPMENT_BODY_PROMPT
+            if needs_ingredients
+            else "🧪 Укажите название проработки (до 200 символов)."
+        )
+
+
+@router.message(WarehouseIntakeStates.missing_development_title, F.text)
+async def missing_development_title_text(
+    message: Message,
+    state: FSMContext,
+    warehouse_service: WarehouseOperationsService,
+) -> None:
+    if message.from_user is None:
+        return
+    data = await state.get_data()
+    try:
+        batch = await _thread(
+            warehouse_service.complete_development_title,
+            int(data.get("development_draft_id", 0)),
+            message.text or "",
+            actor_user_id=message.from_user.id,
+        )
+    except Exception as exc:
+        await message.answer(_error_text(exc))
+        return
+    await _show_batch(message, state, warehouse_service, batch, message.from_user.id)
+
+
+@router.callback_query(WarehouseCallback.filter(F.action == "dy"))
+async def development_draft_cancel(
+    callback: CallbackQuery,
+    callback_data: WarehouseCallback,
+    state: FSMContext,
+    warehouse_service: WarehouseOperationsService,
+) -> None:
+    await callback.answer()
+    try:
+        await _thread(
+            warehouse_service.cancel_development_draft,
+            callback_data.object_id,
+            actor_user_id=callback.from_user.id,
+        )
+    except Exception as exc:
+        if isinstance(callback.message, Message):
+            await callback.message.answer(_error_text(exc))
+        return
+    await state.clear()
+    if isinstance(callback.message, Message):
+        await callback.message.answer("Незавершённая проработка отменена.")
 
 
 @router.callback_query(WarehouseCallback.filter(F.action == "br"))
@@ -663,7 +869,11 @@ async def batch_commit(
     await state.clear()
     if not isinstance(callback.message, Message):
         return
-    kind = "Списание" if operations[0]["operation_type"] == "writeoff" else "Перемещение"
+    kind = {
+        "writeoff": "Списание",
+        "transfer": "Перемещение",
+        "development": "Проработка",
+    }[str(operations[0]["operation_type"])]
     lines = [f"✅ <b>{kind} сохранено</b>", ""]
     lines.extend(
         f"• {escape(str(item['product_name_snapshot']))} — "
@@ -690,6 +900,8 @@ async def batch_commit(
                 and row["product_id"] == item["product_id"]
                 and row["source_location_id"] == item["source_location_id"]
                 and row["destination_location_id"] == item["destination_location_id"]
+                and row.get("development_group_id")
+                == item.get("development_group_id")
             ),
             None,
         )
@@ -720,12 +932,22 @@ async def _show_records(
     )
     writeoffs = sum(item["operation_type"] == "writeoff" for item in operations)
     transfers = sum(item["operation_type"] == "transfer" for item in operations)
+    developments = sum(item["operation_type"] == "development" for item in operations)
+    development_groups = len(
+        {
+            int(item["development_group_id"])
+            for item in operations
+            if item["operation_type"] == "development"
+        }
+    )
     await edit_or_send_text(
         message,
         "📋 <b>Записи текущей смены</b>\n"
         f"{format_business_date(str(shift['business_date']))}\n\n"
         f"♻️ Списание: {writeoffs} записей\n"
-        f"🚚 Перемещение: {transfers} записей",
+        f"🚚 Перемещение: {transfers} записей\n"
+        f"🧪 Проработка: {developments} позиций в "
+        f"{development_groups} проработках",
         records_keyboard(shift["id"]),
     )
 
@@ -745,7 +967,7 @@ async def records_home(
             await callback.message.answer(_error_text(exc))
 
 
-@router.callback_query(WarehouseCallback.filter(F.action.in_({"lw", "lt"})))
+@router.callback_query(WarehouseCallback.filter(F.action.in_({"lw", "lt", "ld"})))
 async def operation_list(
     callback: CallbackQuery,
     callback_data: WarehouseCallback,
@@ -753,10 +975,11 @@ async def operation_list(
     warehouse_service: WarehouseOperationsService,
 ) -> None:
     await callback.answer()
-    kind = (
-        WarehouseOperationType.WRITEOFF
-        if callback_data.action == "lw" else WarehouseOperationType.TRANSFER
-    )
+    kind = {
+        "lw": WarehouseOperationType.WRITEOFF,
+        "lt": WarehouseOperationType.TRANSFER,
+        "ld": WarehouseOperationType.DEVELOPMENT,
+    }[callback_data.action]
     try:
         shift = await _thread(
             warehouse_service.shift_by_id,
@@ -966,6 +1189,23 @@ async def edit_destination_start(
     )
 
 
+@router.callback_query(WarehouseCallback.filter(F.action == "eg"))
+async def edit_development_title_start(
+    callback: CallbackQuery,
+    callback_data: WarehouseCallback,
+    state: FSMContext,
+    auth_service: AuthService,
+) -> None:
+    await _start_operation_edit(
+        callback,
+        callback_data,
+        state,
+        auth_service,
+        WarehouseOperationEditStates.development_title,
+        "Введите новое название всей проработки (до 200 символов).",
+    )
+
+
 @router.message(WarehouseOperationEditStates.product, F.text)
 async def edit_product_text(
     message: Message,
@@ -1139,6 +1379,38 @@ async def edit_note_text(
     )
 
 
+@router.message(WarehouseOperationEditStates.development_title, F.text)
+async def edit_development_title_text(
+    message: Message,
+    state: FSMContext,
+    warehouse_service: WarehouseOperationsService,
+) -> None:
+    if message.from_user is None:
+        return
+    title = (message.text or "").strip()
+    if not title or len(title) > 200:
+        await message.answer("Название должно содержать от 1 до 200 символов.")
+        return
+    data = await state.get_data()
+    operation = await _thread(
+        warehouse_service.operation_view,
+        int(data["operation_id"]),
+        actor_user_id=message.from_user.id,
+    )
+    if operation is None or operation["operation_type"] != "development":
+        await message.answer("Проработка не найдена.")
+        return
+    await state.set_state(WarehouseOperationEditStates.confirm)
+    await state.update_data(edit_kind="development_title", development_title=title)
+    await message.answer(
+        "Переименовать всю проработку во всех её позициях?\n\n"
+        f"Новое название: {escape(title)}",
+        reply_markup=confirm_edit_keyboard(
+            int(operation["id"]), int(operation["revision"])
+        ),
+    )
+
+
 @router.message(WarehouseOperationEditStates.destination, F.text)
 async def edit_destination_text(
     message: Message,
@@ -1267,7 +1539,14 @@ async def edit_confirm(
                 warehouse_service.update_note,
                 callback_data.object_id,
                 reason_text=data.get("note") if operation["operation_type"] == "writeoff" else None,
-                comment_text=data.get("note") if operation["operation_type"] == "transfer" else None,
+                comment_text=data.get("note") if operation["operation_type"] != "writeoff" else None,
+                **common,
+            )
+        elif kind == "development_title":
+            updated = await _thread(
+                warehouse_service.rename_development,
+                callback_data.object_id,
+                str(data["development_title"]),
                 **common,
             )
         else:

@@ -143,14 +143,20 @@ async def _show_session(
     if requirement is None:
         await state.clear()
         overview = await _thread(service.overview, actor_user_id=user_id)
-        is_empty = overview["writeoffs"] == 0 and overview["transfers"] == 0
+        is_empty = (
+            overview["writeoffs"] == 0
+            and overview["transfers"] == 0
+            and overview.get("developments", 0) == 0
+        )
         if is_empty:
             text = "В смене нет операций для отчёта. Закрыть её с пустым Excel?"
         else:
             text = (
                 "✅ <b>Обязательные позиции заполнены</b>\n\n"
                 f"Списание: {overview['writeoffs']} записей\n"
-                f"Перемещение: {overview['transfers']} записей\n\n"
+                f"Перемещение: {overview['transfers']} записей\n"
+                f"Проработка: {overview.get('developments', 0)} позиций в "
+                f"{overview.get('development_groups', 0)} проработках\n\n"
                 "Подготовить смену к формированию отчёта?"
             )
         await edit_or_send_text(
@@ -224,6 +230,8 @@ async def closing_summary(
             f"Смена: {format_business_date(str(shift['business_date']))}\n"
             f"Списание: {overview['writeoffs']} записей\n"
             f"Перемещение: {overview['transfers']} записей\n"
+            f"Проработка: {overview.get('developments', 0)} позиций в "
+            f"{overview.get('development_groups', 0)} проработках\n"
             "Обязательные позиции: "
             f"{overview['requirements_resolved']} из "
             f"{overview['requirements_total']} заполнено",
@@ -548,7 +556,11 @@ async def closing_finalize(
             warehouse_closing_service.overview,
             actor_user_id=callback.from_user.id,
         )
-        is_empty = overview["writeoffs"] == 0 and overview["transfers"] == 0
+        is_empty = (
+            overview["writeoffs"] == 0
+            and overview["transfers"] == 0
+            and overview.get("developments", 0) == 0
+        )
         if is_empty and callback_data.action != "ce":
             if isinstance(callback.message, Message):
                 await edit_or_send_text(

@@ -15,6 +15,7 @@ from app.models.warehouse.nomenclature import BaseUnit, WarehouseName
 class SeedOperationType(StrEnum):
     WRITEOFF = "writeoff"
     TRANSFER = "transfer"
+    DEVELOPMENT = "development"
 
 
 class WarehouseRequiredRule(BaseModel):
@@ -66,7 +67,7 @@ class WarehouseSeedProduct(BaseModel):
     @model_validator(mode="after")
     def validate_product(self) -> "WarehouseSeedProduct":
         if set(self.allowed_operation_types) != set(SeedOperationType):
-            raise ValueError("both writeoff and transfer are required")
+            raise ValueError("writeoff, transfer and development are required")
         if len(self.allowed_operation_types) != len(set(self.allowed_operation_types)):
             raise ValueError("operation types must be unique")
         if (self.review_status == "owner_required") != (self.owner_metadata is not None):
