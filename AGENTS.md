@@ -51,12 +51,18 @@ shell tracing и другие способы, способные раскрыт�
 `invalid`, без длины/фрагментов значения. Нельзя выводить реальные Telegram ID
 или персональные данные. Stage 0 не разрешает изменять DB/permissions,
 останавливать или запускать service, создавать backup либо отправлять сообщения.
+Логический SQLite read-only (`mode=ro`, `query_only=ON`) не гарантирует
+отсутствие filesystem side effects: SQLite может создать или обновить runtime
+`-wal`/`-shm`. Их нельзя удалять либо подменять при работающем service.
 
 ### Stage 1 — stop and verified backup
 
 Только после отдельного подтверждения Stage 1 разрешено остановить ровно один
 подтверждённый systemd unit, доказать отсутствие polling owners, создать новый
-verified backup и проверить backup-копию. Переход к migration не автоматический.
+verified backup в `/opt/barbot-backups/production` и проверить backup-копию.
+Каждый timestamp target должен быть новым и не перезаписываться. Требуемое
+permission hardening выполняется только после verified backup, пока service
+остановлен, и до migration/start. Переход к migration не автоматический.
 
 ### Stage 2 — migration/import
 

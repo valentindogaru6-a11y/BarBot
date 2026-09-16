@@ -40,6 +40,9 @@ cd /opt/barbot
 Any `FAIL` is a stop condition. Resolve warnings explicitly in the change log.
 Do not change DB/audit/report permissions during Stage 0. Any required
 permission hardening must be named and approved as a separate rollout action.
+For a supported old schema or a not-yet-needed report directory, use only the
+explicit controlled flags documented in `production_readiness.md`. A valid old
+schema means migration is required after backup, never during inspection.
 
 ## Stop point 1 — identity and rollback authorization
 
@@ -67,7 +70,7 @@ BARBOT_REPO='/opt/barbot'
 BARBOT_DB='<operator-confirmed-absolute-db-path>'
 BARBOT_REPORTS='<operator-confirmed-absolute-report-directory>'
 BARBOT_AUDIT='<operator-confirmed-absolute-audit-path>'
-BARBOT_BACKUP_ROOT='<operator-confirmed-dedicated-backup-directory>'
+BARBOT_BACKUP_ROOT='/opt/barbot-backups/production'
 
 sudo systemctl stop "$BARBOT_SERVICE"
 sudo systemctl is-active "$BARBOT_SERVICE"
@@ -77,6 +80,11 @@ sudo systemctl is-active "$BARBOT_SERVICE"
 `python -m app.bot` process for this instance and no other polling owner. Do
 not proceed on `activating`, `deactivating`, `failed` without diagnosis, or an
 ambiguous process list.
+
+Before creation, preflight must accept the approved backup root and a direct,
+non-existing `YYYYMMDDTHHMMSSZ` target. Reject `/`, `/opt`, the service user's
+home, repository root, production data/report/audit/catalog paths, symlinks,
+collisions, and any existing target. Nothing is created during Stage 0.
 
 ## Consistent backup
 
@@ -135,6 +143,11 @@ separate, non-overwriting artifacts with restrictive permissions. Include
 their checksums in `SHA256SUMS`; do not archive `.env` or print secrets. Record
 whether `-wal`/`-shm` existed, but the SQLite backup API output is the restore
 source.
+
+Only after this backup is verified, keep the service stopped and apply the
+recorded permission hardening: sensitive runtime files `0600`, runtime
+directories `0750` or stricter, and backup root/destination `0700`. Complete
+hardening before migration or start.
 
 ## Migration and seed
 

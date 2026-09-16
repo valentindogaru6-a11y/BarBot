@@ -84,6 +84,32 @@ cd /opt/barbot
   --polling-owner-count 1
 ```
 
+Logical SQLite read-only is not the same as zero filesystem side effects.
+SQLite may create or update runtime `-wal`/`-shm` files while resolving a live
+WAL database even with `mode=ro` and `query_only=ON`. The inspection path never
+runs `UserDatabase.initialize()`, migrations, `journal_mode`, a WAL checkpoint,
+or `chmod`, but operators must treat sidecars as live runtime state. Never
+delete them while the service is running. Git ignores SQLite sidecars.
+
+Strict mode still requires schema v11 and existing runtime paths. An explicitly
+authorized controlled Stage 0 may add:
+
+```bash
+  --allow-supported-upgrade \
+  --allow-missing-runtime-paths \
+  --backup-root /opt/barbot-backups/production \
+  --backup-target /opt/barbot-backups/production/<YYYYMMDDTHHMMSSZ>
+```
+
+`--allow-supported-upgrade` converts only a structurally valid v1–v10 with a
+complete migration chain into `WARN: supported migration required`; it does
+not migrate. Migration is permitted only after the verified backup and the
+next stop point. v0, future, structurally invalid, incomplete-chain,
+integrity/FK, and open failures remain blocking. `--allow-missing-runtime-paths`
+allows only a safe, repository-contained, non-symlink missing report directory
+while warehouse is disabled; Stage 1 creates it with mode `0750`. Enabled
+warehouse, traversal, broad paths, collisions, files, and symlinks still fail.
+
 Required secrets/IDs must already exist in the process environment; preflight
 never prints their values. It reports `PASS`, `WARN`, `FAIL`, or `SKIP` and
 returns non-zero when a blocking check fails. `--allow-temporary-paths` exists
@@ -108,10 +134,13 @@ The single service account must be able to traverse the repository and read:
 - Vosk model files when voice search is enabled.
 
 It needs read/write access only to the configured SQLite parent, report
-directory, `logs/`, and `backups/`. Recommended starting modes are directories
-`0750` (or stricter) and SQLite/report/audit files `0640` (or stricter), owned
-by the service account and its dedicated group. DB, WAL/SHM, reports, audit,
-and backups must not be world-readable.
+directory and `logs/`. Required modes are runtime directories `0750` (or
+stricter), SQLite/WAL/SHM/report/audit files `0600` (or stricter), and the
+dedicated backup root `/opt/barbot-backups/production` at `0700` (or stricter).
+Preflight only reports broad modes as warnings and never calls `chmod`.
+Hardening is ordered after the verified backup while the service is stopped,
+and before migration or restart. Therefore a clean controlled check with mode
+warnings reports `READY FOR BACKUP WITH REQUIRED POST-BACKUP HARDENING`.
 
 ## Automated rehearsals
 
@@ -159,9 +188,11 @@ rehearsal does not introduce float drift.
 No external monitoring dependency is introduced by Phase 10A.
 
 The first attempted Stage 0 stopped with `NO-GO` and made no production
-mutation. Production permission hardening is an operational change and must be
-performed only as a separately authorized rollout action, never inferred from
-read-only inspection.
+mutation. The hardened Stage 0 inspection is a separate task after its code
+commit; this development phase does not authorize running it on production.
+Production permission hardening is an operational change and must be performed
+only as a separately authorized rollout action, never inferred from read-only
+inspection.
 
 ## Security review outcome
 

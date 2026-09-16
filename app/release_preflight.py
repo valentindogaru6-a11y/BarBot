@@ -12,14 +12,14 @@ import argparse
 import importlib
 import json
 import os
-import sqlite3
+import re
+import stat
 import sys
 import tempfile
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from typing import Mapping, Sequence
-from urllib.parse import quote
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.config import PROJECT_ROOT
@@ -29,6 +29,10 @@ from app.services.warehouse.seed_service import (
     load_warehouse_seed,
 )
 from app.storage.migrations import CURRENT_SCHEMA_VERSION
+from app.storage.release_inspection import (
+    SQLiteInspectionError,
+    inspect_sqlite_database,
+)
 
 EXPECTED_PYTHON = (3, 12)
 EXPECTED_TIMEZONE = "Europe/Kyiv"
@@ -39,6 +43,8 @@ DEFAULT_CATALOG_PATH = PROJECT_ROOT / "data" / "catalog.json"
 DEFAULT_DATABASE_PATH = PROJECT_ROOT / "data" / "barbot.db"
 DEFAULT_REPORT_PATH = PROJECT_ROOT / "reports" / "warehouse"
 DEFAULT_AUDIT_PATH = PROJECT_ROOT / "logs" / "admin_audit.jsonl"
+DEFAULT_BACKUP_ROOT = Path("/opt/barbot-backups/production")
+BACKUP_STAMP_PATTERN = re.compile(r"^\d{8}T\d{6}Z$")
 
 
 class Status(StrEnum):
@@ -58,10 +64,23 @@ class Check:
 @dataclass(frozen=True, slots=True)
 class PreflightResult:
     checks: tuple[Check, ...]
+    controlled_rollout: bool = False
 
     @property
     def exit_code(self) -> int:
         return 2 if any(check.status is Status.FAIL for check in self.checks) else 0
+
+    @property
+    def verdict(self) -> str:
+        if self.exit_code:
+            return "NO-GO"
+        hardening = any(
+            check.name.startswith("permissions.") and check.status is Status.WARN
+            for check in self.checks
+        )
+        if self.controlled_rollout and hardening:
+            return "READY FOR BACKUP WITH REQUIRED POST-BACKUP HARDENING"
+        return "READY FOR BACKUP" if self.controlled_rollout else "PASS"
 
     def render(self) -> str:
         lines = [
@@ -76,6 +95,8 @@ class PreflightResult:
             "SUMMARY "
             + " ".join(f"{status.value}={counts[status]}" for status in Status)
         )
+        if self.controlled_rollout:
+            lines.append(f"VERDICT {self.verdict}")
         return "\n".join(lines)
 
 
@@ -84,6 +105,38 @@ def _path(value: str | Path, *, root: Path = PROJECT_ROOT) -> Path:
     if not candidate.is_absolute():
         candidate = root / candidate
     return candidate.resolve(strict=False)
+
+
+def _lexical_path(value: str | Path, *, root: Path) -> tuple[Path, bool]:
+    """Return a normalized absolute path and whether input contained traversal."""
+
+    source = Path(value).expanduser()
+    traversal = ".." in source.parts
+    if not source.is_absolute():
+        source = root / source
+    return Path(os.path.abspath(source)), traversal
+
+
+def _has_symlink_component(path: Path) -> bool:
+    current = Path(path.anchor)
+    for part in path.parts[1:]:
+        current /= part
+        try:
+            if stat.S_ISLNK(current.lstat().st_mode):
+                return True
+        except FileNotFoundError:
+            continue
+    return False
+
+
+def _nearest_existing_parent(path: Path) -> Path | None:
+    current = path
+    while not current.exists():
+        parent = current.parent
+        if parent == current:
+            return None
+        current = parent
+    return current if current.is_dir() else None
 
 
 def _configured(environment: Mapping[str, str], key: str) -> bool:
@@ -143,39 +196,182 @@ def _writable_target(path: Path, *, expect_directory: bool) -> tuple[Status, str
     return Status.PASS, "existing target is accessible" if path.exists() else "parent can prepare target"
 
 
-def _check_database(path: Path) -> list[Check]:
+def _check_database(path: Path, *, allow_supported_upgrade: bool) -> list[Check]:
     if not path.is_file():
         return [Check("database.read_only", Status.FAIL, "database file is missing")]
-    connection: sqlite3.Connection | None = None
     try:
-        uri = f"file:{quote(str(path), safe='/')}?mode=ro"
-        connection = sqlite3.connect(uri, uri=True, timeout=5, isolation_level=None)
-        connection.execute("PRAGMA query_only=ON")
-        version = int(connection.execute("PRAGMA user_version").fetchone()[0])
-        integrity = str(connection.execute("PRAGMA integrity_check").fetchone()[0])
-        foreign_keys = connection.execute("PRAGMA foreign_key_check").fetchall()
-    except sqlite3.Error:
+        inspection = inspect_sqlite_database(path)
+    except SQLiteInspectionError:
         return [Check("database.read_only", Status.FAIL, "read-only validation failed")]
-    finally:
-        if connection is not None:
-            connection.close()
+    version = inspection.version
+    supported_upgrade = (
+        allow_supported_upgrade
+        and 1 <= version < CURRENT_SCHEMA_VERSION
+        and inspection.schema_compatible
+        and inspection.migration_chain_complete
+    )
+    schema_ok = version == CURRENT_SCHEMA_VERSION and inspection.schema_compatible
+    schema_status = (
+        Status.PASS if schema_ok
+        else Status.WARN if supported_upgrade
+        else Status.FAIL
+    )
+    schema_detail = (
+        f"v{version}; expected v{CURRENT_SCHEMA_VERSION}"
+        if schema_ok
+        else f"supported migration required: v{version} → v{CURRENT_SCHEMA_VERSION}"
+        if supported_upgrade
+        else (
+            f"v{version}; expected a valid schema with complete migration "
+            f"chain to v{CURRENT_SCHEMA_VERSION}"
+        )
+    )
     return [
-        Check(
-            "database.schema",
-            Status.PASS if version == CURRENT_SCHEMA_VERSION else Status.FAIL,
-            f"v{version}; expected v{CURRENT_SCHEMA_VERSION}",
-        ),
+        Check("database.schema", schema_status, schema_detail),
         Check(
             "database.integrity",
-            Status.PASS if integrity == "ok" else Status.FAIL,
-            "integrity_check ok" if integrity == "ok" else "integrity_check failed",
+            Status.PASS if inspection.integrity_ok else Status.FAIL,
+            "integrity_check ok" if inspection.integrity_ok else "integrity_check failed",
         ),
         Check(
             "database.foreign_keys",
-            Status.PASS if not foreign_keys else Status.FAIL,
-            "no violations" if not foreign_keys else "foreign key violations found",
+            Status.PASS if not inspection.foreign_key_violations else Status.FAIL,
+            "no violations" if not inspection.foreign_key_violations
+            else f"foreign key violations found: {inspection.foreign_key_violations}",
         ),
     ]
+
+
+def _permission_check(
+    name: str,
+    path: Path,
+    *,
+    directory: bool,
+    owner_only_directory: bool = False,
+) -> Check:
+    if not path.exists():
+        return Check(f"permissions.{name}", Status.SKIP, "path does not exist yet")
+    mode = stat.S_IMODE(path.stat().st_mode)
+    allowed = (
+        (mode & 0o077) == 0
+        if owner_only_directory or not directory
+        else (mode & 0o027) == 0
+    )
+    policy = (
+        "0700 or stricter" if owner_only_directory
+        else "0750 or stricter" if directory
+        else "0600 or stricter"
+    )
+    return Check(
+        f"permissions.{name}",
+        Status.PASS if allowed else Status.WARN,
+        f"mode {mode:04o}; {policy} required"
+        + (" after verified backup while service is stopped" if not allowed else ""),
+    )
+
+
+def _report_file_permission_check(path: Path) -> Check:
+    if not path.is_dir():
+        return Check(
+            "permissions.report_files",
+            Status.SKIP,
+            "report directory does not exist yet",
+        )
+    report_files = tuple(item for item in path.rglob("*.xlsx") if item.is_file())
+    broad = sum(
+        stat.S_IMODE(item.stat().st_mode) & 0o077 != 0
+        for item in report_files
+    )
+    return Check(
+        "permissions.report_files",
+        Status.WARN if broad else Status.PASS,
+        f"files={len(report_files)} broad_modes={broad}; 0600 or stricter required"
+        + (" after verified backup while service is stopped" if broad else ""),
+    )
+
+
+def _check_backup_policy(
+    backup_root: Path,
+    *,
+    backup_target: Path | None,
+    project_root: Path,
+    database: Path,
+    reports: Path,
+    audit: Path,
+    catalog: Path,
+    allow_temporary_paths: bool,
+) -> list[Check]:
+    resolved = backup_root.resolve(strict=False)
+    forbidden = {
+        Path("/"),
+        Path.home().resolve(),
+        project_root.resolve(),
+        database.parent.resolve(),
+    }
+    collision = (
+        resolved in forbidden
+        or any(
+            resolved == path.resolve(strict=False)
+            or _inside(resolved, path.resolve(strict=False))
+            or _inside(path.resolve(strict=False), resolved)
+            for path in (database, reports, audit, catalog)
+        )
+    )
+    unsafe = (
+        _has_symlink_component(backup_root)
+        or collision
+        or backup_root == Path("/opt")
+        or (not allow_temporary_paths and backup_root != DEFAULT_BACKUP_ROOT)
+    )
+    if backup_root.exists() and not backup_root.is_dir():
+        root_check = Check(
+            "backup.root", Status.FAIL, "backup root is not a directory"
+        )
+    elif unsafe:
+        root_check = Check(
+            "backup.root",
+            Status.FAIL,
+            "unsafe, symlinked, broad, or colliding backup root",
+        )
+    else:
+        parent = _nearest_existing_parent(backup_root)
+        root_check = Check(
+            "backup.root",
+            Status.PASS if parent is not None else Status.FAIL,
+            "approved root exists"
+            if backup_root.exists()
+            else "approved root can be prepared at Stage 1",
+        )
+    checks = [
+        root_check,
+        _permission_check(
+            "backup_root",
+            backup_root,
+            directory=True,
+            owner_only_directory=True,
+        ),
+    ]
+    if backup_target is None:
+        checks.append(Check(
+            "backup.timestamp_target",
+            Status.SKIP,
+            "Stage 1 timestamp target not supplied",
+        ))
+    else:
+        valid_name = bool(BACKUP_STAMP_PATTERN.fullmatch(backup_target.name))
+        valid_parent = backup_target.parent == backup_root
+        valid = (
+            valid_name
+            and valid_parent
+            and not backup_target.exists()
+            and not backup_target.is_symlink()
+        )
+        checks.append(Check(
+            "backup.timestamp_target", Status.PASS if valid else Status.FAIL,
+            "new non-existing timestamp target" if valid
+            else "target must be a new direct YYYYMMDDTHHMMSSZ child of backup root",
+        ))
+    return checks
 
 
 def run_preflight(
@@ -191,25 +387,45 @@ def run_preflight(
     polling_owner_count: int | None = None,
     config_check_only: bool = False,
     allow_temporary_paths: bool = False,
+    allow_supported_upgrade: bool = False,
+    allow_missing_runtime_paths: bool = False,
+    backup_root: str | Path = DEFAULT_BACKUP_ROOT,
+    backup_target: str | Path | None = None,
     project_root: Path = PROJECT_ROOT,
 ) -> PreflightResult:
     """Return deterministic checks without changing any target."""
 
     root = project_root.resolve()
+    database_raw = database_path or environment.get(
+        "DATABASE_PATH", DEFAULT_DATABASE_PATH
+    )
+    report_raw = report_path or environment.get(
+        "WAREHOUSE_REPORTS_PATH", DEFAULT_REPORT_PATH
+    )
+    audit_raw = audit_path or DEFAULT_AUDIT_PATH
+    catalog_raw = catalog_path or environment.get(
+        "CATALOG_PATH", DEFAULT_CATALOG_PATH
+    )
     database = _path(
-        database_path or environment.get("DATABASE_PATH", DEFAULT_DATABASE_PATH),
+        database_raw,
         root=root,
     )
     reports = _path(
-        report_path or environment.get("WAREHOUSE_REPORTS_PATH", DEFAULT_REPORT_PATH),
+        report_raw,
         root=root,
     )
-    audit = _path(audit_path or DEFAULT_AUDIT_PATH, root=root)
+    audit = _path(audit_raw, root=root)
     catalog = _path(
-        catalog_path or environment.get("CATALOG_PATH", DEFAULT_CATALOG_PATH),
+        catalog_raw,
         root=root,
     )
     seed = _path(seed_path, root=root)
+    backup_root_path, backup_root_traversal = _lexical_path(backup_root, root=root)
+    backup_target_path, backup_target_traversal = (
+        _lexical_path(backup_target, root=root)
+        if backup_target is not None else (None, False)
+    )
+    controlled = allow_supported_upgrade or allow_missing_runtime_paths
     checks: list[Check] = []
 
     checks.append(Check(
@@ -280,13 +496,28 @@ def run_preflight(
             f"{service.timezone} {service.cutoff}; expected Europe/Kyiv 23:00",
         ))
 
-    paths = (("database", database, False), ("reports", reports, True),
-             ("audit", audit, False), ("catalog", catalog, False))
-    for name, path, is_directory in paths:
+    paths = (("database", database, database_raw, False),
+             ("reports", reports, report_raw, True),
+             ("audit", audit, audit_raw, False),
+             ("catalog", catalog, catalog_raw, False))
+    for name, path, raw_path, is_directory in paths:
+        lexical, traversal = _lexical_path(raw_path, root=root)
+        if traversal or _has_symlink_component(lexical):
+            checks.append(Check(f"path.{name}", Status.FAIL, "path contains traversal or symlink"))
+            continue
         if _unsafe_broad(path, root):
             checks.append(Check(f"path.{name}", Status.FAIL, "unsafe broad path"))
             continue
         status, detail = _writable_target(path, expect_directory=is_directory)
+        if (
+            name == "reports" and status is Status.FAIL
+            and not path.exists() and allow_missing_runtime_paths
+            and not warehouse_enabled and _inside(path, root)
+        ):
+            parent = _nearest_existing_parent(path)
+            if parent is not None and os.access(parent, os.W_OK | os.X_OK):
+                status = Status.WARN
+                detail = "missing; safely preparable at Stage 1 with mode 0750"
         checks.append(Check(f"path.{name}", status, detail))
     overlap = (
         database == audit
@@ -324,6 +555,32 @@ def run_preflight(
         Status.PASS if catalog.is_file() else Status.FAIL,
         "catalog file exists" if catalog.is_file() else "catalog file is missing",
     ))
+
+    checks.extend((
+        _permission_check("database", database, directory=False),
+        _permission_check("database_wal", Path(f"{database}-wal"), directory=False),
+        _permission_check("database_shm", Path(f"{database}-shm"), directory=False),
+        _permission_check("catalog", catalog, directory=False),
+        _permission_check("audit", audit, directory=False),
+        _permission_check("data_directory", database.parent, directory=True),
+        _permission_check("reports_directory", reports, directory=True),
+        _permission_check("audit_directory", audit.parent, directory=True),
+        _report_file_permission_check(reports),
+    ))
+    checks.extend(_check_backup_policy(
+        backup_root_path,
+        backup_target=backup_target_path,
+        project_root=root,
+        database=database,
+        reports=reports,
+        audit=audit,
+        catalog=catalog,
+        allow_temporary_paths=allow_temporary_paths,
+    ))
+    if backup_root_traversal:
+        checks.append(Check("backup.path_input", Status.FAIL, "backup root contains traversal"))
+    if backup_target_traversal:
+        checks.append(Check("backup.target_input", Status.FAIL, "backup target contains traversal"))
 
     if polling_owner_count is None:
         checks.append(Check("polling.owner", Status.SKIP, "operator count not supplied"))
@@ -394,8 +651,10 @@ def run_preflight(
     if config_check_only:
         checks.append(Check("database.read_only", Status.SKIP, "config-check-only mode"))
     else:
-        checks.extend(_check_database(database))
-    return PreflightResult(tuple(checks))
+        checks.extend(_check_database(
+            database, allow_supported_upgrade=allow_supported_upgrade
+        ))
+    return PreflightResult(tuple(checks), controlled_rollout=controlled)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -410,6 +669,10 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--cutoff", default=EXPECTED_CUTOFF)
     parser.add_argument("--polling-owner-count", type=int)
     parser.add_argument("--allow-temporary-paths", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--allow-supported-upgrade", action="store_true")
+    parser.add_argument("--allow-missing-runtime-paths", action="store_true")
+    parser.add_argument("--backup-root", default=str(DEFAULT_BACKUP_ROOT))
+    parser.add_argument("--backup-target")
     return parser
 
 
@@ -427,6 +690,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         polling_owner_count=arguments.polling_owner_count,
         config_check_only=arguments.config_check_only,
         allow_temporary_paths=arguments.allow_temporary_paths,
+        allow_supported_upgrade=arguments.allow_supported_upgrade,
+        allow_missing_runtime_paths=arguments.allow_missing_runtime_paths,
+        backup_root=arguments.backup_root,
+        backup_target=arguments.backup_target,
     )
     print(result.render())
     return result.exit_code

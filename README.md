@@ -708,6 +708,15 @@ python -m app.release_preflight --config-check-only --polling-owner-count 1
 `docs/production_readiness.md`, `docs/production_rollout.md` и
 `docs/production_rollback.md`.
 
+Для отдельно разрешённого controlled Stage 0 preflight поддерживает
+`--allow-supported-upgrade` (валидная v1–v10 становится предупреждением о
+миграции после backup) и `--allow-missing-runtime-paths` (отсутствующий каталог
+отчётов допустим только при выключенном warehouse). Approved backup root:
+`/opt/barbot-backups/production`; новый timestamp target можно проверить через
+`--backup-target`. Логический SQLite read-only не означает отсутствия
+filesystem side effects: SQLite может создать или обновить `-wal`/`-shm`;
+runtime sidecars игнорируются Git и не удаляются при работающем service.
+
 Backend распознаёт только точные triggers первой непустой строки:
 
 ```text

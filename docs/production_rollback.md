@@ -56,3 +56,9 @@ approved operational process.
 If the restored schema and previous code cannot be proven compatible, keep the
 service stopped and declare the rollout blocked. Never improvise SQL downgrade
 statements in production.
+
+SQLite runtime sidecars are ignored by Git but remain part of live operational
+state. Logical read-only access can still create or update them; never remove,
+truncate, or replace `-wal`/`-shm` while the service is running. Rollback may
+move them only after the exact service is stopped and polling ownership is
+proven absent, as described above.
