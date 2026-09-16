@@ -41,3 +41,10 @@ class WarehouseRequiredRuleStates(StatesGroup):
 class WarehouseRecipientStates(StatesGroup):
     chat_id = State()
     title = State()
+
+
+class WarehouseReminderStates(StatesGroup):
+    chat_id = State()
+    first = State()
+    repeat = State()
+    maximum = State()

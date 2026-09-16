@@ -94,6 +94,28 @@ def build_dispatcher(
     return dispatcher
 
 
+def start_reminder_worker(
+    service: WarehouseReminderService | None,
+) -> asyncio.Task[None] | None:
+    """Create the optional worker only after the warehouse feature is enabled."""
+
+    if service is None:
+        return None
+    return asyncio.create_task(service.run_forever())
+
+
+async def stop_reminder_worker(task: asyncio.Task[None] | None) -> None:
+    """Await cancellation so shutdown never leaves a reminder task behind."""
+
+    if task is None:
+        return
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+
+
 async def main() -> None:
     """Configure and run the bot with long polling."""
 
@@ -185,8 +207,7 @@ async def main() -> None:
             warehouse_enabled=settings.warehouse_enabled,
         )
         await bot.delete_webhook(drop_pending_updates=False)
-        if warehouse_reminder_service is not None:
-            reminder_task = asyncio.create_task(warehouse_reminder_service.run_forever())
+        reminder_task = start_reminder_worker(warehouse_reminder_service)
         await dispatcher.start_polling(
             bot,
             catalog_path=settings.catalog_path,
@@ -206,12 +227,7 @@ async def main() -> None:
             close_bot_session=False,
         )
     finally:
-        if reminder_task is not None:
-            reminder_task.cancel()
-            try:
-                await reminder_task
-            except asyncio.CancelledError:
-                pass
+        await stop_reminder_worker(reminder_task)
         await bot.session.close()
 
 

@@ -76,6 +76,32 @@ def reminder_notification_keyboard() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
+def reminder_settings_keyboard(settings: dict) -> InlineKeyboardMarkup:
+    """Administrative controls for one source location's reminder settings."""
+
+    builder = InlineKeyboardBuilder()
+    revision = int(settings["revision"])
+    builder.button(
+        text="🔕 Выключить" if settings["enabled"] else "🔔 Включить",
+        callback_data=WarehouseCallback(action="me", aux=revision),
+    )
+    builder.button(
+        text="🔔 Использовать этот чат для напоминаний",
+        callback_data=WarehouseCallback(action="mc", aux=revision),
+    )
+    builder.button(
+        text="🔢 Ввести chat ID",
+        callback_data=WarehouseCallback(action="mi", aux=revision),
+    )
+    builder.button(text="⏱ Первое напоминание", callback_data=WarehouseCallback(action="mf", aux=revision))
+    builder.button(text="🔁 Интервал", callback_data=WarehouseCallback(action="mn", aux=revision))
+    builder.button(text="🔢 Максимум повторов", callback_data=WarehouseCallback(action="mm", aux=revision))
+    builder.button(text="🧾 Последние события", callback_data=WarehouseCallback(action="mh"))
+    builder.button(text="⬅️ К складу", callback_data=WarehouseCallback(action="h"))
+    builder.adjust(1)
+    return builder.as_markup()
+
+
 def closing_requirement_keyboard(
     session_id: int,
     requirement_id: int,
