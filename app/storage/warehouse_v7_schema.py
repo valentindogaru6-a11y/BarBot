@@ -418,11 +418,19 @@ _V7_INDEXES_AND_TRIGGERS = (
 )
 
 
-def validate_warehouse_v7_schema(connection: sqlite3.Connection) -> None:
+def validate_warehouse_v7_schema(
+    connection: sqlite3.Connection,
+    *,
+    allow_correction: bool = False,
+) -> None:
     try:
         validate_warehouse_schema(connection, allow_development=True)
         validate_warehouse_operations_schema(connection, allow_development=True)
-        validate_warehouse_reports_schema(connection, allow_development=True)
+        validate_warehouse_reports_schema(
+            connection,
+            allow_development=True,
+            allow_correction=allow_correction,
+        )
     except (
         WarehouseSchemaValidationError,
         WarehouseOperationsSchemaError,

@@ -39,6 +39,7 @@ from app.storage.warehouse_delivery_schema import (
 )
 from app.storage.warehouse_reminder_schema import WarehouseReminderSchemaError, validate_warehouse_reminder_schema
 from app.storage.warehouse_schedule_schema import WarehouseScheduleSchemaError, validate_warehouse_schedule_schema
+from app.storage.warehouse_correction_schema import WarehouseCorrectionSchemaError, validate_warehouse_correction_schema
 from app.utils.warehouse import normalize_warehouse_name
 
 
@@ -107,9 +108,9 @@ class WarehouseSeedDatabase:
     @staticmethod
     def _validate_schema(connection: sqlite3.Connection) -> None:
         version = WarehouseSeedDatabase._schema_version(connection)
-        if version not in {3, 4, 5, 6, 7, 8, 9, 10}:
+        if version not in {3, 4, 5, 6, 7, 8, 9, 10, 11}:
             raise WarehouseSeedImportError(
-                "Warehouse schema v3 through v10 required; "
+                "Warehouse schema v3 through v11 required; "
                 f"found v{version}"
             )
         try:
@@ -127,7 +128,9 @@ class WarehouseSeedDatabase:
                 validate_warehouse_reports_schema(connection)
             if version >= 7:
                 validate_warehouse_closing_schema(connection)
-                validate_warehouse_v7_schema(connection)
+                validate_warehouse_v7_schema(
+                    connection, allow_correction=version >= 11
+                )
             if version == 8:
                 validate_warehouse_delivery_schema(connection)
             if version >= 9:
@@ -135,6 +138,8 @@ class WarehouseSeedDatabase:
                 validate_warehouse_reminder_schema(connection)
             if version >= 10:
                 validate_warehouse_schedule_schema(connection)
+            if version >= 11:
+                validate_warehouse_correction_schema(connection)
         except (
             WarehouseSchemaValidationError,
             WarehouseOperationsSchemaError,
@@ -144,6 +149,7 @@ class WarehouseSeedDatabase:
             WarehouseDeliverySchemaError,
             WarehouseReminderSchemaError,
             WarehouseScheduleSchemaError,
+            WarehouseCorrectionSchemaError,
         ) as exc:
             raise WarehouseSeedImportError(str(exc)) from exc
 

@@ -285,6 +285,7 @@ def validate_warehouse_reports_schema(
     connection: sqlite3.Connection,
     *,
     allow_development: bool = False,
+    allow_correction: bool = False,
 ) -> None:
     """Validate v6 tables, indexes, FKs, CHECK clauses, and immutability."""
 
@@ -293,6 +294,8 @@ def validate_warehouse_reports_schema(
         if sql is None:
             raise WarehouseReportsSchemaError(f"Missing v6 table: {table}")
         expected_columns = _EXPECTED_COLUMNS[table]
+        if allow_correction and table == "warehouse_reports":
+            expected_columns = expected_columns + ("correction_session_id",)
         if allow_development and table == "warehouse_report_lines":
             expected_columns = expected_columns[:-1] + (
                 "development_title",
@@ -301,9 +304,26 @@ def validate_warehouse_reports_schema(
             )
         if _columns(connection, table) != expected_columns:
             raise WarehouseReportsSchemaError(f"Invalid columns: {table}")
-        if _indexes(connection, table) != _EXPECTED_INDEXES[table]:
+        expected_indexes = _EXPECTED_INDEXES[table]
+        if allow_correction and table == "warehouse_reports":
+            expected_indexes = {
+                **expected_indexes,
+                "ux_warehouse_reports_correction_session": 1,
+            }
+        if _indexes(connection, table) != expected_indexes:
             raise WarehouseReportsSchemaError(f"Invalid indexes: {table}")
-        if _foreign_keys(connection, table) != _EXPECTED_FOREIGN_KEYS[table]:
+        expected_foreign_keys = _EXPECTED_FOREIGN_KEYS[table]
+        if allow_correction and table == "warehouse_reports":
+            expected_foreign_keys = expected_foreign_keys | {
+                (
+                    "correction_session_id",
+                    "warehouse_correction_sessions",
+                    "id",
+                    "RESTRICT",
+                    "RESTRICT",
+                )
+            }
+        if _foreign_keys(connection, table) != expected_foreign_keys:
             raise WarehouseReportsSchemaError(f"Invalid foreign keys: {table}")
         compact = _compact(sql)
         fragments = _REQUIRED_CHECKS[table]

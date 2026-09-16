@@ -50,6 +50,7 @@ class WarehouseReportDeliveryService:
         actor_user_id: int,
         retry_failed: bool = False,
         recipient_ids: tuple[int, ...] | None = None,
+        caption: str | None = None,
     ) -> dict[str, Any]:
         self._authorize_send(actor_user_id)
         ready = await asyncio.to_thread(
@@ -85,7 +86,7 @@ class WarehouseReportDeliveryService:
                     chat_id=int(claimed["chat_id"]),
                     path=Path(artifact.path),
                     filename=Path(artifact.relative_file_path).name,
-                    caption=f"Складской отчёт за {report['business_date']}",
+                    caption=caption or f"Складской отчёт за {report['business_date']}",
                 )
             except Exception as exc:
                 code = type(exc).__name__.casefold()[:100] or "telegram_error"

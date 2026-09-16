@@ -29,7 +29,7 @@ def test_fresh_v8_repeat_and_schema_validation(tmp_path: Path) -> None:
     database = UserDatabase(path)
     database.initialize()
     database.initialize()
-    assert _version(path) == 10
+    assert _version(path) == 11
     with sqlite3.connect(path) as connection:
         validate_warehouse_delivery_schema(connection)
         assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
@@ -49,7 +49,7 @@ def test_v7_to_v8_preserves_existing_rows(tmp_path: Path) -> None:
         )
         connection.commit()
     UserDatabase(path).initialize()
-    assert _version(path) == 10
+    assert _version(path) == 11
     with sqlite3.connect(path) as connection:
         assert connection.execute(
             "SELECT telegram_user_id, role FROM users WHERE telegram_user_id=42"
