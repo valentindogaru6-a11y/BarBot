@@ -37,6 +37,7 @@ from app.storage.warehouse_delivery_schema import (
     WarehouseDeliverySchemaError,
     validate_warehouse_delivery_schema,
 )
+from app.storage.warehouse_reminder_schema import WarehouseReminderSchemaError, validate_warehouse_reminder_schema
 from app.utils.warehouse import normalize_warehouse_name
 
 
@@ -105,9 +106,9 @@ class WarehouseSeedDatabase:
     @staticmethod
     def _validate_schema(connection: sqlite3.Connection) -> None:
         version = WarehouseSeedDatabase._schema_version(connection)
-        if version not in {3, 4, 5, 6, 7, 8}:
+        if version not in {3, 4, 5, 6, 7, 8, 9}:
             raise WarehouseSeedImportError(
-                "Warehouse schema v3, v4, v5, v6, v7 or v8 required; "
+                "Warehouse schema v3, v4, v5, v6, v7, v8 or v9 required; "
                 f"found v{version}"
             )
         try:
@@ -128,6 +129,9 @@ class WarehouseSeedDatabase:
                 validate_warehouse_v7_schema(connection)
             if version == 8:
                 validate_warehouse_delivery_schema(connection)
+            if version == 9:
+                validate_warehouse_delivery_schema(connection)
+                validate_warehouse_reminder_schema(connection)
         except (
             WarehouseSchemaValidationError,
             WarehouseOperationsSchemaError,
@@ -135,6 +139,7 @@ class WarehouseSeedDatabase:
             WarehouseReportsSchemaError,
             WarehouseV7SchemaError,
             WarehouseDeliverySchemaError,
+            WarehouseReminderSchemaError,
         ) as exc:
             raise WarehouseSeedImportError(str(exc)) from exc
 

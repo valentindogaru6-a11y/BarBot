@@ -635,6 +635,11 @@ Telegram `chat_id`, soft activation и optimistic `revision`, а также
 `pending`, `sending`, `delivered` или `failed`. Пара report/recipient уникальна,
 поэтому повтор не создаёт новую доставку и не отправляет уже доставленный файл.
 
+Schema v9 добавляет настраиваемые напоминания о незакрытой смене. Рабочий
+Telegram chat ID отделён от бухгалтерских recipients; по умолчанию напоминания
+выключены. Worker только напоминает: автоматическое закрытие, создание XLSX и
+доставка по расписанию не реализованы. Production deployment не выполнялся.
+
 Backend распознаёт только точные triggers первой непустой строки:
 
 ```text

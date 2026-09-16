@@ -115,6 +115,15 @@ class TelegramReportSender:
         return int(message.message_id)
 
 
+class TelegramReminderSender:
+    def __init__(self, bot: Bot) -> None:
+        self.bot = bot
+
+    async def send_reminder(self, *, chat_id: int, text: str, reply_markup=None) -> int:
+        message = await self.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup)
+        return int(message.message_id)
+
+
 __all__ = [
     "ReportSender",
     "TelegramChatVerifier",

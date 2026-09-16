@@ -16,6 +16,7 @@ def warehouse_home_keyboard(
     active_closing_session_id: int | None = None,
     can_manage_required_rules: bool = False,
     can_manage_report_recipients: bool = False,
+    can_manage_reminders: bool = False,
 ) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     if can_mutate and shift_status in {"open", "waiting_required"}:
@@ -42,6 +43,8 @@ def warehouse_home_keyboard(
             text="👥 Получатели отчётов",
             callback_data=WarehouseCallback(action="pr"),
         )
+    if can_manage_reminders:
+        builder.button(text="🔔 Напоминания", callback_data=WarehouseCallback(action="mr"))
     if shift_status in {"open", "waiting_required", "closing"}:
         builder.button(
             text="📄 Скачать текущий Excel",
@@ -61,6 +64,14 @@ def closing_summary_keyboard() -> InlineKeyboardMarkup:
     builder.button(text="✅ Проверить и закрыть", callback_data=WarehouseCallback(action="cc"))
     builder.button(text="📋 Посмотреть записи", callback_data=WarehouseCallback(action="ls"))
     builder.button(text="❌ Отмена", callback_data=WarehouseCallback(action="h"))
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def reminder_notification_keyboard() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="✅ Закрыть смену", callback_data=WarehouseCallback(action="cs"))
+    builder.button(text="📋 Записи за смену", callback_data=WarehouseCallback(action="ls"))
     builder.adjust(1)
     return builder.as_markup()
 

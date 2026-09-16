@@ -32,7 +32,7 @@ def test_fresh_v6_and_repeated_initialization(tmp_path: Path) -> None:
     database.initialize()
     database.initialize()
 
-    assert _version(path) == 8
+    assert _version(path) == 9
     with sqlite3.connect(path) as connection:
         tables = {
             row[0]
@@ -59,7 +59,7 @@ def test_v5_to_v6_preserves_existing_rows(tmp_path: Path) -> None:
 
     UserDatabase(path).initialize()
 
-    assert _version(path) == 8
+    assert _version(path) == 9
     with sqlite3.connect(path) as connection:
         assert connection.execute(
             "SELECT role FROM users WHERE telegram_user_id=42"

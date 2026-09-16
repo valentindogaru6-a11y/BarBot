@@ -38,7 +38,7 @@ def test_fresh_database_contains_v5_schema_and_repeat_is_idempotent(
     database.initialize()
     database.initialize()
 
-    assert _version(path) == 8
+    assert _version(path) == 9
     with sqlite3.connect(path) as connection:
         tables = {
             row[0]
@@ -65,7 +65,7 @@ def test_sequential_v4_to_v5_preserves_existing_rows(tmp_path: Path) -> None:
 
     UserDatabase(path).initialize()
 
-    assert _version(path) == 8
+    assert _version(path) == 9
     with sqlite3.connect(path) as connection:
         assert connection.execute(
             "SELECT role FROM users WHERE telegram_user_id=42"
