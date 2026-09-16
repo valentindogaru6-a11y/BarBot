@@ -101,7 +101,7 @@ async def card(callback:CallbackQuery,callback_data:WarehouseCallback,warehouse_
  await callback.answer();buttons=[('📜 Запуски','sj',row['id'],0),('⬅️ Назад','sd',0,0)]
  try:
   await _t(warehouse_schedule_service.list,callback.from_user.id)
-  buttons.insert(0,('⏸ Выключить' if row['is_active'] else '▶️ Включить','se',row['id'],row['revision']))
+  buttons[:0]=[('✏️ Название','en',row['id'],row['revision']),('⏱ Время / задержка','ed',row['id'],row['revision']),('👥 Получатели','er',row['id'],row['revision']),('⏸ Выключить' if row['is_active'] else '▶️ Включить','se',row['id'],row['revision'])]
  except Exception:pass
  await edit_or_send_text(callback.message,_card(row),_kb(*buttons))
 @router.callback_query(WarehouseCallback.filter(F.action=='se'))
@@ -125,13 +125,55 @@ async def job(callback:CallbackQuery,callback_data:WarehouseCallback,warehouse_s
  if r['status'] in ('failed','partial_failed'):buttons.insert(0,('🔁 Повторить неудачные','sr',r['id'],0))
  if r['shift_id'] is None and r['status'] in ('scheduled','waiting_report'):buttons.insert(0,('❌ Отменить запуск','sc',r['id'],0))
  await edit_or_send_text(callback.message,f"📄 <b>Запуск</b>\n\nДата: {r['business_date']}\nВремя: {r['scheduled_at_utc']}\nСтатус: {r['status']}\nОшибка: {r['last_error_code'] or '—'}",_kb(*buttons))
-@router.callback_query(WarehouseCallback.filter(F.action=='sr'))
-async def retry(callback:CallbackQuery,callback_data:WarehouseCallback,warehouse_schedule_service:WarehouseScheduleService):
- try:result=await warehouse_schedule_service.retry_job(callback_data.object_id,callback.from_user.id)
- except Exception as e:await callback.answer(_error(e),show_alert=True);return
- await callback.answer(f"Доставлено: {result['delivered']}, ошибок: {result['failed']}")
 @router.callback_query(WarehouseCallback.filter(F.action=='sc'))
 async def cancel_job(callback:CallbackQuery,callback_data:WarehouseCallback,warehouse_schedule_service:WarehouseScheduleService):
+ job=await _t(warehouse_schedule_service.repository.job,callback_data.object_id)
+ if not job or job['shift_id'] is not None or job['status'] not in ('scheduled','waiting_report'):await callback.answer('Этот запуск нельзя отменить',show_alert=True);return
+ await callback.answer();await edit_or_send_text(callback.message,f"❌ <b>Отменить разовый запуск?</b>\n\nДата: {job['business_date']}\nВремя: {job['scheduled_at_utc']}",_kb(('❌ Отменить запуск','cq',job['id'],0),('↩️ Не отменять','cx',job['id'],0)))
+
+@router.callback_query(WarehouseCallback.filter(F.action=='cq'))
+async def cancel_confirm(callback:CallbackQuery,callback_data:WarehouseCallback,warehouse_schedule_service:WarehouseScheduleService):
  try:ok=await _t(warehouse_schedule_service.cancel_job,callback_data.object_id,callback.from_user.id)
  except Exception as e:await callback.answer(_error(e),show_alert=True);return
- await callback.answer('Запуск отменён' if ok else 'Этот запуск нельзя отменить')
+ await callback.answer('Запуск отменён' if ok else 'Запуск уже нельзя отменить');await job(callback,callback_data,warehouse_schedule_service)
+@router.callback_query(WarehouseCallback.filter(F.action=='cx'))
+async def cancel_back(callback:CallbackQuery,callback_data:WarehouseCallback,warehouse_schedule_service:WarehouseScheduleService):await job(callback,callback_data,warehouse_schedule_service)
+
+@router.callback_query(WarehouseCallback.filter(F.action=='sr'))
+async def retry_preview(callback:CallbackQuery,callback_data:WarehouseCallback,warehouse_schedule_service:WarehouseScheduleService):
+ try:r=await _t(warehouse_schedule_service.repository.job,callback_data.object_id);await _t(warehouse_schedule_service.details,r['schedule_id'],callback.from_user.id)
+ except Exception as e:await callback.answer(_error(e),show_alert=True);return
+ if not r or r['status'] not in ('failed','partial_failed'):await callback.answer('Этот запуск нельзя повторить',show_alert=True);return
+ await callback.answer();await edit_or_send_text(callback.message,f"🔁 <b>Повторить неудачные доставки?</b>\n\nДата: {r['business_date']}\nReport: готовый immutable XLSX",_kb(('🔁 Повторить','rq',r['id'],0),('❌ Отмена','rx',r['id'],0)))
+@router.callback_query(WarehouseCallback.filter(F.action=='rq'))
+async def retry_confirm(callback:CallbackQuery,callback_data:WarehouseCallback,warehouse_schedule_service:WarehouseScheduleService):
+ try:result=await warehouse_schedule_service.retry_job(callback_data.object_id,callback.from_user.id)
+ except Exception as e:await callback.answer(_error(e),show_alert=True);return
+ await callback.answer(f"Доставлено: {result['delivered']}, ошибок: {result['failed']}");await job(callback,callback_data,warehouse_schedule_service)
+@router.callback_query(WarehouseCallback.filter(F.action=='rx'))
+async def retry_back(callback:CallbackQuery,callback_data:WarehouseCallback,warehouse_schedule_service:WarehouseScheduleService):await job(callback,callback_data,warehouse_schedule_service)
+
+async def _edit_start(callback,data,state,service,kind,prompt):
+ try:row=await _t(service.repository.details,data.object_id);await _t(service.list,callback.from_user.id)
+ except Exception as e:await callback.answer(_error(e),show_alert=True);return
+ if not row or row['revision']!=data.aux:await callback.answer('Данные изменились. Откройте карточку заново.',show_alert=True);return
+ await state.clear();await state.update_data(edit_schedule=row['id'],edit_revision=row['revision'],edit_kind=kind,edit_recipients=list(row['recipients']));await state.set_state(WarehouseScheduleStates.edit_name if kind=='name' else WarehouseScheduleStates.edit_delay);await callback.answer();await callback.message.answer(prompt)
+@router.callback_query(WarehouseCallback.filter(F.action=='en'))
+async def edit_name_start(callback:CallbackQuery,callback_data:WarehouseCallback,state:FSMContext,warehouse_schedule_service:WarehouseScheduleService):await _edit_start(callback,callback_data,state,warehouse_schedule_service,'name','Введите новое название (1–200 символов).')
+@router.callback_query(WarehouseCallback.filter(F.action=='ed'))
+async def edit_delay_start(callback:CallbackQuery,callback_data:WarehouseCallback,state:FSMContext,warehouse_schedule_service:WarehouseScheduleService):await _edit_start(callback,callback_data,state,warehouse_schedule_service,'delay','Введите новую задержку 0–1440 минут.')
+@router.message(WarehouseScheduleStates.edit_name,F.text)
+async def edit_name_input(message:Message,state:FSMContext):
+ value=(message.text or '').strip()
+ if not 1<=len(value)<=200:await message.answer('Название должно содержать 1–200 символов.');return
+ await state.update_data(edit_values={'name':value});await state.set_state(WarehouseScheduleStates.edit_confirm);await message.answer(f"Новое название: <b>{escape(value)}</b>",reply_markup=_kb(('✅ Сохранить','es',0,0),('❌ Отмена','sx',0,0)))
+@router.message(WarehouseScheduleStates.edit_delay,F.text)
+async def edit_delay_input(message:Message,state:FSMContext):
+ try:value=int(message.text or '');assert 0<=value<=1440
+ except Exception:await message.answer('Допустимо целое число 0–1440.');return
+ await state.update_data(edit_values={'delay':value});await state.set_state(WarehouseScheduleStates.edit_confirm);await message.answer(f"Новая задержка: <b>{value}</b> мин.",reply_markup=_kb(('✅ Сохранить','es',0,0),('❌ Отмена','sx',0,0)))
+@router.callback_query(WarehouseCallback.filter(F.action=='es'),StateFilter(WarehouseScheduleStates.edit_confirm))
+async def edit_save(callback:CallbackQuery,state:FSMContext,warehouse_schedule_service:WarehouseScheduleService):
+ try:
+  d=await state.get_data();await _t(warehouse_schedule_service.update,d['edit_schedule'],d['edit_values'],d['edit_recipients'],d['edit_revision'],callback.from_user.id);await state.clear();await callback.answer('Сохранено');await card(callback,WarehouseCallback(action='sv',object_id=d['edit_schedule']),warehouse_schedule_service)
+ except Exception as e:await callback.answer(_error(e),show_alert=True)

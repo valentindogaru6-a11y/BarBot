@@ -37,7 +37,12 @@ class WarehouseScheduleDatabase:
   row['recipients']=self.recipient_ids(id);row['latest_job']=self.jobs(id,1)[0] if self.jobs(id,1) else None
   return row
  def cancel_job(self,id,now):
-  with self._tx() as c:return c.execute("UPDATE warehouse_delivery_jobs SET status='cancelled',finished_at_utc=?,updated_at_utc=? WHERE id=? AND shift_id IS NULL AND status IN ('scheduled','waiting_report')",(now,now,id)).rowcount==1
+  with self._tx() as c:
+   row=c.execute("SELECT schedule_id FROM warehouse_delivery_jobs WHERE id=? AND shift_id IS NULL AND status IN ('scheduled','waiting_report')",(id,)).fetchone()
+   if not row:return False
+   changed=c.execute("UPDATE warehouse_delivery_jobs SET status='cancelled',finished_at_utc=?,updated_at_utc=? WHERE id=? AND status IN ('scheduled','waiting_report')",(now,now,id)).rowcount
+   if changed:c.execute("UPDATE warehouse_delivery_schedules SET is_active=0,revision=revision+1,updated_at_utc=? WHERE id=?",(now,row['schedule_id']))
+   return bool(changed)
  def recipient_ids(self,schedule_id,active_only=False):
   with self._c() as c:return tuple(r[0] for r in c.execute('SELECT sr.recipient_id FROM warehouse_delivery_schedule_recipients sr JOIN warehouse_report_recipients r ON r.id=sr.recipient_id WHERE sr.schedule_id=?'+(' AND r.is_active=1' if active_only else ''),(schedule_id,)).fetchall())
  def create(self,values,recipient_ids,actor,now):

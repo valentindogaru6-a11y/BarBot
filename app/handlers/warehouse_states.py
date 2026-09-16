@@ -58,3 +58,7 @@ class WarehouseScheduleStates(StatesGroup):
     once_time = State()
     recipients = State()
     confirm = State()
+    edit_name = State()
+    edit_delay = State()
+    edit_recipients = State()
+    edit_confirm = State()

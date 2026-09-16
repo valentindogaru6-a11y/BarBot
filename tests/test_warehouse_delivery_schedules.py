@@ -148,3 +148,19 @@ def test_retry_reuses_only_selected_active_recipients(tmp_path: Path):
     with sqlite3.connect(path) as c:c.execute("UPDATE warehouse_delivery_jobs SET status='failed' WHERE id=?",(job['id'],));c.commit()
     delivery=Delivery();service=WarehouseScheduleService(repo,delivery,AccessService(frozenset({1})),Clock())
     assert asyncio.run(service.retry_job(job['id'],1))['delivered']==1 and delivery.calls[0][1]==(recipient,)
+
+
+def test_edit_name_and_delay_use_optimistic_revision(tmp_path: Path):
+    _,repo,source,recipient,_=_env(tmp_path);schedule=repo.create(_daily(source),(recipient,),1,'now')
+    renamed=repo.update(schedule['id'],{'name':'Новое имя'},(recipient,),schedule['revision'],'now')
+    assert renamed['name']=='Новое имя'
+    changed=repo.update(schedule['id'],{'delay':0},(recipient,),renamed['revision'],'later')
+    assert changed['delay_minutes_after_close']==0
+    with pytest.raises(WarehouseScheduleConflict): repo.update(schedule['id'],{'name':'Старый callback'},(recipient,),schedule['revision'],'late')
+
+
+def test_edit_rejects_empty_and_inactive_recipients(tmp_path: Path):
+    path,repo,source,recipient,_=_env(tmp_path);schedule=repo.create(_daily(source),(recipient,),1,'now')
+    with pytest.raises(WarehouseScheduleError):repo.update(schedule['id'],{},(),schedule['revision'],'now')
+    with sqlite3.connect(path) as c:c.execute('UPDATE warehouse_report_recipients SET is_active=0 WHERE id=?',(recipient,));c.commit()
+    with pytest.raises(WarehouseScheduleError):repo.update(schedule['id'],{},(recipient,),schedule['revision'],'now')
