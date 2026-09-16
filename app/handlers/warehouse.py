@@ -239,6 +239,7 @@ async def show_warehouse_home(
                 context.can_manage_warehouse_report_recipients
             ),
             can_manage_reminders=context.can_manage_warehouse_reminders,
+            can_manage_delivery_schedules=context.can_manage_warehouse_delivery_schedules,
         ),
     )
 

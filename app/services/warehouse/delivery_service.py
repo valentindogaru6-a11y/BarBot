@@ -49,6 +49,7 @@ class WarehouseReportDeliveryService:
         *,
         actor_user_id: int,
         retry_failed: bool = False,
+        recipient_ids: tuple[int, ...] | None = None,
     ) -> dict[str, Any]:
         self._authorize_send(actor_user_id)
         ready = await asyncio.to_thread(
@@ -65,6 +66,7 @@ class WarehouseReportDeliveryService:
             stale_before=utc_rfc3339(now_value - self.STALE_SENDING_TIMEOUT),
             retry_failed=retry_failed,
             authorize=lambda: self._authorize_send(actor_user_id),
+            recipient_ids=recipient_ids,
         )
         for delivery in deliveries:
             attempt_time = utc_rfc3339(self._now_datetime())
@@ -114,6 +116,35 @@ class WarehouseReportDeliveryService:
             "failed": sum(row["status"] == "failed" for row in history),
             "pending": sum(row["status"] in {"pending", "sending"} for row in history),
         }
+
+    async def deliver_scheduled(
+        self, report_id: int, *, recipient_ids: tuple[int, ...], retry_failed: bool = True
+    ) -> dict[str, Any]:
+        """System path for v10 schedules; reuses v8 delivery rows and sender."""
+        report = await asyncio.to_thread(self.reports.repository.get_report, report_id)
+        if report is None or report["status"] != "ready":
+            raise ValueError("Report is not ready")
+        artifact = await asyncio.to_thread(self.reports.xlsx.verify_ready, report)
+        now_value = self._now_datetime()
+        deliveries = await asyncio.to_thread(
+            self.repository.prepare_deliveries, report_id, actor_user_id=0,
+            now=utc_rfc3339(now_value), stale_before=utc_rfc3339(now_value-self.STALE_SENDING_TIMEOUT),
+            retry_failed=retry_failed, authorize=lambda: None, recipient_ids=recipient_ids,
+        )
+        for delivery in deliveries:
+            now = utc_rfc3339(self._now_datetime())
+            claimed = await asyncio.to_thread(self.repository.claim_delivery, int(delivery["id"]), allow_failed=retry_failed, actor_user_id=0, now=now, authorize=lambda: None)
+            if claimed is None:
+                continue
+            try:
+                message_id = await self.sender.send_report(chat_id=int(claimed["chat_id"]), path=Path(artifact.path), filename=Path(artifact.relative_file_path).name, caption=f"Складской отчёт за {report['business_date']}")
+            except Exception as exc:
+                await asyncio.to_thread(self.repository.mark_failed, int(claimed["id"]), error_code=type(exc).__name__.casefold()[:100] or "telegram_error", error_text="Telegram не принял документ", actor_user_id=0, now=utc_rfc3339(self._now_datetime()))
+            else:
+                await asyncio.to_thread(self.repository.mark_delivered, int(claimed["id"]), telegram_message_id=message_id, actor_user_id=0, now=utc_rfc3339(self._now_datetime()))
+        history = await asyncio.to_thread(self.repository.deliveries_for_report, report_id)
+        selected = [row for row in history if int(row["recipient_id"]) in recipient_ids]
+        return {"report": report, "artifact": artifact, "deliveries": selected, "delivered": sum(row["status"] == "delivered" for row in selected), "failed": sum(row["status"] == "failed" for row in selected), "pending": sum(row["status"] in {"pending", "sending"} for row in selected)}
 
     def history(self, report_id: int, *, actor_user_id: int) -> dict[str, Any]:
         report = self.reports.report_card(report_id, actor_user_id=actor_user_id)

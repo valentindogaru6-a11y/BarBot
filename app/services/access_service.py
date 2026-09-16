@@ -55,6 +55,10 @@ class UserContext:
         return self.role in {Role.SUPER_ADMIN, Role.ADMIN}
 
     @property
+    def can_manage_warehouse_delivery_schedules(self) -> bool:
+        return self.role in {Role.SUPER_ADMIN, Role.ADMIN}
+
+    @property
     def can_send_warehouse_reports(self) -> bool:
         return self.role in {Role.SUPER_ADMIN, Role.ADMIN, Role.BARTENDER}
 
@@ -149,6 +153,12 @@ class AccessService:
         context = self.get_context(telegram_user_id)
         if not context.can_manage_warehouse_reminders:
             raise AccessDeniedError("Недостаточно прав для управления напоминаниями")
+        return context
+
+    def require_warehouse_delivery_schedule_management(self, telegram_user_id: int) -> UserContext:
+        context = self.get_context(telegram_user_id)
+        if not context.can_manage_warehouse_delivery_schedules:
+            raise AccessDeniedError("Недостаточно прав для управления расписаниями")
         return context
 
     def can_send_warehouse_reports(self, telegram_user_id: int) -> bool:

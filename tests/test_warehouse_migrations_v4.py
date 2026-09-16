@@ -27,7 +27,7 @@ def test_fresh_v6_has_operations_schema_and_locations(tmp_path: Path) -> None:
     UserDatabase(path).initialize()
     connection = sqlite3.connect(path)
     try:
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 9
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 10
         tables = {
             row[0]
             for row in connection.execute(

@@ -17,6 +17,7 @@ from app.handlers import (
     warehouse_closing,
     warehouse_recipients,
     warehouse_reminders,
+    warehouse_schedules,
     warehouse_reports,
 )
 from app.handlers.admin import router as admin_router
@@ -40,6 +41,7 @@ from app.services.warehouse.telegram_delivery import (
 )
 from app.services.warehouse.reminder_service import WarehouseReminderService
 from app.services.warehouse.reminder_service import WarehouseReminderSettingsService
+from app.services.warehouse.schedule_service import WarehouseScheduleService
 from app.storage.json_storage import JsonCatalogStorage
 from app.storage.user_database import UserDatabase
 from app.storage.warehouse_operations_database import WarehouseOperationsDatabase
@@ -47,6 +49,7 @@ from app.storage.warehouse_closing_database import WarehouseClosingDatabase
 from app.storage.warehouse_reports_database import WarehouseReportsDatabase
 from app.storage.warehouse_delivery_database import WarehouseDeliveryDatabase
 from app.storage.warehouse_reminder_database import WarehouseReminderDatabase
+from app.storage.warehouse_schedule_database import WarehouseScheduleDatabase
 from app.telegram_commands import configure_bot_commands
 
 
@@ -61,6 +64,7 @@ def router_names(*, warehouse_enabled: bool) -> tuple[str, ...]:
         names.append("app.handlers.warehouse")
         names.append("app.handlers.warehouse_recipients")
         names.append("app.handlers.warehouse_reminders")
+        names.append("app.handlers.warehouse_schedules")
         names.append("app.handlers.warehouse_closing")
         names.append("app.handlers.warehouse_reports")
     names.append("app.handlers.admin")
@@ -84,6 +88,7 @@ def build_dispatcher(
         dispatcher.include_router(warehouse.router)
         dispatcher.include_router(warehouse_recipients.router)
         dispatcher.include_router(warehouse_reminders.router)
+        dispatcher.include_router(warehouse_schedules.router)
         dispatcher.include_router(warehouse_closing.router)
         dispatcher.include_router(warehouse_reports.router)
     dispatcher.include_router(admin_router)
@@ -102,6 +107,10 @@ def start_reminder_worker(
     if service is None:
         return None
     return asyncio.create_task(service.run_forever())
+
+
+def start_schedule_worker(service: WarehouseScheduleService | None) -> asyncio.Task[None] | None:
+    return asyncio.create_task(service.run_forever()) if service is not None else None
 
 
 async def stop_reminder_worker(task: asyncio.Task[None] | None) -> None:
@@ -157,6 +166,7 @@ async def main() -> None:
     warehouse_chat_verifier = None
     warehouse_reminder_service = None
     warehouse_reminder_settings_service = None
+    warehouse_schedule_service = None
     if settings.warehouse_enabled:
         warehouse_service = WarehouseOperationsService(
             WarehouseOperationsDatabase(settings.database_path),
@@ -194,12 +204,17 @@ async def main() -> None:
         warehouse_reminder_settings_service = WarehouseReminderSettingsService(
             WarehouseReminderDatabase(settings.database_path), auth_service
         )
+        warehouse_schedule_service = WarehouseScheduleService(
+            WarehouseScheduleDatabase(settings.database_path), warehouse_delivery_service,
+            auth_service,
+        )
     dispatcher = build_dispatcher(
         user_service,
         warehouse_enabled=settings.warehouse_enabled,
     )
 
     reminder_task = None
+    schedule_task = None
     try:
         await configure_bot_commands(
             bot,
@@ -208,6 +223,7 @@ async def main() -> None:
         )
         await bot.delete_webhook(drop_pending_updates=False)
         reminder_task = start_reminder_worker(warehouse_reminder_service)
+        schedule_task = start_schedule_worker(warehouse_schedule_service)
         await dispatcher.start_polling(
             bot,
             catalog_path=settings.catalog_path,
@@ -224,10 +240,12 @@ async def main() -> None:
             warehouse_delivery_service=warehouse_delivery_service,
             warehouse_chat_verifier=warehouse_chat_verifier,
             warehouse_reminder_settings_service=warehouse_reminder_settings_service,
+            warehouse_schedule_service=warehouse_schedule_service,
             close_bot_session=False,
         )
     finally:
         await stop_reminder_worker(reminder_task)
+        await stop_reminder_worker(schedule_task)
         await bot.session.close()
 
 

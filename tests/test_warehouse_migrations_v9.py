@@ -27,7 +27,7 @@ def test_fresh_v9_repeat_and_full_chain(tmp_path: Path) -> None:
     path = tmp_path / "fresh.db"
     UserDatabase(path).initialize()
     UserDatabase(path).initialize()
-    assert _version(path) == 9
+    assert _version(path) == 10
     with sqlite3.connect(path) as connection:
         tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert set(WAREHOUSE_REMINDER_TABLES) <= tables
@@ -40,7 +40,7 @@ def test_v8_to_v9_preserves_rows_and_adds_reminder_tables(tmp_path: Path) -> Non
         connection.execute("INSERT INTO users (telegram_user_id,role,is_active,first_seen_at,last_seen_at,updated_at,has_started) VALUES (42,'bartender',1,'now','now','now',1)")
         connection.commit()
     UserDatabase(path).initialize()
-    assert _version(path) == 9
+    assert _version(path) == 10
     with sqlite3.connect(path) as connection:
         assert connection.execute("SELECT role FROM users WHERE telegram_user_id=42").fetchone()[0] == "bartender"
         assert {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")} >= set(WAREHOUSE_REMINDER_TABLES)

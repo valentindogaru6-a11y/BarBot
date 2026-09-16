@@ -48,8 +48,12 @@ from app.storage.warehouse_reminder_schema import (
     WarehouseReminderSchemaError, create_warehouse_reminder_schema,
     validate_warehouse_reminder_schema, warehouse_reminder_schema_is_absent,
 )
+from app.storage.warehouse_schedule_schema import (
+    WarehouseScheduleSchemaError, create_warehouse_schedule_schema,
+    validate_warehouse_schedule_schema, warehouse_schedule_schema_is_absent,
+)
 
-CURRENT_SCHEMA_VERSION = 9
+CURRENT_SCHEMA_VERSION = 10
 
 USER_COLUMNS = (
     "telegram_user_id",
@@ -321,6 +325,8 @@ def _migrate_v1_to_v2(connection: sqlite3.Connection) -> None:
 
 
 def _validate_schema(connection: sqlite3.Connection, version: int) -> None:
+    if version < 10 and not warehouse_schedule_schema_is_absent(connection):
+        raise SchemaValidationError("Warehouse schedule tables не должны существовать до schema v10")
     if version < 9 and not warehouse_reminder_schema_is_absent(connection):
         raise SchemaValidationError("Warehouse reminder tables не должны существовать до schema v9")
     if version < 8 and not warehouse_delivery_schema_is_absent(connection):
@@ -468,6 +474,14 @@ def _validate_schema(connection: sqlite3.Connection, version: int) -> None:
         except (WarehouseClosingSchemaError, WarehouseV7SchemaError, WarehouseDeliverySchemaError, WarehouseReminderSchemaError) as exc:
             raise SchemaValidationError(str(exc)) from exc
         return
+    if version == 10:
+        validate_users_schema(connection, 2)
+        try:
+            validate_warehouse_closing_schema(connection); validate_warehouse_v7_schema(connection)
+            validate_warehouse_delivery_schema(connection); validate_warehouse_reminder_schema(connection); validate_warehouse_schedule_schema(connection)
+        except (WarehouseClosingSchemaError, WarehouseV7SchemaError, WarehouseDeliverySchemaError, WarehouseReminderSchemaError, WarehouseScheduleSchemaError) as exc:
+            raise SchemaValidationError(str(exc)) from exc
+        return
     raise UnsupportedSchemaVersionError(
         f"Неподдерживаемая версия схемы SQLite: {version}"
     )
@@ -520,6 +534,10 @@ def _migrate_v8_to_v9(connection: sqlite3.Connection) -> None:
     _validate_schema(connection, 8); create_warehouse_reminder_schema(connection)
     connection.execute("PRAGMA user_version = 9"); _validate_schema(connection, 9)
 
+def _migrate_v9_to_v10(connection: sqlite3.Connection) -> None:
+    _validate_schema(connection, 9); create_warehouse_schedule_schema(connection)
+    connection.execute("PRAGMA user_version = 10"); _validate_schema(connection, 10)
+
 
 def _create_fresh_v6(connection: sqlite3.Connection) -> None:
     if _table_sql(connection, "users") is not None:
@@ -565,6 +583,9 @@ def _create_fresh_v8(connection: sqlite3.Connection) -> None:
 def _create_fresh_v9(connection: sqlite3.Connection) -> None:
     _create_fresh_v8(connection); _migrate_v8_to_v9(connection)
 
+def _create_fresh_v10(connection: sqlite3.Connection) -> None:
+    _create_fresh_v9(connection); _migrate_v9_to_v10(connection)
+
 
 Migration = Callable[[sqlite3.Connection], None]
 MIGRATIONS: dict[int, Migration] = {
@@ -576,6 +597,7 @@ MIGRATIONS: dict[int, Migration] = {
     6: _migrate_v6_to_v7,
     7: _migrate_v7_to_v8,
     8: _migrate_v8_to_v9,
+    9: _migrate_v9_to_v10,
 }
 
 
@@ -628,7 +650,7 @@ def run_migrations(connection: sqlite3.Connection) -> None:
     if version == 0:
         _run_atomic_step(
             connection,
-            _create_fresh_v9,
+            _create_fresh_v10,
             disable_foreign_keys=True,
         )
         return

@@ -267,6 +267,7 @@ class WarehouseDeliveryDatabase:
         stale_before: str,
         retry_failed: bool,
         authorize: Callable[[], None],
+        recipient_ids: tuple[int, ...] | None = None,
     ) -> list[dict[str, Any]]:
         with self._transaction() as connection:
             authorize()
@@ -276,6 +277,13 @@ class WarehouseDeliveryDatabase:
             ).fetchone()
             if report is None or report["status"] != "ready":
                 raise WarehouseDeliveryError("Report is not ready")
+            recipient_filter = ""
+            params: list[Any] = [report_id, now, now]
+            if recipient_ids is not None:
+                if not recipient_ids:
+                    return []
+                recipient_filter = " AND id IN (" + ",".join("?" for _ in recipient_ids) + ")"
+                params.extend(recipient_ids)
             connection.execute(
                 """
                 INSERT OR IGNORE INTO warehouse_report_deliveries (
@@ -283,9 +291,8 @@ class WarehouseDeliveryDatabase:
                     created_at_utc, updated_at_utc
                 )
                 SELECT ?, id, 'pending', 0, ?, ?
-                FROM warehouse_report_recipients WHERE is_active=1
-                """,
-                (report_id, now, now),
+                FROM warehouse_report_recipients WHERE is_active=1""" + recipient_filter,
+                params,
             )
             if retry_failed:
                 stale = connection.execute(
@@ -327,6 +334,11 @@ class WarehouseDeliveryDatabase:
                 )
             statuses = ("pending", "failed") if retry_failed else ("pending",)
             placeholders = ",".join("?" for _ in statuses)
+            ids_filter = ""
+            query_params: list[Any] = [report_id, *statuses]
+            if recipient_ids is not None:
+                ids_filter = " AND d.recipient_id IN (" + ",".join("?" for _ in recipient_ids) + ")"
+                query_params.extend(recipient_ids)
             rows = connection.execute(
                 f"""
                 SELECT d.*, r.chat_id, r.title AS recipient_title, r.chat_type
@@ -334,9 +346,10 @@ class WarehouseDeliveryDatabase:
                 JOIN warehouse_report_recipients r ON r.id=d.recipient_id
                 WHERE d.report_id=? AND r.is_active=1
                   AND d.status IN ({placeholders})
+                  {ids_filter}
                 ORDER BY d.id
                 """,
-                (report_id, *statuses),
+                query_params,
             ).fetchall()
             return [self._dict(row) for row in rows]
 
