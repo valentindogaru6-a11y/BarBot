@@ -27,8 +27,15 @@ class WarehouseScheduleDatabase:
    r=c.execute('SELECT * FROM warehouse_delivery_schedules WHERE id=?',(id,)).fetchone();return dict(r) if r else None
  def active_recipients(self):
   with self._c() as c:return [dict(r) for r in c.execute("SELECT * FROM warehouse_report_recipients WHERE is_active=1 ORDER BY title COLLATE NOCASE,id")]
+ def recipients_by_ids(self,ids):
+  if not ids:return []
+  with self._c() as c:return [dict(r) for r in c.execute("SELECT * FROM warehouse_report_recipients WHERE id IN ("+','.join('?'*len(ids))+") ORDER BY title COLLATE NOCASE,id",tuple(ids))]
  def ready_reports(self):
   with self._c() as c:return [dict(r) for r in c.execute("SELECT wr.*,sh.business_date FROM warehouse_reports wr JOIN warehouse_shifts sh ON sh.id=wr.shift_id WHERE wr.status='ready' ORDER BY wr.id DESC LIMIT 30")]
+ def report_summary(self,id):
+  with self._c() as c:
+   row=c.execute('SELECT wr.version,sh.business_date FROM warehouse_reports wr JOIN warehouse_shifts sh ON sh.id=wr.shift_id WHERE wr.id=?',(id,)).fetchone()
+   return dict(row) if row else None
  def sources(self):
   with self._c() as c:return [dict(r) for r in c.execute("SELECT * FROM warehouse_locations WHERE is_active=1 AND can_be_source=1 ORDER BY id")]
  def details(self,id):
@@ -63,6 +70,34 @@ class WarehouseScheduleDatabase:
    c.execute('UPDATE warehouse_delivery_schedules SET name=?,delay_minutes_after_close=?,run_at_utc=?,is_active=?,revision=revision+1,updated_at_utc=? WHERE id=? AND revision=?',(values.get('name',old['name']),values.get('delay',old['delay_minutes_after_close']),values.get('run_at_utc',old['run_at_utc']),values.get('is_active',old['is_active']),now,id,revision))
    c.execute('DELETE FROM warehouse_delivery_schedule_recipients WHERE schedule_id=?',(id,));c.executemany('INSERT INTO warehouse_delivery_schedule_recipients(schedule_id,recipient_id,created_at_utc) VALUES(?,?,?)',[(id,r,now) for r in set(recipient_ids)])
    c.execute("UPDATE warehouse_delivery_jobs SET status='cancelled',updated_at_utc=? WHERE schedule_id=? AND status IN ('scheduled','waiting_report') AND ?=0",(now,id,values.get('is_active',old['is_active'])))
+   return self._load(c,id)
+ def update_recipients(self,id,recipient_ids,revision,now):
+  if not recipient_ids:raise WarehouseScheduleError('Schedule requires recipients')
+  with self._tx() as c:
+   old=self._load(c,id)
+   if not old:raise WarehouseScheduleError('Schedule not found')
+   if old['revision']!=revision:raise WarehouseScheduleConflict('Schedule revision conflict')
+   statuses=tuple(r['status'] for r in c.execute('SELECT status FROM warehouse_delivery_jobs WHERE schedule_id=?',(id,)).fetchall())
+   if old['schedule_type']=='once' and any(status not in ('scheduled','waiting_report') for status in statuses):raise WarehouseScheduleError('One-off job already started')
+   if old['schedule_type']=='daily' and any(status in ('sending','failed','partial_failed') for status in statuses):raise WarehouseScheduleError('Schedule has an unfinished started job')
+   unique=tuple(sorted(set(recipient_ids)))
+   found=c.execute('SELECT COUNT(*) FROM warehouse_report_recipients WHERE is_active=1 AND id IN ('+','.join('?'*len(unique))+')',unique).fetchone()[0]
+   if found!=len(unique):raise WarehouseScheduleError('Recipients must be active')
+   cur=c.execute('UPDATE warehouse_delivery_schedules SET revision=revision+1,updated_at_utc=? WHERE id=? AND revision=?',(now,id,revision))
+   if cur.rowcount!=1:raise WarehouseScheduleConflict('Schedule revision conflict')
+   c.execute('DELETE FROM warehouse_delivery_schedule_recipients WHERE schedule_id=?',(id,))
+   c.executemany('INSERT INTO warehouse_delivery_schedule_recipients(schedule_id,recipient_id,created_at_utc) VALUES(?,?,?)',[(id,r,now) for r in unique])
+   return self._load(c,id)
+ def update_once_run_at(self,id,run_at,revision,now):
+  with self._tx() as c:
+   old=self._load(c,id)
+   if not old or old['schedule_type']!='once':raise WarehouseScheduleError('One-off schedule not found')
+   if old['revision']!=revision:raise WarehouseScheduleConflict('Schedule revision conflict')
+   jobs=c.execute('SELECT status FROM warehouse_delivery_jobs WHERE schedule_id=?',(id,)).fetchall()
+   if any(r['status'] not in ('scheduled','waiting_report') for r in jobs):raise WarehouseScheduleError('One-off job already started')
+   cur=c.execute('UPDATE warehouse_delivery_schedules SET run_at_utc=?,revision=revision+1,updated_at_utc=? WHERE id=? AND revision=?',(run_at,now,id,revision))
+   if cur.rowcount!=1:raise WarehouseScheduleConflict('Schedule revision conflict')
+   c.execute("UPDATE warehouse_delivery_jobs SET scheduled_at_utc=?,updated_at_utc=? WHERE schedule_id=? AND status IN ('scheduled','waiting_report')",(run_at,now,id))
    return self._load(c,id)
  def _load(self,c,id):
   r=c.execute('SELECT * FROM warehouse_delivery_schedules WHERE id=?',(id,)).fetchone();return dict(r) if r else None

@@ -34,6 +34,32 @@ class WarehouseScheduleService:
   if first.utcoffset()!=second.utcoffset():raise ValueError('Неоднозначное локальное время: выберите occurrence')
   if first.astimezone(UTC)<=self._now():raise ValueError('Время отправки должно быть в будущем')
   return utc_rfc3339(first.astimezone(UTC))
+ def local_run_candidates(self,date_text,time_text,timezone='Europe/Kyiv'):
+  from datetime import datetime
+  try:naive=datetime.strptime(f'{date_text} {time_text}','%d.%m.%Y %H:%M')
+  except ValueError as exc:raise ValueError('Введите дату ДД.ММ.ГГГГ и время ЧЧ:ММ') from exc
+  zone=ZoneInfo(timezone);values=[]
+  for fold in (0,1):
+   local=naive.replace(tzinfo=zone,fold=fold);utc=local.astimezone(UTC)
+   if utc.astimezone(zone).replace(tzinfo=None)==naive and utc>self._now():
+    stamp=utc_rfc3339(utc)
+    if stamp not in values:values.append(stamp)
+  if not values:
+   probe=naive.replace(tzinfo=zone)
+   if probe.astimezone(UTC)<=self._now():raise ValueError('Время отправки должно быть в будущем')
+   raise ValueError('Такого локального времени не существует')
+  return tuple(values)
+ def update_recipients(self,id,recipient_ids,revision,actor):
+  self.access.require_warehouse_delivery_schedule_management(actor);return self.repository.update_recipients(id,tuple(recipient_ids),revision,utc_rfc3339(self._now()))
+ def update_once_datetime(self,id,run_at,revision,actor):
+  self.access.require_warehouse_delivery_schedule_management(actor)
+  now=self._now()
+  try:value=datetime.fromisoformat(run_at.replace('Z','+00:00'))
+  except (AttributeError,ValueError) as exc:raise ValueError('Некорректное UTC-время отправки') from exc
+  if value.tzinfo is None or value.utcoffset() is None:raise ValueError('Некорректное UTC-время отправки')
+  value=value.astimezone(UTC)
+  if value<=now:raise ValueError('Время отправки должно быть в будущем')
+  return self.repository.update_once_run_at(id,utc_rfc3339(value),revision,utc_rfc3339(now))
  def jobs(self,id,actor):self.access.require_warehouse_delivery_history(actor);return self.repository.jobs(id)
  def cancel_job(self,id,actor):
   self.access.require_warehouse_delivery_schedule_management(actor);return self.repository.cancel_job(id,utc_rfc3339(self._now()))

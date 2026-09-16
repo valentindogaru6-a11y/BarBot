@@ -1,7 +1,9 @@
 """FSM UI for v10 scheduled immutable-report delivery."""
 from __future__ import annotations
 import asyncio
+from datetime import datetime
 from html import escape
+from zoneinfo import ZoneInfo
 from aiogram import F,Router
 from aiogram.filters import Command,StateFilter
 from aiogram.fsm.context import FSMContext
@@ -88,7 +90,7 @@ async def save(callback:CallbackQuery,state:FSMContext,warehouse_schedule_servic
 @router.callback_query(WarehouseCallback.filter(F.action=='sx'))
 async def cancel(callback:CallbackQuery,state:FSMContext):await state.clear();await callback.answer('Отменено')
 @router.message(Command('cancel'),StateFilter(WarehouseScheduleStates))
-async def command_cancel(message:Message,state:FSMContext):await state.clear();await message.answer('Создание расписания отменено.')
+async def command_cancel(message:Message,state:FSMContext):await state.clear();await message.answer('Работа с расписанием отменена.')
 
 def _card(row):
  kind='Ежедневно' if row['schedule_type']=='daily' else 'Разово';target=f"delay: {row['delay_minutes_after_close']} мин." if row['schedule_type']=='daily' else f"UTC: {row['run_at_utc']}"
@@ -101,7 +103,8 @@ async def card(callback:CallbackQuery,callback_data:WarehouseCallback,warehouse_
  await callback.answer();buttons=[('📜 Запуски','sj',row['id'],0),('⬅️ Назад','sd',0,0)]
  try:
   await _t(warehouse_schedule_service.list,callback.from_user.id)
-  buttons[:0]=[('✏️ Название','en',row['id'],row['revision']),('⏱ Время / задержка','ed',row['id'],row['revision']),('👥 Получатели','er',row['id'],row['revision']),('⏸ Выключить' if row['is_active'] else '▶️ Включить','se',row['id'],row['revision'])]
+  time_label='⏱ Дата и время' if row['schedule_type']=='once' else '⏱ Задержка'
+  buttons[:0]=[('✏️ Название','en',row['id'],row['revision']),(time_label,'ed',row['id'],row['revision']),('👥 Получатели','er',row['id'],row['revision']),('⏸ Выключить' if row['is_active'] else '▶️ Включить','se',row['id'],row['revision'])]
  except Exception:pass
  await edit_or_send_text(callback.message,_card(row),_kb(*buttons))
 @router.callback_query(WarehouseCallback.filter(F.action=='se'))
@@ -161,7 +164,15 @@ async def _edit_start(callback,data,state,service,kind,prompt):
 @router.callback_query(WarehouseCallback.filter(F.action=='en'))
 async def edit_name_start(callback:CallbackQuery,callback_data:WarehouseCallback,state:FSMContext,warehouse_schedule_service:WarehouseScheduleService):await _edit_start(callback,callback_data,state,warehouse_schedule_service,'name','Введите новое название (1–200 символов).')
 @router.callback_query(WarehouseCallback.filter(F.action=='ed'))
-async def edit_delay_start(callback:CallbackQuery,callback_data:WarehouseCallback,state:FSMContext,warehouse_schedule_service:WarehouseScheduleService):await _edit_start(callback,callback_data,state,warehouse_schedule_service,'delay','Введите новую задержку 0–1440 минут.')
+async def edit_delay_start(callback:CallbackQuery,callback_data:WarehouseCallback,state:FSMContext,warehouse_schedule_service:WarehouseScheduleService):
+ try:row=await _t(warehouse_schedule_service.repository.details,callback_data.object_id);await _t(warehouse_schedule_service.list,callback.from_user.id)
+ except Exception as e:await callback.answer(_error(e),show_alert=True);return
+ if not row or row['revision']!=callback_data.aux:await callback.answer('Данные изменились. Откройте карточку заново.',show_alert=True);return
+ await state.clear();await state.update_data(edit_schedule=row['id'],edit_revision=row['revision'],edit_recipients=list(row['recipients']),old_run_at=row['run_at_utc'])
+ if row['schedule_type']=='once':
+  report=await _t(warehouse_schedule_service.repository.report_summary,row['report_id']);await state.update_data(report_date=report['business_date'] if report else '—',report_version=report['version'] if report else '—');await state.set_state(WarehouseScheduleStates.edit_once_date);prompt='Введите новую дату: ДД.ММ.ГГГГ'
+ else:await state.set_state(WarehouseScheduleStates.edit_delay);prompt='Введите новую задержку 0–1440 минут.'
+ await callback.answer();await callback.message.answer(prompt)
 @router.message(WarehouseScheduleStates.edit_name,F.text)
 async def edit_name_input(message:Message,state:FSMContext):
  value=(message.text or '').strip()
@@ -176,4 +187,65 @@ async def edit_delay_input(message:Message,state:FSMContext):
 async def edit_save(callback:CallbackQuery,state:FSMContext,warehouse_schedule_service:WarehouseScheduleService):
  try:
   d=await state.get_data();await _t(warehouse_schedule_service.update,d['edit_schedule'],d['edit_values'],d['edit_recipients'],d['edit_revision'],callback.from_user.id);await state.clear();await callback.answer('Сохранено');await card(callback,WarehouseCallback(action='sv',object_id=d['edit_schedule']),warehouse_schedule_service)
+ except Exception as e:await callback.answer(_error(e),show_alert=True)
+
+async def _edit_recipient_page(message,state,service,actor,page=0):
+ recipients=await _t(service.recipients,actor);data=await state.get_data();active_ids={r['id'] for r in recipients};selected=set(data.get('edit_selected',[]))&active_ids;await state.update_data(edit_selected=list(selected));page=max(0,min(page,max(0,(len(recipients)-1)//8)));rows=recipients[page*8:(page+1)*8]
+ buttons=[(f"{'✅' if r['id'] in selected else '⬜'} {r['title']}",'rt',r['id'],page) for r in rows]
+ if page>0:buttons.append(('⬅️','rp',0,page-1))
+ if (page+1)*8<len(recipients):buttons.append(('➡️','rp',0,page+1))
+ buttons += [('👁 Предпросмотр','rv',0,page),('❌ Отмена','sx',0,0)]
+ await edit_or_send_text(message,f"👥 <b>Получатели</b> · страница {page+1}",_kb(*buttons))
+@router.callback_query(WarehouseCallback.filter(F.action=='er'))
+async def edit_recipients_start(callback:CallbackQuery,callback_data:WarehouseCallback,state:FSMContext,warehouse_schedule_service:WarehouseScheduleService):
+ try:row=await _t(warehouse_schedule_service.repository.details,callback_data.object_id);await _t(warehouse_schedule_service.list,callback.from_user.id);active=await _t(warehouse_schedule_service.recipients,callback.from_user.id)
+ except Exception as e:await callback.answer(_error(e),show_alert=True);return
+ if not row or row['revision']!=callback_data.aux:await callback.answer('Данные изменились. Откройте карточку заново.',show_alert=True);return
+ active_ids={r['id'] for r in active};await state.clear();await state.update_data(edit_schedule=row['id'],edit_revision=row['revision'],edit_old=list(row['recipients']),edit_selected=[r for r in row['recipients'] if r in active_ids]);await state.set_state(WarehouseScheduleStates.edit_recipients);await callback.answer();await _edit_recipient_page(callback.message,state,warehouse_schedule_service,callback.from_user.id)
+@router.callback_query(WarehouseCallback.filter(F.action=='rt'),StateFilter(WarehouseScheduleStates.edit_recipients))
+async def edit_recipient_toggle(callback:CallbackQuery,callback_data:WarehouseCallback,state:FSMContext,warehouse_schedule_service:WarehouseScheduleService):
+ data=await state.get_data();selected=set(data.get('edit_selected',[]));selected.symmetric_difference_update({callback_data.object_id});await state.update_data(edit_selected=list(selected));await callback.answer();await _edit_recipient_page(callback.message,state,warehouse_schedule_service,callback.from_user.id,callback_data.aux)
+@router.callback_query(WarehouseCallback.filter(F.action=='rp'),StateFilter(WarehouseScheduleStates.edit_recipients))
+async def edit_recipient_page(callback:CallbackQuery,callback_data:WarehouseCallback,state:FSMContext,warehouse_schedule_service:WarehouseScheduleService):await callback.answer();await _edit_recipient_page(callback.message,state,warehouse_schedule_service,callback.from_user.id,callback_data.aux)
+@router.callback_query(WarehouseCallback.filter(F.action=='rv'),StateFilter(WarehouseScheduleStates.edit_recipients))
+async def edit_recipient_preview(callback:CallbackQuery,state:FSMContext,warehouse_schedule_service:WarehouseScheduleService):
+ data=await state.get_data();selected=data.get('edit_selected',[])
+ if not selected:await callback.answer('Выберите хотя бы одного получателя.',show_alert=True);return
+ old=await _t(warehouse_schedule_service.repository.recipients_by_ids,data.get('edit_old',[]));new=await _t(warehouse_schedule_service.repository.recipients_by_ids,selected)
+ text='👥 <b>Изменение получателей</b>\n\nБыло:\n'+'\n'.join('• '+escape(r['title']) for r in old)+'\n\nСтанет:\n'+'\n'.join('• '+escape(r['title']) for r in new)
+ await callback.answer();await edit_or_send_text(callback.message,text,_kb(('✅ Сохранить','rz',0,0),('❌ Отмена','sx',0,0)))
+@router.callback_query(WarehouseCallback.filter(F.action=='rz'),StateFilter(WarehouseScheduleStates.edit_recipients))
+async def edit_recipient_save(callback:CallbackQuery,state:FSMContext,warehouse_schedule_service:WarehouseScheduleService):
+ try:
+  d=await state.get_data();await _t(warehouse_schedule_service.update_recipients,d['edit_schedule'],d['edit_selected'],d['edit_revision'],callback.from_user.id);sid=d['edit_schedule'];await state.clear();await callback.answer('Получатели сохранены');await card(callback,WarehouseCallback(action='sv',object_id=sid),warehouse_schedule_service)
+ except Exception as e:
+  await callback.answer(_error(e),show_alert=True)
+  try:await _edit_recipient_page(callback.message,state,warehouse_schedule_service,callback.from_user.id)
+  except Exception:pass
+
+@router.message(WarehouseScheduleStates.edit_once_date,F.text)
+async def edit_once_date_input(message:Message,state:FSMContext):await state.update_data(edit_date=message.text or '');await state.set_state(WarehouseScheduleStates.edit_once_time);await message.answer('Введите новое время: ЧЧ:ММ')
+def _local_time(stamp):
+ return datetime.fromisoformat(stamp.replace('Z','+00:00')).astimezone(ZoneInfo('Europe/Kyiv')).strftime('%d.%m.%Y %H:%M %Z')
+async def _once_preview(message,state,run_at):
+ data=await state.get_data();await state.update_data(edit_run_at=run_at);await state.set_state(WarehouseScheduleStates.edit_confirm)
+ text=(f"⏱ <b>Изменение даты и времени</b>\n\n"
+       f"Было: <b>{_local_time(data['old_run_at'])}</b>\nUTC: <code>{data['old_run_at']}</code>\n\n"
+       f"Станет: <b>{_local_time(run_at)}</b>\nUTC: <code>{run_at}</code>\n\n"
+       f"Отчёт: {escape(str(data['report_date']))}, версия {escape(str(data['report_version']))}")
+ await message.answer(text,reply_markup=_kb(('✅ Сохранить','os',0,0),('❌ Отмена','sx',0,0)))
+@router.message(WarehouseScheduleStates.edit_once_time,F.text)
+async def edit_once_time_input(message:Message,state:FSMContext,warehouse_schedule_service:WarehouseScheduleService):
+ try:
+  data=await state.get_data();values=await _t(warehouse_schedule_service.local_run_candidates,data['edit_date'],message.text or '')
+ except Exception as e:await message.answer(_error(e));return
+ if len(values)==1:await _once_preview(message,state,values[0]);return
+ await state.update_data(edit_occurrences=list(values));await state.set_state(WarehouseScheduleStates.edit_once_occurrence);await message.answer('Это время встречается дважды. Выберите вхождение:',reply_markup=_kb(('1️⃣ Первое вхождение','o1',0,0),('2️⃣ Второе вхождение','o2',0,0),('❌ Отмена','sx',0,0)))
+@router.callback_query(WarehouseCallback.filter(F.action.in_({'o1','o2'})),StateFilter(WarehouseScheduleStates.edit_once_occurrence))
+async def edit_once_occurrence(callback:CallbackQuery,callback_data:WarehouseCallback,state:FSMContext):
+ data=await state.get_data();await callback.answer();await _once_preview(callback.message,state,data['edit_occurrences'][0 if callback_data.action=='o1' else 1])
+@router.callback_query(WarehouseCallback.filter(F.action=='os'),StateFilter(WarehouseScheduleStates.edit_confirm))
+async def edit_once_save(callback:CallbackQuery,state:FSMContext,warehouse_schedule_service:WarehouseScheduleService):
+ try:
+  d=await state.get_data();await _t(warehouse_schedule_service.update_once_datetime,d['edit_schedule'],d['edit_run_at'],d['edit_revision'],callback.from_user.id);sid=d['edit_schedule'];await state.clear();await callback.answer('Дата и время сохранены');await card(callback,WarehouseCallback(action='sv',object_id=sid),warehouse_schedule_service)
  except Exception as e:await callback.answer(_error(e),show_alert=True)
