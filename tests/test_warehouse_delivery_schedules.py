@@ -89,3 +89,38 @@ def test_once_is_single_job_and_deactivated_recipient_is_skipped(tmp_path: Path)
     service=WarehouseScheduleService(repo,Delivery(),AccessService(frozenset({1})),Clock())
     asyncio.run(service.run_once());asyncio.run(service.run_once())
     assert len(repo.jobs(once['id']))==1
+
+
+def test_one_off_local_datetime_rejects_invalid_past_and_dst_cases(tmp_path: Path):
+    _,repo,_,_,_=_env(tmp_path)
+    service=WarehouseScheduleService(repo,Delivery(),AccessService(frozenset({1})),Clock(datetime(2026,1,1,0,0,tzinfo=UTC)))
+    with pytest.raises(ValueError): service.local_run_at('31.02.2026','12:00')
+    with pytest.raises(ValueError): service.local_run_at('01.01.2025','12:00')
+    with pytest.raises(ValueError,match='не существует'): service.local_run_at('29.03.2026','03:30')
+    with pytest.raises(ValueError,match='Неоднозначное'): service.local_run_at('25.10.2026','03:30')
+
+
+def test_one_off_local_datetime_has_explicit_utc_preview(tmp_path: Path):
+    _,repo,_,_,_=_env(tmp_path)
+    service=WarehouseScheduleService(repo,Delivery(),AccessService(frozenset({1})),Clock(datetime(2026,1,1,0,0,tzinfo=UTC)))
+    assert service.local_run_at('02.01.2026','12:00')=='2026-01-02T10:00:00Z'
+
+
+def test_schedule_management_permissions_and_read_only_history(tmp_path: Path):
+    _,repo,source,recipient,_=_env(tmp_path)
+    service=WarehouseScheduleService(repo,Delivery(),AccessService(frozenset({1})),Clock())
+    with pytest.raises(Exception): service.create(_daily(source),(recipient,),2)
+    with pytest.raises(Exception): service.jobs(1,2)
+
+
+def test_disable_cancels_pending_jobs_and_enable_uses_revision(tmp_path: Path):
+    _,repo,source,recipient,_=_env(tmp_path);schedule=repo.create(_daily(source),(recipient,),1,'now');repo.create_daily_jobs('2026-09-10T21:16:00Z')
+    updated=repo.update(schedule['id'],{'is_active':0},(recipient,),schedule['revision'],'later')
+    assert updated['is_active']==0 and repo.jobs(schedule['id'])[0]['status']=='cancelled'
+
+
+def test_stale_job_is_recovered_as_failed(tmp_path: Path):
+    path,repo,source,recipient,_=_env(tmp_path);schedule=repo.create(_daily(source),(recipient,),1,'now');repo.create_daily_jobs('2026-09-10T21:16:00Z');job=repo.jobs(schedule['id'])[0]
+    with sqlite3.connect(path) as connection:
+        connection.execute("UPDATE warehouse_delivery_jobs SET status='sending',claimed_at_utc='2026-09-10T20:00:00Z' WHERE id=?",(job['id'],));connection.commit()
+    assert repo.due('2026-09-10T21:16:00Z','2026-09-10T21:01:00Z')[0]['status']=='failed'

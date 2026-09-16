@@ -48,3 +48,13 @@ class WarehouseReminderStates(StatesGroup):
     first = State()
     repeat = State()
     maximum = State()
+
+
+class WarehouseScheduleStates(StatesGroup):
+    daily_name = State()
+    daily_delay = State()
+    once_name = State()
+    once_date = State()
+    once_time = State()
+    recipients = State()
+    confirm = State()

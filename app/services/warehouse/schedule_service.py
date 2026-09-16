@@ -20,6 +20,20 @@ class WarehouseScheduleService:
  def update(self,id,values,recipient_ids,revision,actor):
   self.access.require_warehouse_delivery_schedule_management(actor);return self.repository.update(id,values,tuple(recipient_ids),revision,utc_rfc3339(self._now()))
  def list(self,actor):self.access.require_warehouse_delivery_schedule_management(actor);return self.repository.schedules()
+ def details(self,id,actor):self.access.require_warehouse_delivery_schedule_management(actor);return self.repository.details(id)
+ def recipients(self,actor):self.access.require_warehouse_delivery_schedule_management(actor);return self.repository.active_recipients()
+ def reports(self,actor):self.access.require_warehouse_delivery_schedule_management(actor);return self.repository.ready_reports()
+ def sources(self,actor):self.access.require_warehouse_delivery_schedule_management(actor);return self.repository.sources()
+ def local_run_at(self,date_text,time_text,timezone='Europe/Kyiv'):
+  from datetime import datetime
+  try:naive=datetime.strptime(f'{date_text} {time_text}','%d.%m.%Y %H:%M')
+  except ValueError as exc:raise ValueError('Введите дату ДД.ММ.ГГГГ и время ЧЧ:ММ') from exc
+  zone=ZoneInfo(timezone);first=naive.replace(tzinfo=zone,fold=0);second=naive.replace(tzinfo=zone,fold=1)
+  def valid(value):return value.astimezone(UTC).astimezone(zone).replace(tzinfo=None)==naive
+  if not valid(first):raise ValueError('Такого локального времени не существует')
+  if first.utcoffset()!=second.utcoffset():raise ValueError('Неоднозначное локальное время: выберите occurrence')
+  if first.astimezone(UTC)<=self._now():raise ValueError('Время отправки должно быть в будущем')
+  return utc_rfc3339(first.astimezone(UTC))
  def jobs(self,id,actor):self.access.require_warehouse_delivery_history(actor);return self.repository.jobs(id)
  async def run_once(self,now_utc:datetime|None=None):
   now=self._now(now_utc);stamp=utc_rfc3339(now)
