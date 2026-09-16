@@ -4,6 +4,13 @@ Phase 10A is an offline readiness stage. It does not authorize deployment,
 production migration, seed import, polling, systemd changes, or Telegram
 delivery. Phase 10B requires a separate explicit owner decision.
 
+Default development remains production-safe: the real `.env`, production
+SQLite/audit/XLSX, polling, and systemd are out of bounds. The limited
+exception in `AGENTS.md` applies only to an explicitly authorized Phase 10B
+Stage, with a confirmed HEAD, clean tree, and the preceding stop point passed.
+Every later Stage requires a new confirmation; permission never carries
+forward automatically.
+
 ## Audited runtime facts
 
 - Application command: `.venv/bin/python -m app.bot` from `/opt/barbot`.
@@ -49,6 +56,9 @@ Values must never be pasted into tickets, logs, command history, or reports.
 
 The real `.env` is operational secret material. The preflight command reads
 the process environment only and deliberately does not load `.env` itself.
+During an explicitly authorized Stage 0, an operator-side wrapper may validate
+only the allowlisted keys programmatically and pass them to preflight without
+printing values. This exception is read-only and does not apply to development.
 
 ## Read-only release preflight
 
@@ -147,6 +157,11 @@ rehearsal does not introduce float drift.
 10. Review errors for operational impact and ensure no token/secret was logged.
 
 No external monitoring dependency is introduced by Phase 10A.
+
+The first attempted Stage 0 stopped with `NO-GO` and made no production
+mutation. Production permission hardening is an operational change and must be
+performed only as a separately authorized rollout action, never inferred from
+read-only inspection.
 
 ## Security review outcome
 

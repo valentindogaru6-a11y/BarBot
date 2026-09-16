@@ -692,6 +692,13 @@ rehearsals и runbooks для backup, rollout и rollback. Target schema — v11
 Production deployment по-прежнему не выполнялся; Phase 10B допускается только
 после отдельного явного разрешения владельца.
 
+Policy различает безопасный default development и поэтапный controlled
+production rollout. Ограниченный Stage 0 разрешает только read-only inspection;
+Stage 1–4 требуют отдельных подтверждений и не наследуют разрешение предыдущего
+этапа. Изменение policy не даёт права использовать новые разрешения в том же
+turn. Первая попытка Stage 0 завершилась `NO-GO` без production mutations;
+deployment всё ещё не выполнялся.
+
 ```bash
 python -m app.release_preflight --config-check-only --polling-owner-count 1
 ```

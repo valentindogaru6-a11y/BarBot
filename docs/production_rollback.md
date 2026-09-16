@@ -4,6 +4,11 @@ Rollback after a migration restores the consistent pre-deploy backup. There is
 no manual schema downgrade and no attempt to combine a v11 database with code
 that expects an older schema.
 
+This runbook is usable only inside an explicitly authorized Phase 10B Stage.
+Rollback authority does not reveal secrets, authorize an unconfirmed service
+unit, or carry permission into a later Stage. Secret values must never appear
+in diagnostics or reports.
+
 ## Immediate stop conditions
 
 - more than one polling owner;

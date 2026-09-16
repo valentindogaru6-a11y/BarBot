@@ -4,6 +4,14 @@ This document is preparation only. Do not execute it without a separate,
 explicit Phase 10B authorization and a named operator. Replace every
 `<operator-confirmed-...>` placeholder; never guess a service unit or path.
 
+The controlled-rollout exception in `AGENTS.md` is active only when the task
+names Phase 10B (or continues a precise Stage/STOP), supplies the confirmed
+HEAD, has a clean tree, and separately authorizes the next Stage. Stage 0 is
+read-only. Stage 1 stop/backup, Stage 2 migration/import, Stage 3
+start/acceptance, and Stage 4 enablement each require a new explicit approval.
+Changing policy in a turn never authorizes production access in that same turn.
+The previous Stage 0 attempt ended `NO-GO` without production mutations.
+
 ## Before the maintenance window
 
 1. Name the operator, reviewer, maintenance start/end, and rollback owner.
@@ -30,6 +38,8 @@ cd /opt/barbot
 ```
 
 Any `FAIL` is a stop condition. Resolve warnings explicitly in the change log.
+Do not change DB/audit/report permissions during Stage 0. Any required
+permission hardening must be named and approved as a separate rollout action.
 
 ## Stop point 1 — identity and rollback authorization
 
