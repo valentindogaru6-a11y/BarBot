@@ -131,6 +131,204 @@ class WarehouseCorrectionDatabase:
             ).fetchall()
             return [self._session(connection, int(row["id"])) for row in rows]
 
+    def report_entry(self, report_id: int) -> dict[str, Any] | None:
+        """Return the trusted report/shift state used by the Telegram entry point."""
+
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                SELECT r.id AS report_id, r.shift_id, r.version, r.status AS report_status,
+                       r.ready_at_utc, s.business_date, s.closed_at_utc,
+                       s.status AS shift_status,
+                       s.revision AS shift_revision, s.source_location_id,
+                       l.name AS source_location_name,
+                       (SELECT id FROM warehouse_reports latest
+                        WHERE latest.shift_id=r.shift_id AND latest.status='ready'
+                        ORDER BY latest.version DESC LIMIT 1) AS latest_report_id
+                FROM warehouse_reports r
+                JOIN warehouse_shifts s ON s.id=r.shift_id
+                JOIN warehouse_locations l ON l.id=s.source_location_id
+                WHERE r.id=?
+                """,
+                (report_id,),
+            ).fetchone()
+            if row is None:
+                return None
+            result = self._dict(row)
+            active = connection.execute(
+                "SELECT id FROM warehouse_correction_sessions WHERE shift_id=? "
+                "AND status IN ('open','building') ORDER BY id DESC LIMIT 1",
+                (result["shift_id"],),
+            ).fetchone()
+            result["active_session_id"] = int(active["id"]) if active else None
+            return result
+
+    @staticmethod
+    def _operation_state(events: list[sqlite3.Row], deleted: bool) -> str:
+        names = [str(event["event_type"]) for event in events]
+        if deleted:
+            return "deleted"
+        if "correction_operation_created" in names:
+            return "added"
+        if names and names[-1] == "correction_operation_restored":
+            return "restored"
+        if any(name in {
+            "correction_operation_updated",
+            "correction_development_group_renamed",
+            "correction_operation_deleted",
+            "correction_operation_restored",
+        } for name in names):
+            return "changed"
+        return "unchanged"
+
+    @classmethod
+    def _operation_model(
+        cls,
+        connection: sqlite3.Connection,
+        row: sqlite3.Row,
+        session_id: int,
+    ) -> dict[str, Any]:
+        result = cls._dict(row)
+        events = connection.execute(
+            """
+            SELECT event_type,before_json,after_json FROM warehouse_audit_events
+            WHERE correlation_id=? AND (
+                operation_id=? OR (
+                    event_type='correction_development_group_renamed'
+                    AND entity_id=?
+                )
+            ) ORDER BY id
+            """,
+            (
+                f"correction:{session_id}", row["id"],
+                row["development_group_id"] if row["development_group_id"] else -1,
+            ),
+        ).fetchall()
+        result["change_state"] = cls._operation_state(events, bool(row["is_deleted"]))
+        base: dict[str, Any] | None = None
+        for event in events:
+            if event["event_type"] == "correction_operation_created":
+                base = None
+                break
+            if event["before_json"]:
+                base = dict(result)
+                base.update(json.loads(str(event["before_json"])))
+                break
+        result["base"] = base
+        return result
+
+    def dashboard(self, session_id: int) -> dict[str, Any] | None:
+        with self._connection() as connection:
+            session = self._session(connection, session_id)
+            if session is None:
+                return None
+            location = connection.execute(
+                """
+                SELECT l.id,l.name,s.closed_at_utc FROM warehouse_shifts s
+                JOIN warehouse_locations l ON l.id=s.source_location_id
+                WHERE s.id=?
+                """,
+                (session["shift_id"],),
+            ).fetchone()
+            assert location is not None
+            session["source_location_id"] = int(location["id"])
+            session["source_location_name"] = str(location["name"])
+            session["closed_at_utc"] = location["closed_at_utc"]
+            operation_rows = connection.execute(
+                """
+                SELECT o.*,src.name AS source_location_name,
+                       dst.name AS destination_location_name
+                FROM warehouse_operations o
+                JOIN warehouse_locations src ON src.id=o.source_location_id
+                LEFT JOIN warehouse_locations dst ON dst.id=o.destination_location_id
+                WHERE o.shift_id=? ORDER BY o.occurred_at_utc,o.id
+                """,
+                (session["shift_id"],),
+            ).fetchall()
+            operations = [
+                self._operation_model(connection, row, session_id)
+                for row in operation_rows
+            ]
+            counts = {name: 0 for name in ("added", "changed", "deleted", "restored")}
+            for operation in operations:
+                state = str(operation["change_state"])
+                if state in counts:
+                    counts[state] += 1
+            session["operation_count"] = sum(not bool(row["is_deleted"]) for row in operations)
+            session["change_counts"] = counts
+            session["has_mutations"] = any(counts.values())
+            requirements = connection.execute(
+                "SELECT status,COUNT(*) AS count FROM warehouse_shift_requirements "
+                "WHERE shift_id=? GROUP BY status",
+                (session["shift_id"],),
+            ).fetchall()
+            session["requirements"] = {
+                str(row["status"]): int(row["count"]) for row in requirements
+            }
+            return session
+
+    def operation_page(
+        self, session_id: int, *, page: int, page_size: int = 8
+    ) -> tuple[list[dict[str, Any]], int]:
+        offset = max(page, 0) * page_size
+        with self._connection() as connection:
+            session = self._session(connection, session_id)
+            if session is None:
+                raise WarehouseCorrectionError("Correction session not found")
+            total = int(connection.execute(
+                "SELECT COUNT(*) FROM warehouse_operations WHERE shift_id=?",
+                (session["shift_id"],),
+            ).fetchone()[0])
+            rows = connection.execute(
+                """
+                SELECT o.*,src.name AS source_location_name,
+                       dst.name AS destination_location_name
+                FROM warehouse_operations o
+                JOIN warehouse_locations src ON src.id=o.source_location_id
+                LEFT JOIN warehouse_locations dst ON dst.id=o.destination_location_id
+                WHERE o.shift_id=? ORDER BY o.occurred_at_utc,o.id LIMIT ? OFFSET ?
+                """,
+                (session["shift_id"], page_size, offset),
+            ).fetchall()
+            return [self._operation_model(connection, row, session_id) for row in rows], total
+
+    def operation(self, session_id: int, operation_id: int) -> dict[str, Any] | None:
+        with self._connection() as connection:
+            session = self._session(connection, session_id)
+            if session is None:
+                return None
+            row = connection.execute(
+                """
+                SELECT o.*,src.name AS source_location_name,
+                       dst.name AS destination_location_name
+                FROM warehouse_operations o
+                JOIN warehouse_locations src ON src.id=o.source_location_id
+                LEFT JOIN warehouse_locations dst ON dst.id=o.destination_location_id
+                WHERE o.id=? AND o.shift_id=?
+                """,
+                (operation_id, session["shift_id"]),
+            ).fetchone()
+            if row is None:
+                return None
+            result = self._operation_model(connection, row, session_id)
+            result["session_id"] = session_id
+            result["session_revision"] = int(session["revision"])
+            result["session_status"] = str(session["status"])
+            result["base_report_id"] = int(session["base_report_id"])
+            return result
+
+    def active_operation(self, operation_id: int) -> dict[str, Any] | None:
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                SELECT cs.id AS session_id FROM warehouse_operations o
+                JOIN warehouse_correction_sessions cs ON cs.shift_id=o.shift_id
+                WHERE o.id=? AND cs.status='open' ORDER BY cs.id DESC LIMIT 1
+                """,
+                (operation_id,),
+            ).fetchone()
+        return self.operation(int(row["session_id"]), operation_id) if row else None
+
     def open(
         self,
         shift_id: int,
@@ -206,6 +404,7 @@ class WarehouseCorrectionDatabase:
         session_id: int,
         *,
         operation_id: int | None = None,
+        expected_session_revision: int | None = None,
     ) -> tuple[sqlite3.Row, sqlite3.Row | None]:
         session = connection.execute(
             """
@@ -218,6 +417,11 @@ class WarehouseCorrectionDatabase:
         ).fetchone()
         if session is None or session["status"] != "open" or session["shift_status"] != "correction_open":
             raise WarehouseCorrectionError("Correction session is not editable")
+        if (
+            expected_session_revision is not None
+            and int(session["revision"]) != expected_session_revision
+        ):
+            raise WarehouseCorrectionConflict("Correction revision conflict")
         operation = None
         if operation_id is not None:
             operation = connection.execute(
@@ -227,6 +431,21 @@ class WarehouseCorrectionDatabase:
             if operation is None:
                 raise WarehouseCorrectionError("Operation not found")
         return session, operation
+
+    @staticmethod
+    def _touch_session(
+        connection: sqlite3.Connection,
+        session_id: int,
+        revision: int,
+        now: str,
+    ) -> None:
+        changed = connection.execute(
+            "UPDATE warehouse_correction_sessions SET revision=revision+1, "
+            "updated_at_utc=? WHERE id=? AND revision=? AND status='open'",
+            (now, session_id, revision),
+        )
+        if changed.rowcount != 1:
+            raise WarehouseCorrectionConflict("Correction revision conflict")
 
     @staticmethod
     def _validate_product(
@@ -261,11 +480,15 @@ class WarehouseCorrectionDatabase:
         actor_user_id: int,
         now: str,
         authorize: Callable[[], None] | None = None,
+        expected_session_revision: int | None = None,
     ) -> dict[str, Any]:
         with self._transaction() as connection:
             if authorize is not None:
                 authorize()
-            session, _ = self._active(connection, session_id)
+            session, _ = self._active(
+                connection, session_id,
+                expected_session_revision=expected_session_revision,
+            )
             kind = str(payload["operation_type"])
             product = self._validate_product(
                 connection, int(payload["product_id"]), str(payload["base_unit"]), kind
@@ -345,6 +568,7 @@ class WarehouseCorrectionDatabase:
                 entity_type="operation", entity_id=operation_id,
                 operation_id=operation_id, now=now, after=result,
             )
+            self._touch_session(connection, session_id, int(session["revision"]), now)
             self._recalculate(connection, int(session["shift_id"]), now)
             return result
 
@@ -358,6 +582,7 @@ class WarehouseCorrectionDatabase:
         actor_user_id: int,
         now: str,
         authorize: Callable[[], None] | None = None,
+        expected_session_revision: int | None = None,
     ) -> dict[str, Any]:
         allowed = {
             "product_id", "product_name_snapshot", "quantity_scaled", "base_unit",
@@ -370,7 +595,8 @@ class WarehouseCorrectionDatabase:
             if authorize is not None:
                 authorize()
             session, current = self._active(
-                connection, session_id, operation_id=operation_id
+                connection, session_id, operation_id=operation_id,
+                expected_session_revision=expected_session_revision,
             )
             assert current is not None
             if int(current["revision"]) != expected_revision:
@@ -414,6 +640,7 @@ class WarehouseCorrectionDatabase:
                 entity_type="operation", entity_id=operation_id,
                 operation_id=operation_id, now=now, before=before, after=updated,
             )
+            self._touch_session(connection, session_id, int(session["revision"]), now)
             self._recalculate(connection, int(session["shift_id"]), now)
             return updated
 
@@ -428,12 +655,14 @@ class WarehouseCorrectionDatabase:
         reason: str,
         now: str,
         authorize: Callable[[], None] | None = None,
+        expected_session_revision: int | None = None,
     ) -> dict[str, Any]:
         with self._transaction() as connection:
             if authorize is not None:
                 authorize()
             session, current = self._active(
-                connection, session_id, operation_id=operation_id
+                connection, session_id, operation_id=operation_id,
+                expected_session_revision=expected_session_revision,
             )
             assert current is not None
             if int(current["revision"]) != expected_revision:
@@ -468,6 +697,7 @@ class WarehouseCorrectionDatabase:
                 operation_id=operation_id, now=now, before=before, after=updated,
                 reason=reason,
             )
+            self._touch_session(connection, session_id, int(session["revision"]), now)
             self._recalculate(connection, int(session["shift_id"]), now)
             return updated
 
@@ -481,12 +711,14 @@ class WarehouseCorrectionDatabase:
         actor_user_id: int,
         now: str,
         authorize: Callable[[], None] | None = None,
+        expected_session_revision: int | None = None,
     ) -> dict[str, Any]:
         with self._transaction() as connection:
             if authorize is not None:
                 authorize()
             session, current = self._active(
-                connection, session_id, operation_id=operation_id
+                connection, session_id, operation_id=operation_id,
+                expected_session_revision=expected_session_revision,
             )
             assert current is not None
             if current["operation_type"] != "development":
@@ -526,6 +758,7 @@ class WarehouseCorrectionDatabase:
                 before={"development_title": before},
                 after={"development_title": title},
             )
+            self._touch_session(connection, session_id, int(session["revision"]), now)
             return self._dict(updated)
 
     def cancel(

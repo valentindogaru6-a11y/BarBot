@@ -69,6 +69,77 @@ class WarehouseCorrectionService:
             raise WarehouseCorrectionError("Correction session not found")
         return result
 
+    def report_entry(self, report_id: int, *, actor_user_id: int) -> dict[str, Any]:
+        context = self.access.require_warehouse_view(actor_user_id)
+        result = self.repository.report_entry(report_id)
+        if result is None:
+            raise WarehouseCorrectionError("Report not found")
+        source = int(self.operations.repository.runtime_settings()["source_location_id"])
+        if int(result["source_location_id"]) != source:
+            raise WarehouseCorrectionError("Report not found")
+        result["can_manage"] = context.can_manage_warehouse_corrections
+        result["can_open"] = bool(
+            context.can_manage_warehouse_corrections
+            and result["report_status"] == "ready"
+            and result["shift_status"] == "closed"
+            and int(result["latest_report_id"]) == int(result["report_id"])
+            and result["active_session_id"] is None
+        )
+        return result
+
+    def dashboard(self, session_id: int, *, actor_user_id: int) -> dict[str, Any]:
+        self.access.require_warehouse_view(actor_user_id)
+        result = self.repository.dashboard(session_id)
+        if result is None:
+            raise WarehouseCorrectionError("Correction session not found")
+        source = int(self.operations.repository.runtime_settings()["source_location_id"])
+        if int(result["source_location_id"]) != source:
+            raise WarehouseCorrectionError("Correction session not found")
+        result["can_manage"] = self.access.get_context(
+            actor_user_id
+        ).can_manage_warehouse_corrections
+        return result
+
+    def operation_page(
+        self, session_id: int, *, page: int, actor_user_id: int
+    ) -> tuple[list[dict[str, Any]], int]:
+        self.dashboard(session_id, actor_user_id=actor_user_id)
+        return self.repository.operation_page(session_id, page=max(page, 0))
+
+    def operation(
+        self, session_id: int, operation_id: int, *, actor_user_id: int
+    ) -> dict[str, Any]:
+        dashboard = self.dashboard(session_id, actor_user_id=actor_user_id)
+        result = self.repository.operation(session_id, operation_id)
+        if result is None or int(result["shift_id"]) != int(dashboard["shift_id"]):
+            raise WarehouseCorrectionError("Operation not found")
+        result["can_manage"] = bool(dashboard["can_manage"])
+        return result
+
+    def active_operation(
+        self, operation_id: int, *, actor_user_id: int
+    ) -> dict[str, Any]:
+        self.access.require_warehouse_view(actor_user_id)
+        result = self.repository.active_operation(operation_id)
+        if result is None:
+            raise WarehouseCorrectionError("Operation not found")
+        dashboard = self.dashboard(int(result["session_id"]), actor_user_id=actor_user_id)
+        result["can_manage"] = bool(dashboard["can_manage"])
+        return result
+
+    def changes(self, session_id: int, *, actor_user_id: int) -> list[dict[str, Any]]:
+        result: list[dict[str, Any]] = []
+        page = 0
+        while True:
+            rows, total = self.operation_page(
+                session_id, page=page, actor_user_id=actor_user_id
+            )
+            result.extend(rows)
+            if len(result) >= total:
+                break
+            page += 1
+        return [row for row in result if row["change_state"] != "unchanged"]
+
     def history(self, shift_id: int, *, actor_user_id: int) -> list[dict[str, Any]]:
         self.access.require_warehouse_view(actor_user_id)
         return self.repository.history(shift_id)
@@ -94,6 +165,7 @@ class WarehouseCorrectionService:
         reason_text: str | None = None,
         comment_text: str | None = None,
         development_title: str | None = None,
+        expected_session_revision: int | None = None,
         actor_user_id: int,
     ) -> dict[str, Any]:
         self._manage(actor_user_id)
@@ -127,6 +199,7 @@ class WarehouseCorrectionService:
             actor_user_id=actor_user_id,
             now=self._now(),
             authorize=lambda: self._manage(actor_user_id),
+            expected_session_revision=expected_session_revision,
         )
 
     def update_product_and_quantity(
@@ -138,6 +211,7 @@ class WarehouseCorrectionService:
         unit_text: str | None,
         *,
         expected_revision: int,
+        expected_session_revision: int | None = None,
         actor_user_id: int,
     ) -> dict[str, Any]:
         self._manage(actor_user_id)
@@ -163,11 +237,13 @@ class WarehouseCorrectionService:
             actor_user_id=actor_user_id,
             now=self._now(),
             authorize=lambda: self._manage(actor_user_id),
+            expected_session_revision=expected_session_revision,
         )
 
     def update_quantity(
         self, session_id: int, operation_id: int, quantity_text: str,
-        unit_text: str | None, *, expected_revision: int, actor_user_id: int,
+        unit_text: str | None, *, expected_revision: int,
+        expected_session_revision: int | None = None, actor_user_id: int,
     ) -> dict[str, Any]:
         self._manage(actor_user_id)
         operation = self.operations.repository.get_operation(operation_id)
@@ -187,12 +263,14 @@ class WarehouseCorrectionService:
             actor_user_id=actor_user_id,
             now=self._now(),
             authorize=lambda: self._manage(actor_user_id),
+            expected_session_revision=expected_session_revision,
         )
 
     def update_note(
         self, session_id: int, operation_id: int, *,
         reason_text: str | None, comment_text: str | None,
-        expected_revision: int, actor_user_id: int,
+        expected_revision: int, expected_session_revision: int | None = None,
+        actor_user_id: int,
     ) -> dict[str, Any]:
         self._manage(actor_user_id)
         return self.repository.update_operation(
@@ -203,11 +281,13 @@ class WarehouseCorrectionService:
             actor_user_id=actor_user_id,
             now=self._now(),
             authorize=lambda: self._manage(actor_user_id),
+            expected_session_revision=expected_session_revision,
         )
 
     def update_destination(
         self, session_id: int, operation_id: int, destination_location_id: int,
-        *, expected_revision: int, actor_user_id: int,
+        *, expected_revision: int, expected_session_revision: int | None = None,
+        actor_user_id: int,
     ) -> dict[str, Any]:
         self._manage(actor_user_id)
         return self.repository.update_operation(
@@ -217,11 +297,13 @@ class WarehouseCorrectionService:
             actor_user_id=actor_user_id,
             now=self._now(),
             authorize=lambda: self._manage(actor_user_id),
+            expected_session_revision=expected_session_revision,
         )
 
     def rename_development(
         self, session_id: int, operation_id: int, title: str, *,
-        expected_revision: int, actor_user_id: int,
+        expected_revision: int, expected_session_revision: int | None = None,
+        actor_user_id: int,
     ) -> dict[str, Any]:
         self._manage(actor_user_id)
         cleaned = title.strip()
@@ -233,11 +315,13 @@ class WarehouseCorrectionService:
             actor_user_id=actor_user_id,
             now=self._now(),
             authorize=lambda: self._manage(actor_user_id),
+            expected_session_revision=expected_session_revision,
         )
 
     def delete_operation(
         self, session_id: int, operation_id: int, *, expected_revision: int,
         reason: str, actor_user_id: int,
+        expected_session_revision: int | None = None,
     ) -> dict[str, Any]:
         self._manage(actor_user_id)
         cleaned = reason.strip()
@@ -248,11 +332,13 @@ class WarehouseCorrectionService:
             expected_revision=expected_revision, actor_user_id=actor_user_id,
             reason=cleaned, now=self._now(),
             authorize=lambda: self._manage(actor_user_id),
+            expected_session_revision=expected_session_revision,
         )
 
     def restore_operation(
         self, session_id: int, operation_id: int, *, expected_revision: int,
         reason: str, actor_user_id: int,
+        expected_session_revision: int | None = None,
     ) -> dict[str, Any]:
         self._manage(actor_user_id)
         cleaned = reason.strip()
@@ -263,6 +349,7 @@ class WarehouseCorrectionService:
             expected_revision=expected_revision, actor_user_id=actor_user_id,
             reason=cleaned, now=self._now(),
             authorize=lambda: self._manage(actor_user_id),
+            expected_session_revision=expected_session_revision,
         )
 
     def cancel_correction(

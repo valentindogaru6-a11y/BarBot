@@ -26,6 +26,7 @@ from app.services.warehouse.report_service import (
     WarehouseReportsError,
 )
 from app.services.warehouse.delivery_service import WarehouseReportDeliveryService
+from app.services.warehouse.correction_service import WarehouseCorrectionService
 from app.services.warehouse.xlsx_report_service import WarehouseXlsxError
 
 router = Router(name=__name__)
@@ -226,6 +227,7 @@ async def report_card(
     callback_data: WarehouseCallback,
     warehouse_report_service: WarehouseReportService,
     warehouse_delivery_service: WarehouseReportDeliveryService,
+    warehouse_correction_service: WarehouseCorrectionService,
 ) -> None:
     try:
         report = await _thread(
@@ -242,6 +244,11 @@ async def report_card(
             warehouse_delivery_service.access.get_context,
             callback.from_user.id,
         )
+        correction = await _thread(
+            warehouse_correction_service.report_entry,
+            int(report["id"]),
+            actor_user_id=callback.from_user.id,
+        )
         await edit_or_send_text(
             callback.message,
             f"📄 <b>Отчёт за "
@@ -255,6 +262,10 @@ async def report_card(
             report_card_keyboard(
                 int(report["id"]), return_page=callback_data.aux,
                 can_send=context.can_send_warehouse_reports,
+                correction_session_id=correction["active_session_id"],
+                can_open_correction=bool(correction["can_open"]),
+                shift_revision=int(correction["shift_revision"]),
+                can_manage_correction=context.can_manage_warehouse_corrections,
             ),
         )
 

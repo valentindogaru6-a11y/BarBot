@@ -310,6 +310,10 @@ def report_card_keyboard(
     *,
     return_page: int,
     can_send: bool = False,
+    correction_session_id: int | None = None,
+    can_open_correction: bool = False,
+    shift_revision: int = 0,
+    can_manage_correction: bool = False,
 ) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(
@@ -328,6 +332,23 @@ def report_card_keyboard(
         builder.button(
             text="📤 Отправить активным",
             callback_data=WarehouseCallback(action="da", object_id=report_id),
+        )
+    if correction_session_id is not None:
+        builder.button(
+            text=(
+                "✏️ Продолжить исправление"
+                if can_manage_correction else "👁 Исправление (только чтение)"
+            ),
+            callback_data=WarehouseCallback(
+                action="kd", object_id=correction_session_id
+            ),
+        )
+    elif can_open_correction:
+        builder.button(
+            text="✏️ Исправить закрытую смену",
+            callback_data=WarehouseCallback(
+                action="ko", object_id=report_id, aux=shift_revision
+            ),
         )
     builder.button(
         text="⬅️ Назад",
