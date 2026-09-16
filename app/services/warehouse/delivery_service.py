@@ -43,6 +43,11 @@ class WarehouseReportDeliveryService:
     def _authorize_send(self, actor_user_id: int) -> None:
         self.access.require_warehouse_report_delivery(actor_user_id)
 
+    def _authorize_report_send(self, report: dict[str, Any], actor_user_id: int) -> None:
+        self._authorize_send(actor_user_id)
+        if report.get("correction_session_id") is not None:
+            self.access.require_warehouse_correction_management(actor_user_id)
+
     async def deliver(
         self,
         report_id: int,
@@ -51,6 +56,7 @@ class WarehouseReportDeliveryService:
         retry_failed: bool = False,
         recipient_ids: tuple[int, ...] | None = None,
         caption: str | None = None,
+        require_all_recipients_active: bool = False,
     ) -> dict[str, Any]:
         self._authorize_send(actor_user_id)
         ready = await asyncio.to_thread(
@@ -58,6 +64,7 @@ class WarehouseReportDeliveryService:
         )
         report = ready["report"]
         artifact = ready["artifact"]
+        self._authorize_report_send(report, actor_user_id)
         now_value = self._now_datetime()
         deliveries = await asyncio.to_thread(
             self.repository.prepare_deliveries,
@@ -66,8 +73,9 @@ class WarehouseReportDeliveryService:
             now=utc_rfc3339(now_value),
             stale_before=utc_rfc3339(now_value - self.STALE_SENDING_TIMEOUT),
             retry_failed=retry_failed,
-            authorize=lambda: self._authorize_send(actor_user_id),
+            authorize=lambda: self._authorize_report_send(report, actor_user_id),
             recipient_ids=recipient_ids,
+            require_all_active=require_all_recipients_active,
         )
         for delivery in deliveries:
             attempt_time = utc_rfc3339(self._now_datetime())
@@ -77,7 +85,7 @@ class WarehouseReportDeliveryService:
                 allow_failed=retry_failed,
                 actor_user_id=actor_user_id,
                 now=attempt_time,
-                authorize=lambda: self._authorize_send(actor_user_id),
+                authorize=lambda: self._authorize_report_send(report, actor_user_id),
             )
             if claimed is None:
                 continue
@@ -125,6 +133,8 @@ class WarehouseReportDeliveryService:
         report = await asyncio.to_thread(self.reports.repository.get_report, report_id)
         if report is None or report["status"] != "ready":
             raise ValueError("Report is not ready")
+        if report.get("correction_session_id") is not None:
+            raise ValueError("Correction reports require explicit manual delivery")
         artifact = await asyncio.to_thread(self.reports.xlsx.verify_ready, report)
         now_value = self._now_datetime()
         deliveries = await asyncio.to_thread(

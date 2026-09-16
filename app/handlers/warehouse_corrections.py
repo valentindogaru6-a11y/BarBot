@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import asyncio
 from html import escape
+from pathlib import Path
 
 from aiogram import F, Router
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, FSInputFile, Message
 
 from app.handlers.common import edit_or_send_text
 from app.handlers.warehouse_states import WarehouseCorrectionStates
@@ -18,14 +19,22 @@ from app.keyboards.warehouse_corrections import (
     correction_candidates_keyboard,
     correction_dashboard_keyboard,
     correction_destinations_keyboard,
+    correction_delivery_confirm_keyboard,
+    correction_finalize_keyboard,
     correction_mutation_confirm_keyboard,
     correction_open_confirm_keyboard,
     correction_operation_keyboard,
     correction_operations_keyboard,
+    correction_recipient_keyboard,
+    correction_recovery_keyboard,
+    correction_result_keyboard,
+    correction_retry_keyboard,
+    correction_versions_keyboard,
 )
 from app.models.warehouse.operations import WarehouseOperationType
 from app.services.access_service import AccessDeniedError
 from app.services.warehouse.correction_service import WarehouseCorrectionService
+from app.services.warehouse.delivery_service import WarehouseReportDeliveryService
 from app.services.warehouse.formatting import format_business_date, format_scaled
 from app.services.warehouse.operations_service import WarehouseOperationsService
 from app.services.warehouse.quantity_service import QuantityError, parse_quantity
@@ -50,6 +59,14 @@ def _safe_error(error: Exception) -> str:
         return str(error)
     if isinstance(error, WarehouseCorrectionError):
         value = str(error).casefold()
+        if "no mutations" in value:
+            return "Сначала внесите хотя бы одно изменение."
+        if "select at least one recipient" in value:
+            return "Выберите хотя бы одного получателя."
+        if "no active recipients" in value:
+            return "Нет активных получателей."
+        if "no active failed deliveries" in value:
+            return "Неуспешных доставок активным получателям нет."
         if "mutations" in value:
             return "После первого изменения отмена исправления недоступна."
         if "editable" in value or "revision" in value:
@@ -97,7 +114,13 @@ def dashboard_text(session: dict) -> str:
         f"🗑 Удалено: {counts['deleted']}\n"
         f"♻️ Восстановлено: {counts['restored']}\n"
         f"Checklist: {checklist}\n\n"
-        "Новая версия отчёта ещё не выпущена."
+        + (
+            "Новая версия отчёта ещё не выпущена."
+            if session["status"] in {"open", "building", "failed"}
+            else "Исправленная версия отчёта выпущена."
+            if session["status"] == "completed"
+            else "Исправление отменено."
+        )
     )
 
 
@@ -1191,9 +1214,719 @@ async def cancel_session_confirm(
 @router.callback_query(WarehouseCallback.filter(F.action == "kh"))
 async def future_stage(callback: CallbackQuery) -> None:
     await callback.answer(
-        "Выпуск новой версии отчёта будет доступен на следующем этапе.",
+        "Сначала внесите хотя бы одно изменение.",
         show_alert=True,
     )
+
+
+def finalize_preview_text(preview: dict) -> str:
+    counts = preview["change_counts"]
+    snapshot = preview["snapshot_counts"]
+    lines = [
+        "📄 <b>Выпуск исправленного отчёта</b>", "",
+        f"Дата: {format_business_date(str(preview['business_date']))}",
+        f"Локация: {escape(str(preview['source_location_name']))}",
+        f"Базовая версия: v{int(preview['base_version']):03d}",
+        f"Новая версия: v{int(preview['future_version']):03d}",
+        f"Причина: {escape(str(preview['reason_text']))}",
+        f"Автор: {escape(str(preview['opened_by_name']))}",
+        "",
+        f"➕ Добавлено: {counts['added']}",
+        f"✏️ Изменено: {counts['changed']}",
+        f"🗑 Удалено: {counts['deleted']}",
+        f"♻️ Восстановлено: {counts['restored']}",
+        f"Операций в snapshot: {int(preview['snapshot_operation_count'])}",
+        "",
+        "Листы XLSX:",
+        f"• Списание — {int(snapshot.get('writeoff', 0))}",
+        f"• Перемещение — {int(snapshot.get('transfer', 0))}",
+        f"• Проработка — {int(snapshot.get('development', 0))}",
+    ]
+    if preview["changes"]:
+        lines.extend(("", "<b>Изменения:</b>"))
+        for row in preview["changes"][:20]:
+            marker = {
+                "added": "➕", "changed": "✏️", "deleted": "🗑", "restored": "♻️"
+            }[str(row["change_state"])]
+            quantity = format_scaled(
+                int(row["quantity_scaled"]), str(row["base_unit"])
+            )
+            lines.append(
+                f"{marker} {escape(str(row['product_name_snapshot']))} — {quantity}"
+            )
+            if row.get("base"):
+                lines.extend(
+                    f"  {value}" for value in _field_differences(row["base"], row)[:3]
+                )
+        if len(preview["changes"]) > 20:
+            lines.append(f"… и ещё {len(preview['changes']) - 20}")
+    if preview["missing"]:
+        lines.extend(("", "⛔ <b>Выпуск заблокирован</b>"))
+        lines.extend(
+            f"• {escape(str(row['product_name']))}" for row in preview["missing"]
+        )
+    else:
+        lines.extend(("", "✅ Required checklist выполнен."))
+    lines.extend(("", "Старые версии и их файлы останутся неизменяемыми."))
+    return "\n".join(lines)
+
+
+@router.callback_query(WarehouseCallback.filter(F.action == "k6"))
+async def finalize_preview(
+    callback: CallbackQuery, callback_data: WarehouseCallback, state: FSMContext,
+    warehouse_correction_service: WarehouseCorrectionService,
+) -> None:
+    try:
+        preview = await _thread(
+            warehouse_correction_service.finalize_preview,
+            callback_data.object_id, actor_user_id=callback.from_user.id,
+        )
+        if int(preview["revision"]) != callback_data.aux:
+            raise WarehouseCorrectionConflict("Correction revision conflict")
+    except Exception as exc:
+        await callback.answer(_safe_error(exc), show_alert=True)
+        return
+    await state.clear()
+    await state.update_data(
+        correction_session_id=int(preview["id"]),
+        correction_session_revision=int(preview["revision"]),
+    )
+    await state.set_state(WarehouseCorrectionStates.finalize_confirm)
+    await callback.answer()
+    if isinstance(callback.message, Message):
+        await edit_or_send_text(
+            callback.message, finalize_preview_text(preview),
+            correction_finalize_keyboard(
+                int(preview["id"]), int(preview["revision"]),
+                blocked=bool(preview["missing"]),
+            ),
+        )
+
+
+@router.callback_query(WarehouseCallback.filter(F.action == "kq"))
+async def finalize_confirm(
+    callback: CallbackQuery, callback_data: WarehouseCallback, state: FSMContext,
+    warehouse_correction_service: WarehouseCorrectionService,
+    warehouse_delivery_service: WarehouseReportDeliveryService,
+) -> None:
+    try:
+        if isinstance(callback.message, Message):
+            await edit_or_send_text(
+                callback.message, "⏳ Формируется исправленный отчёт…"
+            )
+        result = await _thread(
+            warehouse_correction_service.release_correction,
+            callback_data.object_id, expected_revision=callback_data.aux,
+            actor_user_id=callback.from_user.id,
+        )
+        if not result["ready"]:
+            await callback.answer("Required checklist не выполнен.", show_alert=True)
+            if isinstance(callback.message, Message):
+                preview = await _thread(
+                    warehouse_correction_service.finalize_preview,
+                    callback_data.object_id, actor_user_id=callback.from_user.id,
+                )
+                await edit_or_send_text(
+                    callback.message, finalize_preview_text(preview),
+                    correction_finalize_keyboard(
+                        callback_data.object_id, int(preview["revision"]), blocked=True
+                    ),
+                )
+            return
+    except Exception as exc:
+        await state.clear()
+        await callback.answer(_safe_error(exc), show_alert=True)
+        if isinstance(callback.message, Message):
+            try:
+                session = await _thread(
+                    warehouse_correction_service.dashboard,
+                    callback_data.object_id, actor_user_id=callback.from_user.id,
+                )
+                await edit_or_send_text(
+                    callback.message,
+                    "⚠️ Выпуск не завершён. Состояние сохранено; проверьте выпуск.",
+                    correction_recovery_keyboard(
+                        callback_data.object_id, failed=session["status"] == "failed"
+                    ),
+                )
+            except Exception:
+                pass
+        return
+    await state.clear()
+    await callback.answer("Исправленный отчёт готов")
+    if isinstance(callback.message, Message):
+        await _show_result(
+            callback.message, warehouse_correction_service,
+            warehouse_delivery_service, callback_data.object_id,
+            callback.from_user.id,
+        )
+
+
+@router.callback_query(WarehouseCallback.filter(F.action == "k8"))
+async def recovery_preview(
+    callback: CallbackQuery, callback_data: WarehouseCallback,
+    warehouse_correction_service: WarehouseCorrectionService,
+) -> None:
+    try:
+        session = await _thread(
+            warehouse_correction_service.recovery_preview, callback_data.object_id,
+            actor_user_id=callback.from_user.id,
+        )
+        if session["status"] == "completed":
+            await callback.answer()
+            return
+    except Exception as exc:
+        await callback.answer(_safe_error(exc), show_alert=True)
+        return
+    await callback.answer()
+    if isinstance(callback.message, Message):
+        await edit_or_send_text(
+            callback.message,
+            "🔄 <b>Восстановление выпуска</b>\n\n"
+            f"Текущее состояние: {_status_label(str(session['status']))}.\n"
+            "Будет проверена та же logical version; новая версия не создаётся.",
+            correction_recovery_keyboard(
+                callback_data.object_id, failed=session["status"] == "failed"
+            ),
+        )
+
+
+@router.callback_query(WarehouseCallback.filter(F.action == "ka"))
+async def recovery_confirm(
+    callback: CallbackQuery, callback_data: WarehouseCallback,
+    warehouse_correction_service: WarehouseCorrectionService,
+    warehouse_delivery_service: WarehouseReportDeliveryService,
+) -> None:
+    try:
+        if isinstance(callback.message, Message):
+            await edit_or_send_text(callback.message, "⏳ Проверяю выпуск отчёта…")
+        await _thread(
+            warehouse_correction_service.recover_correction,
+            callback_data.object_id, actor_user_id=callback.from_user.id,
+        )
+    except Exception as exc:
+        await callback.answer(_safe_error(exc), show_alert=True)
+        return
+    await callback.answer("Выпуск восстановлен")
+    if isinstance(callback.message, Message):
+        await _show_result(
+            callback.message, warehouse_correction_service,
+            warehouse_delivery_service, callback_data.object_id,
+            callback.from_user.id,
+        )
+
+
+async def _show_result(
+    message: Message,
+    correction_service: WarehouseCorrectionService,
+    delivery_service: WarehouseReportDeliveryService,
+    session_id: int,
+    actor_user_id: int,
+) -> None:
+    result = await _thread(
+        correction_service.result, session_id, actor_user_id=actor_user_id
+    )
+    delivery = await _thread(
+        delivery_service.history, int(result["report"]["id"]),
+        actor_user_id=actor_user_id,
+    )
+    has_active_failed = any(
+        row["status"] == "failed" and row.get("recipient_is_active", 1)
+        for row in delivery["details"]
+    )
+    session = result["session"]
+    report = result["report"]
+    text = (
+        "✅ <b>Исправленный отчёт готов</b>\n\n"
+        f"Дата: {format_business_date(str(report['business_date']))}\n"
+        f"Версия: v{int(report['version']):03d}\n"
+        f"Базовая версия: v{int(session['base_version']):03d}\n"
+        f"Причина: {escape(str(session['reason_text']))}\n"
+        f"Создан: {escape(str(report['ready_at_utc'] or report['created_at_utc']))}\n"
+        f"Списание: {int(report['writeoff_count'])}\n"
+        f"Перемещение: {int(report['transfer_count'])}\n"
+        f"Проработка: {int(report['development_count'])}\n"
+        f"Файл: {escape(str(result['file_name']))}\n"
+        f"Состояние выпуска: {_status_label(str(session['status']))}\n"
+        f"Доставка: ✅ {delivery['delivered']}, ⚠️ {delivery['failed']}, "
+        f"⏳ {delivery['pending']}"
+    )
+    await edit_or_send_text(
+        message, text,
+        correction_result_keyboard(
+            session_id, int(report["id"]),
+            can_manage=bool(result["can_manage"]),
+            has_failed=has_active_failed,
+        ),
+    )
+
+
+@router.callback_query(WarehouseCallback.filter(F.action == "k9"))
+async def result_card(
+    callback: CallbackQuery, callback_data: WarehouseCallback,
+    warehouse_correction_service: WarehouseCorrectionService,
+    warehouse_delivery_service: WarehouseReportDeliveryService,
+) -> None:
+    try:
+        if isinstance(callback.message, Message):
+            await _show_result(
+                callback.message, warehouse_correction_service,
+                warehouse_delivery_service, callback_data.object_id,
+                callback.from_user.id,
+            )
+    except Exception as exc:
+        await callback.answer(_safe_error(exc), show_alert=True)
+        return
+    await callback.answer()
+
+
+@router.callback_query(WarehouseCallback.filter(F.action == "kk"))
+async def result_download(
+    callback: CallbackQuery, callback_data: WarehouseCallback,
+    warehouse_correction_service: WarehouseCorrectionService,
+) -> None:
+    try:
+        result = await _thread(
+            warehouse_correction_service.download_result,
+            callback_data.object_id, actor_user_id=callback.from_user.id,
+        )
+    except Exception as exc:
+        await callback.answer(_safe_error(exc), show_alert=True)
+        return
+    await callback.answer()
+    if isinstance(callback.message, Message):
+        await callback.message.answer_document(
+            FSInputFile(
+                result["artifact"].path,
+                filename=Path(result["artifact"].relative_file_path).name,
+            ),
+            caption=(
+                f"Исправленный отчёт за "
+                f"{format_business_date(str(result['report']['business_date']))}, "
+                f"v{int(result['report']['version']):03d}."
+            ),
+        )
+
+
+@router.callback_query(WarehouseCallback.filter(F.action == "kH"))
+async def version_history(
+    callback: CallbackQuery, callback_data: WarehouseCallback,
+    warehouse_correction_service: WarehouseCorrectionService,
+) -> None:
+    try:
+        result = await _thread(
+            warehouse_correction_service.version_history,
+            callback_data.object_id, actor_user_id=callback.from_user.id,
+        )
+    except Exception as exc:
+        await callback.answer(_safe_error(exc), show_alert=True)
+        return
+    lines = [
+        "🕘 <b>История версий</b>",
+        format_business_date(str(result["session"]["business_date"])),
+    ]
+    for version in result["versions"]:
+        kind = "Исправленная версия" if version["correction_session_id"] else "Исходный отчёт"
+        lines.extend((
+            "",
+            f"<b>v{int(version['version']):03d}</b> — {kind}",
+            f"Статус: {escape(str(version['status']))}",
+            f"Создан: {escape(str(version['ready_at_utc'] or version['created_at_utc']))}",
+        ))
+        if version["correction_reason"]:
+            lines.append(f"Причина: {escape(str(version['correction_reason']))}")
+            lines.append(
+                f"Базовая версия: v{int(version['supersedes_version']):03d}"
+            )
+            lines.append(f"Автор: {escape(str(version['opened_by_name']))}")
+        lines.append(
+            f"Доставка: ✅ {int(version['delivered_count'])}, "
+            f"⚠️ {int(version['failed_count'])}, ⏳ {int(version['pending_count'])}"
+        )
+    await callback.answer()
+    if isinstance(callback.message, Message):
+        await edit_or_send_text(
+            callback.message, "\n".join(lines),
+            correction_versions_keyboard(
+                result["versions"], session_id=callback_data.object_id
+            ),
+        )
+
+
+async def _recipient_page(
+    message: Message, state: FSMContext,
+    service: WarehouseCorrectionService, actor_user_id: int, *, page: int = 0,
+) -> bool:
+    data = await state.get_data()
+    session_id = int(data["correction_delivery_session_id"])
+    preview = await _thread(
+        service.delivery_preview, session_id, actor_user_id=actor_user_id
+    )
+    active = preview["active_recipients"]
+    active_ids = {int(row["id"]) for row in active}
+    selected = {int(value) for value in data.get("correction_recipient_ids", [])}
+    refreshed = selected & active_ids
+    changed = refreshed != selected
+    await state.update_data(correction_recipient_ids=sorted(refreshed))
+    page = max(0, min(page, max(0, (len(active) - 1) // 8)))
+    rows = active[page * 8:(page + 1) * 8]
+    await edit_or_send_text(
+        message,
+        "👥 <b>Получатели исправленного отчёта</b>\n\n"
+        f"Выбрано: {len(refreshed)} · страница {page + 1}",
+        correction_recipient_keyboard(
+            rows, session_id=session_id, selected=refreshed,
+            page=page, total=len(active),
+        ),
+    )
+    return changed
+
+
+@router.callback_query(WarehouseCallback.filter(F.action == "kR"))
+async def recipient_start(
+    callback: CallbackQuery, callback_data: WarehouseCallback, state: FSMContext,
+    warehouse_correction_service: WarehouseCorrectionService,
+) -> None:
+    try:
+        preview = await _thread(
+            warehouse_correction_service.delivery_preview,
+            callback_data.object_id, actor_user_id=callback.from_user.id,
+        )
+        if not preview["active_recipients"]:
+            raise WarehouseCorrectionError("No active recipients")
+    except Exception as exc:
+        await callback.answer(_safe_error(exc), show_alert=True)
+        return
+    await state.clear()
+    await state.update_data(
+        correction_delivery_session_id=callback_data.object_id,
+        correction_recipient_ids=list(preview["recipient_ids"]),
+    )
+    await state.set_state(WarehouseCorrectionStates.recipient_selection)
+    await callback.answer()
+    if isinstance(callback.message, Message):
+        await _recipient_page(
+            callback.message, state, warehouse_correction_service,
+            callback.from_user.id,
+        )
+
+
+@router.callback_query(WarehouseCallback.filter(F.action == "kB"))
+async def recipient_back(
+    callback: CallbackQuery, callback_data: WarehouseCallback, state: FSMContext,
+    warehouse_correction_service: WarehouseCorrectionService,
+    warehouse_delivery_service: WarehouseReportDeliveryService,
+) -> None:
+    await state.clear()
+    try:
+        if isinstance(callback.message, Message):
+            await _show_result(
+                callback.message, warehouse_correction_service,
+                warehouse_delivery_service, callback_data.object_id,
+                callback.from_user.id,
+            )
+    except Exception as exc:
+        await callback.answer(_safe_error(exc), show_alert=True)
+        return
+    await callback.answer()
+
+
+@router.callback_query(WarehouseCallback.filter(F.action == "kT"))
+async def recipient_toggle(
+    callback: CallbackQuery, callback_data: WarehouseCallback, state: FSMContext,
+    warehouse_correction_service: WarehouseCorrectionService,
+) -> None:
+    data = await state.get_data()
+    if await state.get_state() != WarehouseCorrectionStates.recipient_selection.state:
+        await callback.answer("Этот экран устарел.", show_alert=True)
+        return
+    selected = {int(value) for value in data.get("correction_recipient_ids", [])}
+    selected.symmetric_difference_update({callback_data.object_id})
+    await state.update_data(correction_recipient_ids=sorted(selected))
+    await callback.answer()
+    if isinstance(callback.message, Message):
+        try:
+            await _recipient_page(
+                callback.message, state, warehouse_correction_service,
+                callback.from_user.id, page=callback_data.aux,
+            )
+        except Exception as exc:
+            await callback.answer(_safe_error(exc), show_alert=True)
+
+
+@router.callback_query(WarehouseCallback.filter(F.action == "kL"))
+async def recipient_page(
+    callback: CallbackQuery, callback_data: WarehouseCallback, state: FSMContext,
+    warehouse_correction_service: WarehouseCorrectionService,
+) -> None:
+    data = await state.get_data()
+    if (
+        int(data.get("correction_delivery_session_id", 0)) != callback_data.object_id
+        or await state.get_state() not in {
+            WarehouseCorrectionStates.recipient_selection.state,
+            WarehouseCorrectionStates.delivery_confirm.state,
+        }
+    ):
+        await callback.answer("Этот экран устарел.", show_alert=True)
+        return
+    await state.set_state(WarehouseCorrectionStates.recipient_selection)
+    try:
+        if isinstance(callback.message, Message):
+            await _recipient_page(
+                callback.message, state, warehouse_correction_service,
+                callback.from_user.id, page=callback_data.aux,
+            )
+    except Exception as exc:
+        await callback.answer(_safe_error(exc), show_alert=True)
+        return
+    await callback.answer()
+
+
+@router.callback_query(WarehouseCallback.filter(F.action == "kV"))
+async def delivery_preview(
+    callback: CallbackQuery, callback_data: WarehouseCallback, state: FSMContext,
+    warehouse_correction_service: WarehouseCorrectionService,
+) -> None:
+    data = await state.get_data()
+    if (
+        await state.get_state() != WarehouseCorrectionStates.recipient_selection.state
+        or int(data.get("correction_delivery_session_id", 0)) != callback_data.object_id
+    ):
+        await callback.answer("Этот экран устарел.", show_alert=True)
+        return
+    selected = tuple(int(value) for value in data.get("correction_recipient_ids", []))
+    try:
+        recipients = await _thread(
+            warehouse_correction_service.validate_delivery_selection,
+            callback_data.object_id, selected, actor_user_id=callback.from_user.id,
+        )
+        preview = await _thread(
+            warehouse_correction_service.delivery_preview,
+            callback_data.object_id, actor_user_id=callback.from_user.id,
+        )
+    except WarehouseCorrectionConflict:
+        await callback.answer("Список получателей изменился.", show_alert=True)
+        if isinstance(callback.message, Message):
+            await _recipient_page(
+                callback.message, state, warehouse_correction_service,
+                callback.from_user.id,
+            )
+        return
+    except Exception as exc:
+        await callback.answer(_safe_error(exc), show_alert=True)
+        return
+    await state.set_state(WarehouseCorrectionStates.delivery_confirm)
+    text = (
+        "📨 <b>Отправка исправленного отчёта</b>\n\n"
+        f"Дата: {format_business_date(str(preview['business_date']))}\n"
+        f"Версия: v{int(preview['version']):03d}\n"
+        f"Базовая версия: v{int(preview['base_version']):03d}\n"
+        f"Причина: {escape(str(preview['reason']))}\n"
+        f"Получателей: {len(recipients)}\n\n"
+        + "\n".join(f"• {escape(str(row['title']))}" for row in recipients)
+        + "\n\nЭто отдельная доставка новой immutable версии."
+    )
+    await callback.answer()
+    if isinstance(callback.message, Message):
+        await edit_or_send_text(
+            callback.message, text,
+            correction_delivery_confirm_keyboard(callback_data.object_id),
+        )
+
+
+@router.callback_query(WarehouseCallback.filter(F.action == "kS"))
+async def delivery_confirm(
+    callback: CallbackQuery, callback_data: WarehouseCallback, state: FSMContext,
+    warehouse_correction_service: WarehouseCorrectionService,
+    warehouse_delivery_service: WarehouseReportDeliveryService,
+) -> None:
+    data = await state.get_data()
+    if (
+        await state.get_state() != WarehouseCorrectionStates.delivery_confirm.state
+        or int(data.get("correction_delivery_session_id", 0)) != callback_data.object_id
+    ):
+        await callback.answer("Этот экран устарел.", show_alert=True)
+        return
+    selected = tuple(int(value) for value in data.get("correction_recipient_ids", []))
+    try:
+        await _thread(
+            warehouse_correction_service.validate_delivery_selection,
+            callback_data.object_id, selected, actor_user_id=callback.from_user.id,
+        )
+    except WarehouseCorrectionConflict:
+        await state.set_state(WarehouseCorrectionStates.recipient_selection)
+        await callback.answer("Список получателей изменился.", show_alert=True)
+        if isinstance(callback.message, Message):
+            await _recipient_page(
+                callback.message, state, warehouse_correction_service,
+                callback.from_user.id,
+            )
+        return
+    except Exception as exc:
+        await callback.answer(_safe_error(exc), show_alert=True)
+        return
+    try:
+        result = await warehouse_correction_service.deliver_correction(
+            callback_data.object_id, warehouse_delivery_service,
+            actor_user_id=callback.from_user.id, recipient_ids=selected,
+        )
+    except WarehouseCorrectionConflict:
+        await state.set_state(WarehouseCorrectionStates.recipient_selection)
+        await callback.answer("Список получателей изменился.", show_alert=True)
+        if isinstance(callback.message, Message):
+            await _recipient_page(
+                callback.message, state, warehouse_correction_service,
+                callback.from_user.id,
+            )
+        return
+    except Exception as exc:
+        await callback.answer(_safe_error(exc), show_alert=True)
+        return
+    await state.clear()
+    await callback.answer(
+        f"Отправлено: {result['delivered']}, ошибок: {result['failed']}"
+    )
+    if isinstance(callback.message, Message):
+        await _show_delivery_status(
+            callback.message, warehouse_correction_service,
+            warehouse_delivery_service, callback_data.object_id,
+            callback.from_user.id,
+        )
+
+
+async def _show_delivery_status(
+    message: Message,
+    correction_service: WarehouseCorrectionService,
+    delivery_service: WarehouseReportDeliveryService,
+    session_id: int,
+    actor_user_id: int,
+) -> None:
+    result = await _thread(
+        correction_service.result, session_id, actor_user_id=actor_user_id
+    )
+    delivery = await _thread(
+        delivery_service.history, int(result["report"]["id"]),
+        actor_user_id=actor_user_id,
+    )
+    labels = {
+        "delivered": "sent", "failed": "failed", "pending": "pending",
+        "sending": "pending",
+    }
+    details = []
+    skipped = 0
+    for row in delivery["details"]:
+        status = labels[str(row["status"])]
+        if row["status"] == "failed" and not row.get("recipient_is_active", 1):
+            status = "skipped"
+            skipped += 1
+        details.append(f"• {escape(str(row['recipient_title']))}: {status}")
+    has_active_failed = any(
+        row["status"] == "failed" and row.get("recipient_is_active", 1)
+        for row in delivery["details"]
+    )
+    text = (
+        "📋 <b>Статусы доставки исправленного отчёта</b>\n\n"
+        f"sent: {delivery['delivered']}\n"
+        f"failed: {delivery['failed'] - skipped}\n"
+        f"skipped: {skipped}\n"
+        f"pending: {delivery['pending']}"
+    )
+    if details:
+        text += "\n\n" + "\n".join(details)
+    await edit_or_send_text(
+        message, text,
+        correction_result_keyboard(
+            session_id, int(result["report"]["id"]),
+            can_manage=bool(result["can_manage"]),
+            has_failed=has_active_failed,
+        ),
+    )
+
+
+@router.callback_query(WarehouseCallback.filter(F.action == "kD"))
+async def delivery_status(
+    callback: CallbackQuery, callback_data: WarehouseCallback,
+    warehouse_correction_service: WarehouseCorrectionService,
+    warehouse_delivery_service: WarehouseReportDeliveryService,
+) -> None:
+    try:
+        if isinstance(callback.message, Message):
+            await _show_delivery_status(
+                callback.message, warehouse_correction_service,
+                warehouse_delivery_service, callback_data.object_id,
+                callback.from_user.id,
+            )
+    except Exception as exc:
+        await callback.answer(_safe_error(exc), show_alert=True)
+        return
+    await callback.answer()
+
+
+@router.callback_query(WarehouseCallback.filter(F.action == "kY"))
+async def retry_preview(
+    callback: CallbackQuery, callback_data: WarehouseCallback, state: FSMContext,
+    warehouse_correction_service: WarehouseCorrectionService,
+) -> None:
+    try:
+        preview = await _thread(
+            warehouse_correction_service.retry_preview,
+            callback_data.object_id, actor_user_id=callback.from_user.id,
+        )
+        if not preview["recipients"]:
+            raise WarehouseCorrectionError("No active failed deliveries")
+    except Exception as exc:
+        await callback.answer(_safe_error(exc), show_alert=True)
+        return
+    await state.clear()
+    await state.update_data(correction_delivery_session_id=callback_data.object_id)
+    await state.set_state(WarehouseCorrectionStates.retry_confirm)
+    text = (
+        "🔄 <b>Повторить неуспешные доставки?</b>\n\n"
+        + "\n".join(
+            f"• {escape(str(row['title']))}" for row in preview["recipients"]
+        )
+    )
+    if preview["skipped_inactive"]:
+        text += f"\n\nНеактивные получатели будут пропущены: {preview['skipped_inactive']}"
+    await callback.answer()
+    if isinstance(callback.message, Message):
+        await edit_or_send_text(
+            callback.message, text,
+            correction_retry_keyboard(callback_data.object_id, confirm=True),
+        )
+
+
+@router.callback_query(WarehouseCallback.filter(F.action == "kZ"))
+async def retry_confirm(
+    callback: CallbackQuery, callback_data: WarehouseCallback, state: FSMContext,
+    warehouse_correction_service: WarehouseCorrectionService,
+    warehouse_delivery_service: WarehouseReportDeliveryService,
+) -> None:
+    data = await state.get_data()
+    if (
+        await state.get_state() != WarehouseCorrectionStates.retry_confirm.state
+        or int(data.get("correction_delivery_session_id", 0)) != callback_data.object_id
+    ):
+        await callback.answer("Этот экран устарел.", show_alert=True)
+        return
+    try:
+        result = await warehouse_correction_service.retry_correction_delivery(
+            callback_data.object_id, warehouse_delivery_service,
+            actor_user_id=callback.from_user.id,
+        )
+    except Exception as exc:
+        await callback.answer(_safe_error(exc), show_alert=True)
+        return
+    await state.clear()
+    await callback.answer(
+        f"Доставлено: {result['delivered']}, ошибок: {result['failed']}"
+    )
+    if isinstance(callback.message, Message):
+        await _show_delivery_status(
+            callback.message, warehouse_correction_service,
+            warehouse_delivery_service, callback_data.object_id,
+            callback.from_user.id,
+        )
 
 
 __all__ = ["dashboard_text", "operation_text", "router"]

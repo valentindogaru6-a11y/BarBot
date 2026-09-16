@@ -280,8 +280,9 @@ def report_history_keyboard(
     builder = InlineKeyboardBuilder()
     for report in reports:
         day, month, year = str(report["business_date"]).split("-")[::-1]
+        kind = "исправленная" if report.get("correction_session_id") else "исходная"
         builder.button(
-            text=f"{day}.{month}.{year} — версия {report['version']} — готов",
+            text=f"{day}.{month}.{year} — v{int(report['version']):03d} — {kind}",
             callback_data=WarehouseCallback(
                 action="hv", object_id=int(report["id"]), aux=page
             ),
@@ -314,6 +315,7 @@ def report_card_keyboard(
     can_open_correction: bool = False,
     shift_revision: int = 0,
     can_manage_correction: bool = False,
+    result_correction_session_id: int | None = None,
 ) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(
@@ -328,11 +330,25 @@ def report_card_keyboard(
             action="dh", object_id=report_id, aux=return_page
         ),
     )
-    if can_send:
+    if can_send and result_correction_session_id is None:
         builder.button(
             text="📤 Отправить активным",
             callback_data=WarehouseCallback(action="da", object_id=report_id),
         )
+    if result_correction_session_id is not None:
+        builder.button(
+            text="📄 Карточка исправленной версии",
+            callback_data=WarehouseCallback(
+                action="k9", object_id=result_correction_session_id
+            ),
+        )
+        if can_manage_correction:
+            builder.button(
+                text="📨 Отправить получателям",
+                callback_data=WarehouseCallback(
+                    action="kR", object_id=result_correction_session_id
+                ),
+            )
     if correction_session_id is not None:
         builder.button(
             text=(

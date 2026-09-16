@@ -88,3 +88,7 @@ class WarehouseCorrectionStates(StatesGroup):
     restore_reason = State()
     restore_confirm = State()
     cancel_session = State()
+    finalize_confirm = State()
+    recipient_selection = State()
+    delivery_confirm = State()
+    retry_confirm = State()

@@ -69,6 +69,21 @@ def test_warehouse_operation_permissions(tmp_path: Path) -> None:
         assert not access.can_mutate_warehouse(user_id)
 
 
+def test_warehouse_correction_view_and_management_permissions(tmp_path: Path) -> None:
+    access, _, _ = _services(tmp_path)
+
+    for user_id in (1, 10):
+        context = access.require_warehouse_correction_view(user_id)
+        assert context.can_view_warehouse_corrections
+        assert context.can_manage_warehouse_corrections
+    accountant = access.require_warehouse_correction_view(50)
+    assert accountant.can_view_warehouse_corrections
+    assert not accountant.can_manage_warehouse_corrections
+    for user_id in (20, 30, 40):
+        with pytest.raises(AccessDeniedError):
+            access.require_warehouse_correction_view(user_id)
+
+
 def test_super_admin_assigns_admin_and_admin_assigns_bartender(
     tmp_path: Path,
 ) -> None:

@@ -96,11 +96,18 @@ class WarehouseCorrectionDatabase:
             """
             SELECT cs.*, s.status AS shift_status, s.revision AS shift_revision,
                    s.business_date, br.version AS base_version,
-                   rr.version AS result_version
+                   rr.version AS result_version,
+                   COALESCE(
+                       NULLIF(TRIM(COALESCE(u.first_name,'') || ' ' ||
+                                   COALESCE(u.last_name,'')), ''),
+                       CASE WHEN u.username IS NOT NULL THEN '@' || u.username END,
+                       'сотрудник'
+                   ) AS opened_by_name
             FROM warehouse_correction_sessions cs
             JOIN warehouse_shifts s ON s.id=cs.shift_id
             JOIN warehouse_reports br ON br.id=cs.base_report_id
             LEFT JOIN warehouse_reports rr ON rr.id=cs.result_report_id
+            LEFT JOIN users u ON u.telegram_user_id=cs.opened_by
             WHERE cs.id=?
             """,
             (session_id,),
@@ -138,10 +145,19 @@ class WarehouseCorrectionDatabase:
             row = connection.execute(
                 """
                 SELECT r.id AS report_id, r.shift_id, r.version, r.status AS report_status,
-                       r.ready_at_utc, s.business_date, s.closed_at_utc,
+                       r.ready_at_utc, r.created_at_utc, r.created_by,
+                       r.supersedes_report_id, r.correction_reason,
+                       r.correction_session_id, s.business_date, s.closed_at_utc,
                        s.status AS shift_status,
                        s.revision AS shift_revision, s.source_location_id,
                        l.name AS source_location_name,
+                       (SELECT COUNT(*) FROM warehouse_report_deliveries d
+                        WHERE d.report_id=r.id AND d.status='delivered') AS delivered_count,
+                       (SELECT COUNT(*) FROM warehouse_report_deliveries d
+                        WHERE d.report_id=r.id AND d.status='failed') AS failed_count,
+                       (SELECT COUNT(*) FROM warehouse_report_deliveries d
+                        WHERE d.report_id=r.id AND d.status IN ('pending','sending'))
+                            AS pending_count,
                        (SELECT id FROM warehouse_reports latest
                         WHERE latest.shift_id=r.shift_id AND latest.status='ready'
                         ORDER BY latest.version DESC LIMIT 1) AS latest_report_id
@@ -157,11 +173,84 @@ class WarehouseCorrectionDatabase:
             result = self._dict(row)
             active = connection.execute(
                 "SELECT id FROM warehouse_correction_sessions WHERE shift_id=? "
-                "AND status IN ('open','building') ORDER BY id DESC LIMIT 1",
+                "AND status IN ('open','building','failed') ORDER BY id DESC LIMIT 1",
                 (result["shift_id"],),
             ).fetchone()
             result["active_session_id"] = int(active["id"]) if active else None
             return result
+
+    def finalize_preview(self, session_id: int) -> dict[str, Any]:
+        """Build a read-only release preview without creating a report version."""
+
+        with self._connection() as connection:
+            session = self._session(connection, session_id)
+            if session is None:
+                raise WarehouseCorrectionError("Correction session not found")
+            latest = connection.execute(
+                "SELECT id,version FROM warehouse_reports WHERE shift_id=? "
+                "AND status='ready' ORDER BY version DESC LIMIT 1",
+                (session["shift_id"],),
+            ).fetchone()
+            missing = connection.execute(
+                """
+                SELECT p.official_name AS product_name
+                FROM warehouse_shift_requirements sr
+                JOIN warehouse_products p ON p.id=sr.product_id
+                WHERE sr.shift_id=? AND sr.status='pending'
+                ORDER BY sr.sort_order,sr.id
+                """,
+                (session["shift_id"],),
+            ).fetchall()
+            counts = connection.execute(
+                """
+                SELECT operation_type,COUNT(*) AS count
+                FROM warehouse_operations
+                WHERE shift_id=? AND is_deleted=0
+                GROUP BY operation_type
+                """,
+                (session["shift_id"],),
+            ).fetchall()
+            result = dict(session)
+            result["latest_report_id"] = int(latest["id"]) if latest else None
+            result["future_version"] = int(latest["version"]) + 1 if latest else 1
+            result["missing"] = [self._dict(row) for row in missing]
+            result["snapshot_counts"] = {
+                str(row["operation_type"]): int(row["count"]) for row in counts
+            }
+            result["snapshot_operation_count"] = sum(result["snapshot_counts"].values())
+            return result
+
+    def version_history(self, shift_id: int) -> list[dict[str, Any]]:
+        with self._connection() as connection:
+            rows = connection.execute(
+                """
+                SELECT r.id,r.version,r.status,r.created_at_utc,r.ready_at_utc,
+                       r.supersedes_report_id,r.correction_reason,
+                       br.version AS supersedes_version,
+                       r.correction_session_id,cs.opened_by,
+                       COALESCE(
+                           NULLIF(TRIM(COALESCE(u.first_name,'') || ' ' ||
+                                       COALESCE(u.last_name,'')), ''),
+                           CASE WHEN u.username IS NOT NULL THEN '@' || u.username END,
+                           'сотрудник'
+                       ) AS opened_by_name,
+                       (SELECT COUNT(*) FROM warehouse_report_deliveries d
+                        WHERE d.report_id=r.id AND d.status='delivered') AS delivered_count,
+                       (SELECT COUNT(*) FROM warehouse_report_deliveries d
+                        WHERE d.report_id=r.id AND d.status='failed') AS failed_count,
+                       (SELECT COUNT(*) FROM warehouse_report_deliveries d
+                        WHERE d.report_id=r.id AND d.status IN ('pending','sending'))
+                            AS pending_count
+                FROM warehouse_reports r
+                LEFT JOIN warehouse_correction_sessions cs
+                  ON cs.id=r.correction_session_id
+                LEFT JOIN warehouse_reports br ON br.id=r.supersedes_report_id
+                LEFT JOIN users u ON u.telegram_user_id=cs.opened_by
+                WHERE r.shift_id=? ORDER BY r.version
+                """,
+                (shift_id,),
+            ).fetchall()
+            return [self._dict(row) for row in rows]
 
     @staticmethod
     def _operation_state(events: list[sqlite3.Row], deleted: bool) -> str:
@@ -323,7 +412,8 @@ class WarehouseCorrectionDatabase:
                 """
                 SELECT cs.id AS session_id FROM warehouse_operations o
                 JOIN warehouse_correction_sessions cs ON cs.shift_id=o.shift_id
-                WHERE o.id=? AND cs.status='open' ORDER BY cs.id DESC LIMIT 1
+                WHERE o.id=? AND cs.status IN ('open','building','failed','completed')
+                ORDER BY cs.id DESC LIMIT 1
                 """,
                 (operation_id,),
             ).fetchone()
@@ -827,6 +917,7 @@ class WarehouseCorrectionDatabase:
         actor_user_id: int,
         now: str,
         authorize: Callable[[], None] | None = None,
+        require_mutations: bool = False,
     ) -> dict[str, Any]:
         with self._transaction() as connection:
             if authorize is not None:
@@ -860,11 +951,40 @@ class WarehouseCorrectionDatabase:
                 raise WarehouseCorrectionError("Correction cannot be finalized")
             if int(session["revision"]) != expected_revision:
                 raise WarehouseCorrectionConflict("Correction revision conflict")
+            if require_mutations:
+                operation_rows = connection.execute(
+                    """
+                    SELECT o.*,src.name AS source_location_name,
+                           dst.name AS destination_location_name
+                    FROM warehouse_operations o
+                    JOIN warehouse_locations src ON src.id=o.source_location_id
+                    LEFT JOIN warehouse_locations dst ON dst.id=o.destination_location_id
+                    WHERE o.shift_id=? ORDER BY o.occurred_at_utc,o.id
+                    """,
+                    (session["shift_id"],),
+                ).fetchall()
+                has_changes = any(
+                    self._operation_model(connection, row, session_id)["change_state"]
+                    != "unchanged"
+                    for row in operation_rows
+                )
+                if not has_changes:
+                    raise WarehouseCorrectionError("Correction has no mutations")
             shift = connection.execute(
                 "SELECT * FROM warehouse_shifts WHERE id=?", (session["shift_id"],)
             ).fetchone()
             if shift is None or shift["status"] != "correction_open":
                 raise WarehouseCorrectionError("Shift is not in correction")
+            latest_ready = connection.execute(
+                "SELECT id FROM warehouse_reports WHERE shift_id=? AND status='ready' "
+                "ORDER BY version DESC LIMIT 1",
+                (session["shift_id"],),
+            ).fetchone()
+            if (
+                latest_ready is None
+                or int(latest_ready["id"]) != int(session["base_report_id"])
+            ):
+                raise WarehouseCorrectionConflict("Correction base report changed")
             self._recalculate(connection, int(session["shift_id"]), now)
             missing_rows = connection.execute(
                 """
@@ -1112,11 +1232,65 @@ class WarehouseCorrectionDatabase:
                 ).fetchall()]
             else:
                 recipients = []
+            active_recipients = [self._dict(row) for row in connection.execute(
+                "SELECT id,title,chat_type FROM warehouse_report_recipients "
+                "WHERE is_active=1 ORDER BY title COLLATE NOCASE,id"
+            ).fetchall()]
+            report = WarehouseReportsDatabase._load_report(
+                connection, int(session["result_report_id"])
+            )
+            assert report is not None
             return {
                 "session_id": session_id,
                 "report_id": int(session["result_report_id"]),
                 "version": int(session["result_version"]),
+                "base_version": int(session["base_version"]),
+                "business_date": str(session["business_date"]),
                 "reason": str(session["reason_text"]),
                 "recipient_ids": ids,
                 "recipients": recipients,
+                "active_recipients": active_recipients,
+                "report": report,
+            }
+
+    def validate_delivery_recipients(
+        self, session_id: int, recipient_ids: tuple[int, ...]
+    ) -> tuple[dict[str, Any], ...]:
+        unique = tuple(sorted(set(recipient_ids)))
+        if not unique:
+            raise WarehouseCorrectionError("Select at least one recipient")
+        with self._connection() as connection:
+            session = self._session(connection, session_id)
+            if session is None or session["status"] != "completed":
+                raise WarehouseCorrectionError("Correction report is not ready")
+            rows = connection.execute(
+                "SELECT id,title,chat_type FROM warehouse_report_recipients "
+                "WHERE is_active=1 AND id IN (" + ",".join("?" for _ in unique) + ") "
+                "ORDER BY title COLLATE NOCASE,id",
+                unique,
+            ).fetchall()
+            if len(rows) != len(unique):
+                raise WarehouseCorrectionConflict("Recipient selection changed")
+            return tuple(self._dict(row) for row in rows)
+
+    def failed_delivery_recipient_ids(self, session_id: int) -> dict[str, tuple[int, ...]]:
+        with self._connection() as connection:
+            session = self._session(connection, session_id)
+            if session is None or session["status"] != "completed":
+                raise WarehouseCorrectionError("Correction report is not ready")
+            rows = connection.execute(
+                """
+                SELECT d.recipient_id,r.is_active FROM warehouse_report_deliveries d
+                JOIN warehouse_report_recipients r ON r.id=d.recipient_id
+                WHERE d.report_id=? AND d.status='failed' ORDER BY d.id
+                """,
+                (session["result_report_id"],),
+            ).fetchall()
+            return {
+                "active": tuple(
+                    int(row["recipient_id"]) for row in rows if row["is_active"]
+                ),
+                "inactive": tuple(
+                    int(row["recipient_id"]) for row in rows if not row["is_active"]
+                ),
             }

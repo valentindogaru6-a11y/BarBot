@@ -409,6 +409,8 @@ def test_all_correction_callbacks_fit_telegram_64_byte_limit():
         "ko", "kf", "k0", "kd", "kl", "kv", "kw", "kt", "kg", "kp",
         "ki", "ks", "ke", "k1", "k2", "k3", "k4", "k5", "ku", "kj",
         "ky", "kx", "kz", "kr", "kb", "kn", "km", "kh",
+        "k6", "kq", "k8", "ka", "k9", "kk", "kH", "kR", "kB",
+        "kT", "kL", "kV", "kS", "kD", "kY", "kZ",
     )
     for action in actions:
         packed = WarehouseCallback(

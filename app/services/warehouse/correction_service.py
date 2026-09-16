@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC
 from html import escape
+from pathlib import Path
 from typing import Any
 
 from app.models.warehouse.nomenclature import BaseUnit
@@ -15,9 +17,11 @@ from app.services.warehouse.quantity_service import parse_quantity
 from app.services.warehouse.report_service import _shift_lock
 from app.services.warehouse.xlsx_report_service import WarehouseXlsxReportService
 from app.storage.warehouse_correction_database import (
+    WarehouseCorrectionConflict,
     WarehouseCorrectionDatabase,
     WarehouseCorrectionError,
 )
+from app.storage.warehouse_delivery_database import WarehouseDeliveryError
 
 
 class WarehouseCorrectionService:
@@ -63,14 +67,14 @@ class WarehouseCorrectionService:
         )
 
     def session(self, session_id: int, *, actor_user_id: int) -> dict[str, Any]:
-        self.access.require_warehouse_view(actor_user_id)
+        self.access.require_warehouse_correction_view(actor_user_id)
         result = self.repository.session(session_id)
         if result is None:
             raise WarehouseCorrectionError("Correction session not found")
         return result
 
     def report_entry(self, report_id: int, *, actor_user_id: int) -> dict[str, Any]:
-        context = self.access.require_warehouse_view(actor_user_id)
+        context = self.access.require_warehouse_correction_view(actor_user_id)
         result = self.repository.report_entry(report_id)
         if result is None:
             raise WarehouseCorrectionError("Report not found")
@@ -88,7 +92,7 @@ class WarehouseCorrectionService:
         return result
 
     def dashboard(self, session_id: int, *, actor_user_id: int) -> dict[str, Any]:
-        self.access.require_warehouse_view(actor_user_id)
+        self.access.require_warehouse_correction_view(actor_user_id)
         result = self.repository.dashboard(session_id)
         if result is None:
             raise WarehouseCorrectionError("Correction session not found")
@@ -119,7 +123,7 @@ class WarehouseCorrectionService:
     def active_operation(
         self, operation_id: int, *, actor_user_id: int
     ) -> dict[str, Any]:
-        self.access.require_warehouse_view(actor_user_id)
+        self.access.require_warehouse_correction_view(actor_user_id)
         result = self.repository.active_operation(operation_id)
         if result is None:
             raise WarehouseCorrectionError("Operation not found")
@@ -140,8 +144,73 @@ class WarehouseCorrectionService:
             page += 1
         return [row for row in result if row["change_state"] != "unchanged"]
 
+    def finalize_preview(
+        self, session_id: int, *, actor_user_id: int
+    ) -> dict[str, Any]:
+        self._manage(actor_user_id)
+        dashboard = self.dashboard(session_id, actor_user_id=actor_user_id)
+        if dashboard["status"] != "open" or dashboard["shift_status"] != "correction_open":
+            raise WarehouseCorrectionError("Correction is not open")
+        if not dashboard["has_mutations"]:
+            raise WarehouseCorrectionError("Correction has no mutations")
+        preview = self.repository.finalize_preview(session_id)
+        if int(preview["latest_report_id"] or 0) != int(preview["base_report_id"]):
+            raise WarehouseCorrectionError("Correction base report changed")
+        preview.update(
+            source_location_name=dashboard["source_location_name"],
+            change_counts=dashboard["change_counts"],
+            changes=self.changes(session_id, actor_user_id=actor_user_id),
+            can_manage=True,
+        )
+        return preview
+
+    def result(
+        self, session_id: int, *, actor_user_id: int
+    ) -> dict[str, Any]:
+        dashboard = self.dashboard(session_id, actor_user_id=actor_user_id)
+        if dashboard["status"] != "completed" or dashboard["result_report_id"] is None:
+            raise WarehouseCorrectionError("Correction report is not ready")
+        report = self.repository.report(int(dashboard["result_report_id"]))
+        if (
+            report is None
+            or report["status"] != "ready"
+            or int(report.get("correction_session_id") or 0) != session_id
+        ):
+            raise WarehouseCorrectionError("Correction result is inconsistent")
+        return {
+            "session": dashboard,
+            "report": report,
+            "file_name": Path(str(report["relative_file_path"])).name,
+            "can_manage": bool(dashboard["can_manage"]),
+        }
+
+    def recovery_preview(
+        self, session_id: int, *, actor_user_id: int
+    ) -> dict[str, Any]:
+        self._manage(actor_user_id)
+        dashboard = self.dashboard(session_id, actor_user_id=actor_user_id)
+        if dashboard["status"] not in {"building", "failed", "completed"}:
+            raise WarehouseCorrectionError("Correction is not recoverable")
+        return dashboard
+
+    def download_result(
+        self, session_id: int, *, actor_user_id: int
+    ) -> dict[str, Any]:
+        result = self.result(session_id, actor_user_id=actor_user_id)
+        result["artifact"] = self.xlsx.verify_ready(result["report"])
+        return result
+
+    def version_history(
+        self, session_id: int, *, actor_user_id: int
+    ) -> dict[str, Any]:
+        dashboard = self.dashboard(session_id, actor_user_id=actor_user_id)
+        return {
+            "session": dashboard,
+            "versions": self.repository.version_history(int(dashboard["shift_id"])),
+        }
+
     def history(self, shift_id: int, *, actor_user_id: int) -> list[dict[str, Any]]:
-        self.access.require_warehouse_view(actor_user_id)
+        self.access.require_warehouse_correction_view(actor_user_id)
         return self.repository.history(shift_id)
 
     @staticmethod
@@ -364,6 +433,7 @@ class WarehouseCorrectionService:
 
     def finalize_correction(
         self, session_id: int, *, expected_revision: int, actor_user_id: int,
+        require_mutations: bool = False,
     ) -> dict[str, Any]:
         self._manage(actor_user_id)
         current = self.repository.session(session_id)
@@ -375,6 +445,7 @@ class WarehouseCorrectionService:
                 session_id, expected_revision=expected_revision,
                 actor_user_id=actor_user_id, now=self._now(),
                 authorize=lambda: self._manage(actor_user_id),
+                require_mutations=require_mutations,
             )
             if not prepared["ready"]:
                 return prepared
@@ -406,6 +477,16 @@ class WarehouseCorrectionService:
                 "artifact": artifact, "missing": [],
             }
 
+    def release_correction(
+        self, session_id: int, *, expected_revision: int, actor_user_id: int,
+    ) -> dict[str, Any]:
+        return self.finalize_correction(
+            session_id,
+            expected_revision=expected_revision,
+            actor_user_id=actor_user_id,
+            require_mutations=True,
+        )
+
     def recover_correction(
         self, session_id: int, *, actor_user_id: int,
     ) -> dict[str, Any]:
@@ -424,20 +505,88 @@ class WarehouseCorrectionService:
         self._manage(actor_user_id)
         return self.repository.delivery_preview(session_id)
 
+    def validate_delivery_selection(
+        self, session_id: int, recipient_ids: tuple[int, ...], *, actor_user_id: int,
+    ) -> tuple[dict[str, Any], ...]:
+        self._manage(actor_user_id)
+        self.result(session_id, actor_user_id=actor_user_id)
+        return self.repository.validate_delivery_recipients(session_id, recipient_ids)
+
     async def deliver_correction(
         self, session_id: int, delivery_service, *, actor_user_id: int,
         retry_failed: bool = False,
+        recipient_ids: tuple[int, ...] | None = None,
     ) -> dict[str, Any]:
         preview = self.delivery_preview(session_id, actor_user_id=actor_user_id)
+        selected = (
+            preview["recipient_ids"]
+            if recipient_ids is None
+            else tuple(
+                int(row["id"])
+                for row in self.validate_delivery_selection(
+                    session_id, recipient_ids, actor_user_id=actor_user_id
+                )
+            )
+        )
         caption = (
-            f"Исправленный отчёт\nВерсия: v{preview['version']:03d}\n"
+            f"Исправленный отчёт\nДата: {preview['business_date']}\n"
+            f"Версия: v{preview['version']:03d}\n"
             f"Причина: {escape(preview['reason'])}"
         )
-        return await delivery_service.deliver(
-            preview["report_id"], actor_user_id=actor_user_id,
-            retry_failed=retry_failed,
-            recipient_ids=preview["recipient_ids"], caption=caption,
+        try:
+            result = await delivery_service.deliver(
+                preview["report_id"], actor_user_id=actor_user_id,
+                retry_failed=retry_failed,
+                recipient_ids=selected, caption=caption,
+                require_all_recipients_active=True,
+            )
+        except WarehouseDeliveryError as exc:
+            if "selection changed" in str(exc).casefold():
+                raise WarehouseCorrectionConflict(
+                    "Recipient selection changed"
+                ) from exc
+            raise
+        result["skipped_inactive"] = 0
+        return result
+
+    def retry_preview(
+        self, session_id: int, *, actor_user_id: int
+    ) -> dict[str, Any]:
+        self._manage(actor_user_id)
+        preview = self.delivery_preview(session_id, actor_user_id=actor_user_id)
+        failed = self.repository.failed_delivery_recipient_ids(session_id)
+        active = (
+            self.repository.validate_delivery_recipients(session_id, failed["active"])
+            if failed["active"] else ()
         )
+        return {
+            **preview,
+            "recipient_ids": failed["active"],
+            "recipients": active,
+            "skipped_inactive": len(failed["inactive"]),
+        }
+
+    async def retry_correction_delivery(
+        self, session_id: int, delivery_service, *, actor_user_id: int,
+    ) -> dict[str, Any]:
+        preview = self.retry_preview(session_id, actor_user_id=actor_user_id)
+        if not preview["recipient_ids"]:
+            history = await asyncio.to_thread(
+                delivery_service.history,
+                preview["report_id"], actor_user_id=actor_user_id,
+            )
+            return {
+                "report": history["report"], "deliveries": history["details"],
+                "delivered": history["delivered"], "failed": history["failed"],
+                "pending": history["pending"],
+                "skipped_inactive": preview["skipped_inactive"],
+            }
+        result = await self.deliver_correction(
+            session_id, delivery_service, actor_user_id=actor_user_id,
+            retry_failed=True, recipient_ids=preview["recipient_ids"],
+        )
+        result["skipped_inactive"] = preview["skipped_inactive"]
+        return result
 
 
 __all__ = [

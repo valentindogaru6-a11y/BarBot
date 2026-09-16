@@ -44,8 +44,8 @@ def test_ready_history_card_and_retry_keyboards() -> None:
     ]
     history = report_history_keyboard(reports, page=0, total=9)
     assert _texts(history)[:2] == [
-        "01.09.2026 — версия 1 — готов",
-        "02.09.2026 — версия 1 — готов",
+        "01.09.2026 — v001 — исходная",
+        "02.09.2026 — v001 — исходная",
     ]
     assert "➡️" in _texts(history)
     assert _texts(report_card_keyboard(7, return_page=2)) == [

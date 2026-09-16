@@ -31,7 +31,7 @@ class WarehouseScheduleDatabase:
   if not ids:return []
   with self._c() as c:return [dict(r) for r in c.execute("SELECT * FROM warehouse_report_recipients WHERE id IN ("+','.join('?'*len(ids))+") ORDER BY title COLLATE NOCASE,id",tuple(ids))]
  def ready_reports(self):
-  with self._c() as c:return [dict(r) for r in c.execute("SELECT wr.*,sh.business_date FROM warehouse_reports wr JOIN warehouse_shifts sh ON sh.id=wr.shift_id WHERE wr.status='ready' ORDER BY wr.id DESC LIMIT 30")]
+  with self._c() as c:return [dict(r) for r in c.execute("SELECT wr.*,sh.business_date FROM warehouse_reports wr JOIN warehouse_shifts sh ON sh.id=wr.shift_id WHERE wr.status='ready' AND wr.correction_session_id IS NULL ORDER BY wr.id DESC LIMIT 30")]
  def report_summary(self,id):
   with self._c() as c:
    row=c.execute('SELECT wr.version,sh.business_date FROM warehouse_reports wr JOIN warehouse_shifts sh ON sh.id=wr.shift_id WHERE wr.id=?',(id,)).fetchone()
@@ -56,7 +56,7 @@ class WarehouseScheduleDatabase:
   if not recipient_ids:raise WarehouseScheduleError('Schedule requires recipients')
   with self._tx() as c:
    if c.execute('SELECT COUNT(*) FROM warehouse_report_recipients WHERE is_active=1 AND id IN ('+','.join('?'*len(recipient_ids))+')',recipient_ids).fetchone()[0]!=len(set(recipient_ids)):raise WarehouseScheduleError('Recipients must be active')
-   if values['schedule_type']=='once' and c.execute("SELECT 1 FROM warehouse_reports WHERE id=? AND status='ready'",(values.get('report_id'),)).fetchone() is None:raise WarehouseScheduleError('One-off schedule requires a ready report')
+   if values['schedule_type']=='once' and c.execute("SELECT 1 FROM warehouse_reports WHERE id=? AND status='ready' AND correction_session_id IS NULL",(values.get('report_id'),)).fetchone() is None:raise WarehouseScheduleError('One-off schedule requires a ready report')
    cur=c.execute('INSERT INTO warehouse_delivery_schedules(name,schedule_type,source_location_id,report_id,timezone,delay_minutes_after_close,run_at_utc,max_wait_minutes,is_active,created_by,revision,created_at_utc,updated_at_utc) VALUES(?,?,?,?,?,?,?,?,?,?,1,?,?)',(values['name'],values['schedule_type'],values.get('source_location_id'),values.get('report_id'),values['timezone'],values.get('delay'),values.get('run_at_utc'),values.get('max_wait',1440),values.get('is_active',0),actor,now,now));sid=cur.lastrowid
    c.executemany('INSERT INTO warehouse_delivery_schedule_recipients(schedule_id,recipient_id,created_at_utc) VALUES(?,?,?)',[(sid,r,now) for r in set(recipient_ids)])
    return self._load(c,sid)
@@ -115,8 +115,8 @@ class WarehouseScheduleDatabase:
    return [dict(r) for r in c.execute("SELECT j.*,s.is_active,s.max_wait_minutes,s.schedule_type FROM warehouse_delivery_jobs j JOIN warehouse_delivery_schedules s ON s.id=j.schedule_id WHERE j.status IN ('scheduled','waiting_report','failed','partial_failed') AND j.scheduled_at_utc<=?",(now,)).fetchall()]
  def report_for_job(self,job):
   with self._c() as c:
-   if job['report_id']:r=c.execute("SELECT * FROM warehouse_reports WHERE id=? AND status='ready'",(job['report_id'],)).fetchone()
-   else:r=c.execute("SELECT * FROM warehouse_reports WHERE shift_id=? AND status='ready' ORDER BY id DESC LIMIT 1",(job['shift_id'],)).fetchone()
+   if job['report_id']:r=c.execute("SELECT * FROM warehouse_reports WHERE id=? AND status='ready' AND correction_session_id IS NULL",(job['report_id'],)).fetchone()
+   else:r=c.execute("SELECT * FROM warehouse_reports WHERE shift_id=? AND status='ready' AND correction_session_id IS NULL ORDER BY id DESC LIMIT 1",(job['shift_id'],)).fetchone()
    return dict(r) if r else None
  def wait_or_timeout(self,id,now,timeout):
   with self._tx() as c:c.execute("UPDATE warehouse_delivery_jobs SET status=?,last_error_code=?,last_error_text=?,finished_at_utc=CASE WHEN ?>? THEN ? ELSE NULL END,updated_at_utc=? WHERE id=? AND status IN ('scheduled','waiting_report','failed','partial_failed')",('failed' if now>timeout else 'waiting_report','report_not_ready_timeout' if now>timeout else None,'Отчёт не готов за допустимое время' if now>timeout else None,now,timeout,now,now,id))

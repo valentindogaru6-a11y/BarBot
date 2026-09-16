@@ -268,6 +268,7 @@ class WarehouseDeliveryDatabase:
         retry_failed: bool,
         authorize: Callable[[], None],
         recipient_ids: tuple[int, ...] | None = None,
+        require_all_active: bool = False,
     ) -> list[dict[str, Any]]:
         with self._transaction() as connection:
             authorize()
@@ -282,6 +283,16 @@ class WarehouseDeliveryDatabase:
             if recipient_ids is not None:
                 if not recipient_ids:
                     return []
+                unique_recipient_ids = tuple(sorted(set(recipient_ids)))
+                if require_all_active:
+                    active_count = int(connection.execute(
+                        "SELECT COUNT(*) FROM warehouse_report_recipients "
+                        "WHERE is_active=1 AND id IN ("
+                        + ",".join("?" for _ in unique_recipient_ids) + ")",
+                        unique_recipient_ids,
+                    ).fetchone()[0])
+                    if active_count != len(unique_recipient_ids):
+                        raise WarehouseDeliveryError("Recipient selection changed")
                 recipient_filter = " AND id IN (" + ",".join("?" for _ in recipient_ids) + ")"
                 params.extend(recipient_ids)
             connection.execute(
@@ -485,6 +496,7 @@ class WarehouseDeliveryDatabase:
             rows = connection.execute(
                 """
                 SELECT d.*, r.chat_id, r.title AS recipient_title, r.chat_type,
+                       r.is_active AS recipient_is_active,
                        wr.shift_id, s.closed_by
                 FROM warehouse_report_deliveries d
                 JOIN warehouse_report_recipients r ON r.id=d.recipient_id

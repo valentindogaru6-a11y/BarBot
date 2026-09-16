@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import tempfile
+from html import escape
 from pathlib import Path
 
 from aiogram import F, Router
@@ -244,28 +245,68 @@ async def report_card(
             warehouse_delivery_service.access.get_context,
             callback.from_user.id,
         )
-        correction = await _thread(
-            warehouse_correction_service.report_entry,
-            int(report["id"]),
-            actor_user_id=callback.from_user.id,
+        correction = (
+            await _thread(
+                warehouse_correction_service.report_entry,
+                int(report["id"]),
+                actor_user_id=callback.from_user.id,
+            )
+            if context.can_view_warehouse_corrections
+            else {
+                "correction_session_id": None,
+                "active_session_id": None,
+                "can_open": False,
+                "shift_revision": 0,
+                "correction_reason": None,
+                "delivered_count": 0,
+                "failed_count": 0,
+                "pending_count": 0,
+            }
         )
+        version_kind = (
+            "Исправленная версия"
+            if report.get("correction_session_id") is not None
+            else "Исходный отчёт"
+        )
+        is_correction = report.get("correction_session_id") is not None
+        correction_details = ""
+        if correction.get("correction_reason"):
+            correction_details = (
+                f"\nПричина исправления: "
+                f"{escape(str(correction['correction_reason']))}"
+            )
+        delivery_details = ""
+        if context.can_view_warehouse_corrections:
+            delivery_details = (
+                f"\nДоставка: ✅ {int(correction['delivered_count'])}, "
+                f"⚠️ {int(correction['failed_count'])}, "
+                f"⏳ {int(correction['pending_count'])}"
+            )
         await edit_or_send_text(
             callback.message,
             f"📄 <b>Отчёт за "
             f"{format_business_date(str(report['business_date']))}</b>\n\n"
-            f"Версия: {report['version']}\n"
+            f"Версия: v{int(report['version']):03d} — {version_kind}\n"
             "Статус: готов\n"
             f"Списание: {report['writeoff_count']} позиций\n"
             f"Перемещение: {report['transfer_count']} позиции\n"
             f"Проработка: {report.get('development_count', 0)} позиций в "
-            f"{report.get('development_group_count', 0)} проработках",
+            f"{report.get('development_group_count', 0)} проработках"
+            f"{correction_details}{delivery_details}",
             report_card_keyboard(
                 int(report["id"]), return_page=callback_data.aux,
-                can_send=context.can_send_warehouse_reports,
+                can_send=context.can_send_warehouse_reports and not is_correction,
                 correction_session_id=correction["active_session_id"],
                 can_open_correction=bool(correction["can_open"]),
                 shift_revision=int(correction["shift_revision"]),
                 can_manage_correction=context.can_manage_warehouse_corrections,
+                result_correction_session_id=(
+                    int(correction["correction_session_id"])
+                    if (
+                        context.can_view_warehouse_corrections
+                        and correction.get("correction_session_id") is not None
+                    ) else None
+                ),
             ),
         )
 
@@ -418,7 +459,7 @@ async def report_delivery_history(
             "failed": "⚠️ ошибка",
         }
         text += "\n\n" + "\n".join(
-            f"• {row['recipient_title']}: {labels[row['status']]}"
+            f"• {escape(str(row['recipient_title']))}: {labels[row['status']]}"
             for row in result["details"]
         )
     await edit_or_send_text(

@@ -56,8 +56,9 @@ def correction_dashboard_keyboard(session: dict) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     session_id = int(session["id"])
     revision = int(session["revision"])
-    can_manage = bool(session.get("can_manage")) and session["status"] == "open"
-    if can_manage:
+    can_manage = bool(session.get("can_manage"))
+    can_edit = can_manage and session["status"] == "open"
+    if can_edit:
         for action, text in (
             ("kw", "➕ Добавить списание"),
             ("kt", "🔁 Добавить перемещение"),
@@ -77,22 +78,43 @@ def correction_dashboard_keyboard(session: dict) -> InlineKeyboardMarkup:
         text="📝 Изменения",
         callback_data=WarehouseCallback(action="ke", object_id=session_id),
     )
-    if can_manage and not session.get("has_mutations"):
+    if can_edit and not session.get("has_mutations"):
         builder.button(
             text="❌ Отменить исправление",
             callback_data=WarehouseCallback(
                 action="kn", object_id=session_id, aux=revision
             ),
         )
-    elif can_manage:
+    elif can_edit:
         builder.button(
             text="🔒 Отмена недоступна после изменений",
             callback_data=WarehouseCallback(action="kh", object_id=session_id),
         )
-    if can_manage:
+    if can_edit and session.get("has_mutations"):
         builder.button(
-            text="📄 Выпуск версии — следующий этап",
+            text="📄 Выпустить исправленный отчёт",
+            callback_data=WarehouseCallback(
+                action="k6", object_id=session_id, aux=revision
+            ),
+        )
+    elif can_edit:
+        builder.button(
+            text="📄 Выпуск недоступен без изменений",
             callback_data=WarehouseCallback(action="kh", object_id=session_id),
+        )
+    if can_manage and session["status"] in {"building", "failed"}:
+        builder.button(
+            text="🔄 Проверить выпуск",
+            callback_data=WarehouseCallback(action="k8", object_id=session_id),
+        )
+    if session["status"] == "completed":
+        builder.button(
+            text="📄 Исправленный отчёт",
+            callback_data=WarehouseCallback(action="k9", object_id=session_id),
+        )
+        builder.button(
+            text="🕘 История версий",
+            callback_data=WarehouseCallback(action="kH", object_id=session_id),
         )
     builder.button(
         text="⬅️ Назад",
@@ -256,6 +278,175 @@ def correction_cancel_session_keyboard(
     return correction_mutation_confirm_keyboard(
         "km", session_id, revision, session_id=session_id
     )
+
+
+def correction_finalize_keyboard(
+    session_id: int, revision: int, *, blocked: bool = False
+) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    if not blocked:
+        builder.button(
+            text="✅ Выпустить новую версию",
+            callback_data=WarehouseCallback(
+                action="kq", object_id=session_id, aux=revision
+            ),
+        )
+    builder.button(
+        text="⬅️ Вернуться к редактированию",
+        callback_data=WarehouseCallback(action="kd", object_id=session_id),
+    )
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def correction_recovery_keyboard(session_id: int, *, failed: bool) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text="🔄 Повторить сборку" if failed else "🔄 Проверить выпуск",
+        callback_data=WarehouseCallback(action="ka", object_id=session_id),
+    )
+    builder.button(
+        text="⬅️ К исправлению",
+        callback_data=WarehouseCallback(action="kd", object_id=session_id),
+    )
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def correction_result_keyboard(
+    session_id: int,
+    report_id: int,
+    *,
+    can_manage: bool,
+    has_failed: bool,
+) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text="📎 Получить файл",
+        callback_data=WarehouseCallback(action="kk", object_id=session_id),
+    )
+    if can_manage:
+        builder.button(
+            text="📨 Отправить получателям",
+            callback_data=WarehouseCallback(action="kR", object_id=session_id),
+        )
+    builder.button(
+        text="🕘 История версий",
+        callback_data=WarehouseCallback(action="kH", object_id=session_id),
+    )
+    builder.button(
+        text="📋 Статусы доставки",
+        callback_data=WarehouseCallback(action="kD", object_id=session_id),
+    )
+    if can_manage and has_failed:
+        builder.button(
+            text="🔄 Повторить неуспешные",
+            callback_data=WarehouseCallback(action="kY", object_id=session_id),
+        )
+    builder.button(
+        text="⬅️ К отчёту",
+        callback_data=WarehouseCallback(action="hv", object_id=report_id),
+    )
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def correction_recipient_keyboard(
+    recipients: list[dict], *, session_id: int, selected: set[int], page: int,
+    total: int, page_size: int = 8,
+) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for recipient in recipients:
+        recipient_id = int(recipient["id"])
+        builder.button(
+            text=("✅ " if recipient_id in selected else "⬜ ")
+            + str(recipient["title"])[:60],
+            callback_data=WarehouseCallback(
+                action="kT", object_id=recipient_id, aux=max(page, 0)
+            ),
+        )
+    pages = max(1, ceil(total / page_size))
+    if page > 0:
+        builder.button(
+            text="⬅️",
+            callback_data=WarehouseCallback(
+                action="kL", object_id=session_id, aux=page - 1
+            ),
+        )
+    if page + 1 < pages:
+        builder.button(
+            text="➡️",
+            callback_data=WarehouseCallback(
+                action="kL", object_id=session_id, aux=page + 1
+            ),
+        )
+    builder.button(
+        text="👁 Предпросмотр",
+        callback_data=WarehouseCallback(action="kV", object_id=session_id),
+    )
+    builder.button(
+        text="⬅️ К результату",
+        callback_data=WarehouseCallback(action="kB", object_id=session_id),
+    )
+    builder.button(
+        text="❌ Отмена",
+        callback_data=WarehouseCallback(action="k0", object_id=session_id, aux=1),
+    )
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def correction_delivery_confirm_keyboard(session_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text="✅ Отправить исправленный отчёт",
+        callback_data=WarehouseCallback(action="kS", object_id=session_id),
+    )
+    builder.button(
+        text="⬅️ Изменить получателей",
+        callback_data=WarehouseCallback(action="kL", object_id=session_id),
+    )
+    builder.button(
+        text="❌ Отмена",
+        callback_data=WarehouseCallback(action="k0", object_id=session_id, aux=1),
+    )
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def correction_retry_keyboard(session_id: int, *, confirm: bool = False) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    if confirm:
+        builder.button(
+            text="✅ Повторить неуспешные",
+            callback_data=WarehouseCallback(action="kZ", object_id=session_id),
+        )
+    builder.button(
+        text="⬅️ К результату",
+        callback_data=WarehouseCallback(action="k9", object_id=session_id),
+    )
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def correction_versions_keyboard(
+    versions: list[dict], *, session_id: int
+) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for version in versions:
+        label = "исправленная" if version.get("correction_session_id") else "исходная"
+        builder.button(
+            text=f"v{int(version['version']):03d} — {label} — {version['status']}"[:64],
+            callback_data=WarehouseCallback(
+                action="hv", object_id=int(version["id"])
+            ),
+        )
+    builder.button(
+        text="⬅️ К результату",
+        callback_data=WarehouseCallback(action="k9", object_id=session_id),
+    )
+    builder.adjust(1)
+    return builder.as_markup()
 
 
 __all__ = [name for name in globals() if name.startswith("correction_")]
