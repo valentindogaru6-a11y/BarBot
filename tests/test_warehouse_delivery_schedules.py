@@ -124,3 +124,27 @@ def test_stale_job_is_recovered_as_failed(tmp_path: Path):
     with sqlite3.connect(path) as connection:
         connection.execute("UPDATE warehouse_delivery_jobs SET status='sending',claimed_at_utc='2026-09-10T20:00:00Z' WHERE id=?",(job['id'],));connection.commit()
     assert repo.due('2026-09-10T21:16:00Z','2026-09-10T21:01:00Z')[0]['status']=='failed'
+
+
+def test_schedule_card_details_and_jobs_are_safe_for_history_reader(tmp_path: Path):
+    _,repo,source,recipient,_=_env(tmp_path);schedule=repo.create(_daily(source),(recipient,),1,'now');repo.create_daily_jobs('2026-09-10T21:16:00Z')
+    detail=repo.details(schedule['id'])
+    assert detail['name']=='Ежедневно' and detail['recipients']==(recipient,) and detail['latest_job']['business_date']=='2026-09-10'
+
+
+def test_cancel_only_pending_one_off_job_is_idempotent(tmp_path: Path):
+    path,repo,source,recipient,shift=_env(tmp_path)
+    with sqlite3.connect(path) as c:
+        c.execute("INSERT INTO warehouse_reports(shift_id,version,report_kind,status,relative_file_path,file_sha256,file_size_bytes,created_at_utc,created_by,ready_at_utc) VALUES(?,1,'final','ready','reports/z.xlsx',?,1,'now',1,'now')",(shift,'2'*64));report=c.execute('SELECT id FROM warehouse_reports').fetchone()[0];c.commit()
+    once=repo.create({'name':'Разово','schedule_type':'once','report_id':report,'timezone':'Europe/Kyiv','run_at_utc':'2026-09-10T21:30:00Z','max_wait':1440,'is_active':1},(recipient,),1,'now');repo.create_daily_jobs('now');job=repo.jobs(once['id'])[0]
+    assert repo.cancel_job(job['id'],'now') is True and repo.cancel_job(job['id'],'now') is False
+
+
+def test_retry_reuses_only_selected_active_recipients(tmp_path: Path):
+    path,repo,source,recipient,shift=_env(tmp_path)
+    with sqlite3.connect(path) as c:
+        c.execute("INSERT INTO warehouse_reports(shift_id,version,report_kind,status,relative_file_path,file_sha256,file_size_bytes,created_at_utc,created_by,ready_at_utc) VALUES(?,1,'final','ready','reports/retry.xlsx',?,1,'now',1,'now')",(shift,'3'*64));report=c.execute('SELECT id FROM warehouse_reports').fetchone()[0];c.commit()
+    once=repo.create({'name':'Retry','schedule_type':'once','report_id':report,'timezone':'Europe/Kyiv','run_at_utc':'2026-09-10T20:00:00Z','max_wait':1440,'is_active':1},(recipient,),1,'now');repo.create_daily_jobs('now');job=repo.jobs(once['id'])[0]
+    with sqlite3.connect(path) as c:c.execute("UPDATE warehouse_delivery_jobs SET status='failed' WHERE id=?",(job['id'],));c.commit()
+    delivery=Delivery();service=WarehouseScheduleService(repo,delivery,AccessService(frozenset({1})),Clock())
+    assert asyncio.run(service.retry_job(job['id'],1))['delivered']==1 and delivery.calls[0][1]==(recipient,)

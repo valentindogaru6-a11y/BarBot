@@ -90,6 +90,9 @@ class WarehouseScheduleDatabase:
   with self._tx() as c:c.execute("UPDATE warehouse_delivery_jobs SET status=?,finished_at_utc=?,last_error_code=?,last_error_text=?,updated_at_utc=? WHERE id=? AND status='sending'",(status,now,code,'Telegram доставка завершилась не полностью' if code else None,now,id))
  def jobs(self,schedule_id,limit=20):
   with self._c() as c:return [dict(r) for r in c.execute('SELECT * FROM warehouse_delivery_jobs WHERE schedule_id=? ORDER BY id DESC LIMIT ?',(schedule_id,limit)).fetchall()]
+ def job(self,id):
+  with self._c() as c:
+   r=c.execute('SELECT * FROM warehouse_delivery_jobs WHERE id=?',(id,)).fetchone();return dict(r) if r else None
 def _plus(stamp,minutes):
  from datetime import UTC,datetime,timedelta
  return (datetime.fromisoformat(stamp.replace('Z','+00:00')).astimezone(UTC)+timedelta(minutes=minutes)).replace(microsecond=0).isoformat().replace('+00:00','Z')

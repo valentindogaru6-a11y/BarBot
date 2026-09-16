@@ -20,7 +20,7 @@ class WarehouseScheduleService:
  def update(self,id,values,recipient_ids,revision,actor):
   self.access.require_warehouse_delivery_schedule_management(actor);return self.repository.update(id,values,tuple(recipient_ids),revision,utc_rfc3339(self._now()))
  def list(self,actor):self.access.require_warehouse_delivery_schedule_management(actor);return self.repository.schedules()
- def details(self,id,actor):self.access.require_warehouse_delivery_schedule_management(actor);return self.repository.details(id)
+ def details(self,id,actor):self.access.require_warehouse_delivery_history(actor);return self.repository.details(id)
  def recipients(self,actor):self.access.require_warehouse_delivery_schedule_management(actor);return self.repository.active_recipients()
  def reports(self,actor):self.access.require_warehouse_delivery_schedule_management(actor);return self.repository.ready_reports()
  def sources(self,actor):self.access.require_warehouse_delivery_schedule_management(actor);return self.repository.sources()
@@ -35,6 +35,13 @@ class WarehouseScheduleService:
   if first.astimezone(UTC)<=self._now():raise ValueError('Время отправки должно быть в будущем')
   return utc_rfc3339(first.astimezone(UTC))
  def jobs(self,id,actor):self.access.require_warehouse_delivery_history(actor);return self.repository.jobs(id)
+ def cancel_job(self,id,actor):
+  self.access.require_warehouse_delivery_schedule_management(actor);return self.repository.cancel_job(id,utc_rfc3339(self._now()))
+ async def retry_job(self,id,actor):
+  self.access.require_warehouse_delivery_schedule_management(actor);job=await asyncio.to_thread(self.repository.job,id)
+  if not job or job['status'] not in ('failed','partial_failed') or job['report_id'] is None:raise ValueError('Этот запуск нельзя повторить')
+  recipients=await asyncio.to_thread(self.repository.recipient_ids,int(job['schedule_id']),True)
+  return await self.delivery.deliver_scheduled(int(job['report_id']),recipient_ids=recipients,retry_failed=True)
  async def run_once(self,now_utc:datetime|None=None):
   now=self._now(now_utc);stamp=utc_rfc3339(now)
   await asyncio.to_thread(self.repository.create_daily_jobs,stamp)

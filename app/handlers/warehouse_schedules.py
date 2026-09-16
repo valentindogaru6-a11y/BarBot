@@ -20,10 +20,11 @@ def _kb(*buttons):
  b.adjust(1);return b.as_markup()
 def _error(e):return 'Недостаточно прав.' if isinstance(e,AccessDeniedError) else escape(str(e)) if isinstance(e,ValueError) else 'Не удалось сохранить расписание.'
 async def _home(message,service,actor):
- rows=await _t(service.list,actor);lines=[]
+ rows=await _t(service.list,actor);lines=[];buttons=[]
  for row in rows:
   recipients=await _t(service.repository.recipient_ids,row['id']);job=(await _t(service.repository.jobs,row['id'],1));lines.append(f"• <b>{escape(row['name'])}</b> — {'Ежедневно' if row['schedule_type']=='daily' else 'Разово'}, {'вкл.' if row['is_active'] else 'выкл.'}, получателей: {len(recipients)}"+(f", job: {job[0]['status']}" if job else ''))
- await edit_or_send_text(message,'🗓 <b>Автоотправка отчётов</b>\n\n'+('\n'.join(lines) if lines else 'Расписаний ещё нет.'),_kb(('➕ Ежедневное расписание','sa',0,0),('➕ Разовая отправка','so',0,0),('📜 История запусков','sh',0,0)))
+  buttons.append((f"📋 {row['name']}",'sv',row['id'],0))
+ await edit_or_send_text(message,'🗓 <b>Автоотправка отчётов</b>\n\n'+('\n'.join(lines) if lines else 'Расписаний ещё нет.'),_kb(*buttons,('➕ Ежедневное расписание','sa',0,0),('➕ Разовая отправка','so',0,0),('📜 История запусков','sh',0,0)))
 async def _select_recipients(message,state,service,actor):
  recipients=await _t(service.recipients,actor);data=await state.get_data();selected=set(data.get('recipient_ids',[]));buttons=[(f"{'✅' if r['id'] in selected else '⬜'} {r['title']}",'st',r['id'],0) for r in recipients];buttons += [('➡️ Далее','sp',0,0),('❌ Отмена','sx',0,0)];await edit_or_send_text(message,'👥 <b>Выберите получателей</b>',_kb(*buttons))
 def _preview(data):
@@ -88,3 +89,49 @@ async def save(callback:CallbackQuery,state:FSMContext,warehouse_schedule_servic
 async def cancel(callback:CallbackQuery,state:FSMContext):await state.clear();await callback.answer('Отменено')
 @router.message(Command('cancel'),StateFilter(WarehouseScheduleStates))
 async def command_cancel(message:Message,state:FSMContext):await state.clear();await message.answer('Создание расписания отменено.')
+
+def _card(row):
+ kind='Ежедневно' if row['schedule_type']=='daily' else 'Разово';target=f"delay: {row['delay_minutes_after_close']} мин." if row['schedule_type']=='daily' else f"UTC: {row['run_at_utc']}"
+ return f"🗓 <b>{escape(row['name'])}</b>\n\nТип: {kind}\nСтатус: {'включено' if row['is_active'] else 'выключено'}\n{target}\nTimezone: {row['timezone']}\nПолучателей: {len(row['recipients'])}\nRevision: {row['revision']}\nПоследний job: {row['latest_job']['status'] if row['latest_job'] else 'нет'}"
+@router.callback_query(WarehouseCallback.filter(F.action=='sv'))
+async def card(callback:CallbackQuery,callback_data:WarehouseCallback,warehouse_schedule_service:WarehouseScheduleService):
+ try:row=await _t(warehouse_schedule_service.details,callback_data.object_id,callback.from_user.id)
+ except Exception as e:await callback.answer(_error(e),show_alert=True);return
+ if not row:await callback.answer('Расписание не найдено.',show_alert=True);return
+ await callback.answer();buttons=[('📜 Запуски','sj',row['id'],0),('⬅️ Назад','sd',0,0)]
+ try:
+  await _t(warehouse_schedule_service.list,callback.from_user.id)
+  buttons.insert(0,('⏸ Выключить' if row['is_active'] else '▶️ Включить','se',row['id'],row['revision']))
+ except Exception:pass
+ await edit_or_send_text(callback.message,_card(row),_kb(*buttons))
+@router.callback_query(WarehouseCallback.filter(F.action=='se'))
+async def enable(callback:CallbackQuery,callback_data:WarehouseCallback,warehouse_schedule_service:WarehouseScheduleService):
+ try:
+  row=await _t(warehouse_schedule_service.repository.details,callback_data.object_id);updated=await _t(warehouse_schedule_service.update,row['id'],{'is_active':0 if row['is_active'] else 1},row['recipients'],callback_data.aux,callback.from_user.id)
+ except Exception as e:await callback.answer(_error(e),show_alert=True);return
+ await callback.answer('Статус обновлён');await card(callback,callback_data,warehouse_schedule_service)
+@router.callback_query(WarehouseCallback.filter(F.action=='sj'))
+async def jobs(callback:CallbackQuery,callback_data:WarehouseCallback,warehouse_schedule_service:WarehouseScheduleService):
+ try:rows=await _t(warehouse_schedule_service.jobs,callback_data.object_id,callback.from_user.id)
+ except Exception as e:await callback.answer(_error(e),show_alert=True);return
+ await callback.answer();buttons=[(f"{r['business_date']} — {r['status']}",'sk',r['id'],0) for r in rows[:8]]+[('⬅️ К расписанию','sv',callback_data.object_id,0)]
+ await edit_or_send_text(callback.message,'📜 <b>Запуски</b>',_kb(*buttons))
+@router.callback_query(WarehouseCallback.filter(F.action=='sk'))
+async def job(callback:CallbackQuery,callback_data:WarehouseCallback,warehouse_schedule_service:WarehouseScheduleService):
+ try:r=await _t(warehouse_schedule_service.repository.job,callback_data.object_id)
+ except Exception as e:await callback.answer(_error(e),show_alert=True);return
+ if not r:await callback.answer('Запуск не найден.',show_alert=True);return
+ await callback.answer();buttons=[('⬅️ К запускам','sj',r['schedule_id'],0)]
+ if r['status'] in ('failed','partial_failed'):buttons.insert(0,('🔁 Повторить неудачные','sr',r['id'],0))
+ if r['shift_id'] is None and r['status'] in ('scheduled','waiting_report'):buttons.insert(0,('❌ Отменить запуск','sc',r['id'],0))
+ await edit_or_send_text(callback.message,f"📄 <b>Запуск</b>\n\nДата: {r['business_date']}\nВремя: {r['scheduled_at_utc']}\nСтатус: {r['status']}\nОшибка: {r['last_error_code'] or '—'}",_kb(*buttons))
+@router.callback_query(WarehouseCallback.filter(F.action=='sr'))
+async def retry(callback:CallbackQuery,callback_data:WarehouseCallback,warehouse_schedule_service:WarehouseScheduleService):
+ try:result=await warehouse_schedule_service.retry_job(callback_data.object_id,callback.from_user.id)
+ except Exception as e:await callback.answer(_error(e),show_alert=True);return
+ await callback.answer(f"Доставлено: {result['delivered']}, ошибок: {result['failed']}")
+@router.callback_query(WarehouseCallback.filter(F.action=='sc'))
+async def cancel_job(callback:CallbackQuery,callback_data:WarehouseCallback,warehouse_schedule_service:WarehouseScheduleService):
+ try:ok=await _t(warehouse_schedule_service.cancel_job,callback_data.object_id,callback.from_user.id)
+ except Exception as e:await callback.answer(_error(e),show_alert=True);return
+ await callback.answer('Запуск отменён' if ok else 'Этот запуск нельзя отменить')
