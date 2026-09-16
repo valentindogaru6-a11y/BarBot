@@ -104,7 +104,7 @@ class WarehouseReportsDatabase:
         row = connection.execute(
             """
             SELECT r.*, s.business_date, s.status AS shift_status,
-                   s.source_location_id
+                   s.source_location_id, s.closed_by
             FROM warehouse_reports r
             JOIN warehouse_shifts s ON s.id=r.shift_id
             WHERE r.id=?

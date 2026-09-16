@@ -15,6 +15,7 @@ def warehouse_home_keyboard(
     shift_status: str = "open",
     active_closing_session_id: int | None = None,
     can_manage_required_rules: bool = False,
+    can_manage_report_recipients: bool = False,
 ) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     if can_mutate and shift_status in {"open", "waiting_required"}:
@@ -35,6 +36,11 @@ def warehouse_home_keyboard(
         builder.button(
             text="✅ Обязательные списания",
             callback_data=WarehouseCallback(action="rm"),
+        )
+    if can_manage_report_recipients:
+        builder.button(
+            text="👥 Получатели отчётов",
+            callback_data=WarehouseCallback(action="pr"),
         )
     if shift_status in {"open", "waiting_required", "closing"}:
         builder.button(
@@ -159,16 +165,29 @@ def closing_final_keyboard(
     revision: int,
     *,
     allow_empty: bool = False,
+    recipient_count: int | None = None,
+    can_manage_recipients: bool = False,
 ) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(
-        text="✅ Да, завершить",
+        text=(
+            "✅ Закрыть, создать и отправить"
+            if recipient_count is not None and recipient_count > 0
+            else "✅ Закрыть и создать Excel"
+            if recipient_count == 0
+            else "✅ Да, завершить"
+        ),
         callback_data=WarehouseCallback(
             action="ce" if allow_empty else "cf",
             object_id=session_id,
             aux=revision,
         ),
     )
+    if recipient_count == 0 and can_manage_recipients:
+        builder.button(
+            text="👥 Настроить получателей",
+            callback_data=WarehouseCallback(action="pr"),
+        )
     builder.button(text="📋 Проверить записи", callback_data=WarehouseCallback(action="ls"))
     builder.button(
         text="❌ Отменить",
@@ -183,6 +202,10 @@ def report_ready_keyboard(report_id: int) -> InlineKeyboardMarkup:
     builder.button(
         text="📄 Скачать ещё раз",
         callback_data=WarehouseCallback(action="hd", object_id=report_id),
+    )
+    builder.button(
+        text="📨 Статусы доставки",
+        callback_data=WarehouseCallback(action="dh", object_id=report_id),
     )
     builder.button(
         text="📁 История отчётов",
@@ -242,7 +265,12 @@ def report_history_keyboard(
     return builder.as_markup()
 
 
-def report_card_keyboard(report_id: int, *, return_page: int) -> InlineKeyboardMarkup:
+def report_card_keyboard(
+    report_id: int,
+    *,
+    return_page: int,
+    can_send: bool = False,
+) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(
         text="📥 Скачать",
@@ -251,10 +279,118 @@ def report_card_keyboard(report_id: int, *, return_page: int) -> InlineKeyboardM
         ),
     )
     builder.button(
+        text="📨 Статусы доставки",
+        callback_data=WarehouseCallback(
+            action="dh", object_id=report_id, aux=return_page
+        ),
+    )
+    if can_send:
+        builder.button(
+            text="📤 Отправить активным",
+            callback_data=WarehouseCallback(action="da", object_id=report_id),
+        )
+    builder.button(
         text="⬅️ Назад",
         callback_data=WarehouseCallback(action="hl", object_id=return_page),
     )
     builder.button(text="🏠 Главное меню", callback_data=MainCallback(action="home"))
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def report_delivery_result_keyboard(
+    report_id: int,
+    *,
+    has_failed: bool,
+    can_manage_recipients: bool = False,
+    can_send: bool = False,
+) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    if has_failed and can_send:
+        builder.button(
+            text="🔁 Повторить неудачные",
+            callback_data=WarehouseCallback(action="ds", object_id=report_id),
+        )
+    if can_send:
+        builder.button(
+            text="📤 Отправить активным",
+            callback_data=WarehouseCallback(action="da", object_id=report_id),
+        )
+    builder.button(
+        text="📨 Статусы доставки",
+        callback_data=WarehouseCallback(action="dh", object_id=report_id),
+    )
+    if can_manage_recipients:
+        builder.button(
+            text="👥 Настроить получателей",
+            callback_data=WarehouseCallback(action="pr"),
+        )
+    builder.button(text="⬅️ К складу", callback_data=WarehouseCallback(action="h"))
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def report_recipients_keyboard(recipients: list[dict]) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for recipient in recipients:
+        marker = "✅" if recipient["is_active"] else "⏸"
+        builder.button(
+            text=f"{marker} {recipient['title']}"[:64],
+            callback_data=WarehouseCallback(
+                action="pv", object_id=int(recipient["id"])
+            ),
+        )
+    builder.button(
+        text="➕ Добавить этот чат",
+        callback_data=WarehouseCallback(action="pc"),
+    )
+    builder.button(
+        text="🔢 Добавить по chat ID",
+        callback_data=WarehouseCallback(action="pi"),
+    )
+    builder.button(
+        text="ℹ️ Как добавить бухгалтерскую группу",
+        callback_data=WarehouseCallback(action="px"),
+    )
+    builder.button(text="⬅️ К складу", callback_data=WarehouseCallback(action="h"))
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def report_recipient_candidate_keyboard() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text="✅ Сохранить получателя",
+        callback_data=WarehouseCallback(action="ps"),
+    )
+    builder.button(
+        text="❌ Отмена",
+        callback_data=WarehouseCallback(action="pr"),
+    )
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def report_recipient_card_keyboard(recipient: dict) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    recipient_id = int(recipient["id"])
+    revision = int(recipient["revision"])
+    builder.button(
+        text="✏️ Изменить название",
+        callback_data=WarehouseCallback(
+            action="pt", object_id=recipient_id, aux=revision
+        ),
+    )
+    builder.button(
+        text="⏸ Деактивировать" if recipient["is_active"] else "▶️ Активировать",
+        callback_data=WarehouseCallback(
+            action="pa", object_id=recipient_id, aux=revision
+        ),
+    )
+    builder.button(
+        text="⬅️ К получателям",
+        callback_data=WarehouseCallback(action="pr"),
+    )
     builder.adjust(1)
     return builder.as_markup()
 

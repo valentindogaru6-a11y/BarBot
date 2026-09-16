@@ -33,6 +33,10 @@ from app.storage.warehouse_v7_schema import (
     WarehouseV7SchemaError,
     validate_warehouse_v7_schema,
 )
+from app.storage.warehouse_delivery_schema import (
+    WarehouseDeliverySchemaError,
+    validate_warehouse_delivery_schema,
+)
 from app.utils.warehouse import normalize_warehouse_name
 
 
@@ -101,32 +105,36 @@ class WarehouseSeedDatabase:
     @staticmethod
     def _validate_schema(connection: sqlite3.Connection) -> None:
         version = WarehouseSeedDatabase._schema_version(connection)
-        if version not in {3, 4, 5, 6, 7}:
+        if version not in {3, 4, 5, 6, 7, 8}:
             raise WarehouseSeedImportError(
-                f"Warehouse schema v3, v4, v5, v6 or v7 required; found v{version}"
+                "Warehouse schema v3, v4, v5, v6, v7 or v8 required; "
+                f"found v{version}"
             )
         try:
             validate_warehouse_schema(
-                connection, allow_development=version == 7
+                connection, allow_development=version >= 7
             )
             if version >= 4:
                 validate_warehouse_operations_schema(
-                    connection, allow_development=version == 7
+                    connection, allow_development=version >= 7
                 )
             if version == 5:
                 validate_warehouse_closing_schema(connection)
             if version == 6:
                 validate_warehouse_closing_schema(connection)
                 validate_warehouse_reports_schema(connection)
-            if version == 7:
+            if version >= 7:
                 validate_warehouse_closing_schema(connection)
                 validate_warehouse_v7_schema(connection)
+            if version == 8:
+                validate_warehouse_delivery_schema(connection)
         except (
             WarehouseSchemaValidationError,
             WarehouseOperationsSchemaError,
             WarehouseClosingSchemaError,
             WarehouseReportsSchemaError,
             WarehouseV7SchemaError,
+            WarehouseDeliverySchemaError,
         ) as exc:
             raise WarehouseSeedImportError(str(exc)) from exc
 

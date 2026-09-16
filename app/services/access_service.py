@@ -47,6 +47,18 @@ class UserContext:
         return self.role in {Role.SUPER_ADMIN, Role.ADMIN}
 
     @property
+    def can_manage_warehouse_report_recipients(self) -> bool:
+        return self.role in {Role.SUPER_ADMIN, Role.ADMIN}
+
+    @property
+    def can_send_warehouse_reports(self) -> bool:
+        return self.role in {Role.SUPER_ADMIN, Role.ADMIN, Role.BARTENDER}
+
+    @property
+    def can_view_warehouse_delivery_history(self) -> bool:
+        return self.role in {Role.SUPER_ADMIN, Role.ADMIN, Role.ACCOUNTANT}
+
+    @property
     def can_assign_admin(self) -> bool:
         return self.role is Role.SUPER_ADMIN
 
@@ -119,6 +131,21 @@ class AccessService:
             telegram_user_id
         ).can_manage_warehouse_required_rules
 
+    def can_manage_warehouse_report_recipients(
+        self, telegram_user_id: int
+    ) -> bool:
+        return self.get_context(
+            telegram_user_id
+        ).can_manage_warehouse_report_recipients
+
+    def can_send_warehouse_reports(self, telegram_user_id: int) -> bool:
+        return self.get_context(telegram_user_id).can_send_warehouse_reports
+
+    def can_view_warehouse_delivery_history(self, telegram_user_id: int) -> bool:
+        return self.get_context(
+            telegram_user_id
+        ).can_view_warehouse_delivery_history
+
     def require_warehouse_view(self, telegram_user_id: int) -> UserContext:
         context = self.get_context(telegram_user_id)
         if not context.can_view_warehouse:
@@ -140,6 +167,32 @@ class AccessService:
             raise AccessDeniedError(
                 "Недостаточно прав для обязательных списаний"
             )
+        return context
+
+    def require_warehouse_report_recipient_management(
+        self, telegram_user_id: int
+    ) -> UserContext:
+        context = self.get_context(telegram_user_id)
+        if not context.can_manage_warehouse_report_recipients:
+            raise AccessDeniedError(
+                "Недостаточно прав для управления получателями отчётов"
+            )
+        return context
+
+    def require_warehouse_report_delivery(
+        self, telegram_user_id: int
+    ) -> UserContext:
+        context = self.get_context(telegram_user_id)
+        if not context.can_send_warehouse_reports:
+            raise AccessDeniedError("Недостаточно прав для отправки отчёта")
+        return context
+
+    def require_warehouse_delivery_history(
+        self, telegram_user_id: int
+    ) -> UserContext:
+        context = self.get_context(telegram_user_id)
+        if not context.can_view_warehouse_delivery_history:
+            raise AccessDeniedError("Недостаточно прав для истории доставки")
         return context
 
     def can_assign_admin(self, telegram_user_id: int) -> bool:

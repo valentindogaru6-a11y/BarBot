@@ -25,7 +25,7 @@ def test_fresh_v7_repeat_and_three_operation_checks(tmp_path: Path) -> None:
     database = UserDatabase(path)
     database.initialize()
     database.initialize()
-    assert _version(path) == 7
+    assert _version(path) == 8
     with sqlite3.connect(path) as connection:
         validate_warehouse_v7_schema(connection)
         source = connection.execute(
@@ -171,7 +171,7 @@ def test_v6_to_v7_preserves_rows_and_adds_development_types(tmp_path: Path) -> N
         connection.commit()
 
     UserDatabase(path).initialize()
-    assert _version(path) == 7
+    assert _version(path) == 8
     with sqlite3.connect(path) as connection:
         validate_warehouse_v7_schema(connection)
         assert connection.execute(
@@ -224,6 +224,6 @@ def test_future_schema_is_rejected(tmp_path: Path) -> None:
     path = tmp_path / "future.db"
     UserDatabase(path).initialize()
     with sqlite3.connect(path) as connection:
-        connection.execute("PRAGMA user_version=8")
+        connection.execute("PRAGMA user_version=9")
     with pytest.raises(migrations.UnsupportedSchemaVersionError):
         UserDatabase(path).initialize()

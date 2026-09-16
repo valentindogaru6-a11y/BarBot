@@ -13,6 +13,7 @@ from aiogram.types import CallbackQuery, FSInputFile, Message
 from app.handlers.common import edit_or_send_text
 from app.keyboards.warehouse import (
     report_card_keyboard,
+    report_delivery_result_keyboard,
     report_history_keyboard,
     report_ready_keyboard,
     report_retry_keyboard,
@@ -24,6 +25,7 @@ from app.services.warehouse.report_service import (
     WarehouseReportService,
     WarehouseReportsError,
 )
+from app.services.warehouse.delivery_service import WarehouseReportDeliveryService
 from app.services.warehouse.xlsx_report_service import WarehouseXlsxError
 
 router = Router(name=__name__)
@@ -58,6 +60,7 @@ def _ready_caption(report: dict) -> str:
 async def build_and_send_final_report(
     message: Message,
     service: WarehouseReportService,
+    delivery_service: WarehouseReportDeliveryService,
     *,
     shift_id: int,
     actor_user_id: int,
@@ -85,6 +88,7 @@ async def build_and_send_final_report(
     artifact = result["artifact"]
     ready_keyboard = report_ready_keyboard(int(report["id"]))
     await edit_or_send_text(message, "✅ Смена закрыта. Отчёт сформирован.")
+    actor_file_sent = True
     try:
         await message.answer_document(
             FSInputFile(
@@ -95,6 +99,7 @@ async def build_and_send_final_report(
             reply_markup=ready_keyboard,
         )
     except Exception:
+        actor_file_sent = False
         logger.exception("Warehouse final report delivery failed")
         await edit_or_send_text(
             message,
@@ -102,8 +107,44 @@ async def build_and_send_final_report(
             "Скачайте готовый отчёт повторно.",
             ready_keyboard,
         )
+    try:
+        delivery = await delivery_service.deliver(
+            int(report["id"]), actor_user_id=actor_user_id
+        )
+    except Exception:
+        logger.exception("Warehouse recipient delivery orchestration failed")
+        await message.answer(
+            "Смена закрыта, но отправку получателям не удалось выполнить. "
+            "Откройте статусы доставки и повторите попытку.",
+            reply_markup=report_delivery_result_keyboard(
+                int(report["id"]), has_failed=True, can_send=True
+            ),
+        )
         return False
-    return True
+    context = await _thread(delivery_service.access.get_context, actor_user_id)
+    if not delivery["deliveries"]:
+        delivery_text = (
+            "⚠️ Активных получателей нет. Автоматическая отправка не выполнялась."
+        )
+    else:
+        delivery_text = (
+            f"✅ Доставлено: {delivery['delivered']}\n"
+            f"⚠️ Ошибка: {delivery['failed']}"
+        )
+        if delivery["pending"]:
+            delivery_text += f"\n⏳ Не завершено: {delivery['pending']}"
+    await message.answer(
+        delivery_text,
+        reply_markup=report_delivery_result_keyboard(
+            int(report["id"]),
+            has_failed=bool(delivery["failed"] or delivery["pending"]),
+            can_manage_recipients=(
+                context.can_manage_warehouse_report_recipients
+            ),
+            can_send=context.can_send_warehouse_reports,
+        ),
+    )
+    return actor_file_sent and not delivery["failed"] and not delivery["pending"]
 
 
 @router.callback_query(WarehouseCallback.filter(F.action == "df"))
@@ -184,6 +225,7 @@ async def report_card(
     callback: CallbackQuery,
     callback_data: WarehouseCallback,
     warehouse_report_service: WarehouseReportService,
+    warehouse_delivery_service: WarehouseReportDeliveryService,
 ) -> None:
     try:
         report = await _thread(
@@ -196,6 +238,10 @@ async def report_card(
         return
     await callback.answer()
     if isinstance(callback.message, Message):
+        context = await _thread(
+            warehouse_delivery_service.access.get_context,
+            callback.from_user.id,
+        )
         await edit_or_send_text(
             callback.message,
             f"📄 <b>Отчёт за "
@@ -207,7 +253,8 @@ async def report_card(
             f"Проработка: {report.get('development_count', 0)} позиций в "
             f"{report.get('development_group_count', 0)} проработках",
             report_card_keyboard(
-                int(report["id"]), return_page=callback_data.aux
+                int(report["id"]), return_page=callback_data.aux,
+                can_send=context.can_send_warehouse_reports,
             ),
         )
 
@@ -250,16 +297,130 @@ async def report_retry(
     callback: CallbackQuery,
     callback_data: WarehouseCallback,
     warehouse_report_service: WarehouseReportService,
+    warehouse_delivery_service: WarehouseReportDeliveryService,
 ) -> None:
     await callback.answer()
     if isinstance(callback.message, Message):
         await build_and_send_final_report(
             callback.message,
             warehouse_report_service,
+            warehouse_delivery_service,
             shift_id=callback_data.object_id,
             actor_user_id=callback.from_user.id,
             allow_empty=False,
         )
+
+
+@router.callback_query(WarehouseCallback.filter(F.action == "ds"))
+async def report_delivery_retry(
+    callback: CallbackQuery,
+    callback_data: WarehouseCallback,
+    warehouse_delivery_service: WarehouseReportDeliveryService,
+) -> None:
+    await callback.answer()
+    if not isinstance(callback.message, Message):
+        return
+    try:
+        result = await warehouse_delivery_service.deliver(
+            callback_data.object_id,
+            actor_user_id=callback.from_user.id,
+            retry_failed=True,
+        )
+    except Exception as exc:
+        await callback.message.answer(_safe_error(exc))
+        return
+    await edit_or_send_text(
+        callback.message,
+        f"✅ Доставлено: {result['delivered']}\n"
+        f"⚠️ Ошибка: {result['failed']}"
+        + (f"\n⏳ Не завершено: {result['pending']}" if result["pending"] else ""),
+        report_delivery_result_keyboard(
+            callback_data.object_id,
+            has_failed=bool(result["failed"] or result["pending"]),
+            can_send=True,
+        ),
+    )
+
+
+@router.callback_query(WarehouseCallback.filter(F.action == "da"))
+async def report_delivery_send(
+    callback: CallbackQuery,
+    callback_data: WarehouseCallback,
+    warehouse_delivery_service: WarehouseReportDeliveryService,
+) -> None:
+    await callback.answer()
+    if not isinstance(callback.message, Message):
+        return
+    try:
+        result = await warehouse_delivery_service.deliver(
+            callback_data.object_id,
+            actor_user_id=callback.from_user.id,
+        )
+    except Exception as exc:
+        await callback.message.answer(_safe_error(exc))
+        return
+    text = (
+        "⚠️ Активных получателей нет. Отправка не выполнялась."
+        if not result["deliveries"]
+        else f"✅ Доставлено: {result['delivered']}\n⚠️ Ошибка: {result['failed']}"
+    )
+    await edit_or_send_text(
+        callback.message,
+        text,
+        report_delivery_result_keyboard(
+            callback_data.object_id,
+            has_failed=bool(result["failed"] or result["pending"]),
+            can_send=True,
+        ),
+    )
+
+
+@router.callback_query(WarehouseCallback.filter(F.action == "dh"))
+async def report_delivery_history(
+    callback: CallbackQuery,
+    callback_data: WarehouseCallback,
+    warehouse_delivery_service: WarehouseReportDeliveryService,
+) -> None:
+    try:
+        result = await _thread(
+            warehouse_delivery_service.history,
+            callback_data.object_id,
+            actor_user_id=callback.from_user.id,
+        )
+    except Exception as exc:
+        await callback.answer(_safe_error(exc), show_alert=True)
+        return
+    await callback.answer()
+    if not isinstance(callback.message, Message):
+        return
+    text = (
+        "📨 <b>Доставка отчёта</b>\n\n"
+        f"✅ Доставлено: {result['delivered']}\n"
+        f"⚠️ Ошибка: {result['failed']}\n"
+        f"⏳ Не завершено: {result['pending']}"
+    )
+    if result["can_view_details"] and result["details"]:
+        labels = {
+            "pending": "⏳ ожидает",
+            "sending": "⏳ отправляется",
+            "delivered": "✅ доставлено",
+            "failed": "⚠️ ошибка",
+        }
+        text += "\n\n" + "\n".join(
+            f"• {row['recipient_title']}: {labels[row['status']]}"
+            for row in result["details"]
+        )
+    await edit_or_send_text(
+        callback.message,
+        text,
+        report_delivery_result_keyboard(
+            callback_data.object_id,
+            has_failed=bool(result["failed"] or result["pending"]),
+            can_send=warehouse_delivery_service.access.can_send_warehouse_reports(
+                callback.from_user.id
+            ),
+        ),
+    )
 
 
 __all__ = ["build_and_send_final_report", "router"]

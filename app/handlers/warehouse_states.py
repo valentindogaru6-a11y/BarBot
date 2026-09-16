@@ -36,3 +36,8 @@ class WarehouseRequiredRuleStates(StatesGroup):
     weekdays = State()
     limits = State()
     sort_order = State()
+
+
+class WarehouseRecipientStates(StatesGroup):
+    chat_id = State()
+    title = State()

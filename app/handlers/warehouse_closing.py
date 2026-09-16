@@ -33,6 +33,8 @@ from app.models.warehouse.nomenclature import BaseUnit
 from app.services.access_service import AccessDeniedError
 from app.services.warehouse.closing_service import WarehouseClosingService
 from app.services.warehouse.report_service import WarehouseReportService
+from app.services.warehouse.delivery_service import WarehouseReportDeliveryService
+from app.services.warehouse.recipient_service import WarehouseRecipientService
 from app.services.warehouse.formatting import (
     format_business_date,
     format_scaled,
@@ -131,6 +133,7 @@ async def _show_session(
     service: WarehouseClosingService,
     session: dict,
     user_id: int,
+    recipient_service: WarehouseRecipientService,
 ) -> None:
     if session.get("shift_status") == "closing" or session["status"] == "completed":
         await state.clear()
@@ -148,16 +151,27 @@ async def _show_session(
             and overview["transfers"] == 0
             and overview.get("developments", 0) == 0
         )
-        if is_empty:
-            text = "В смене нет операций для отчёта. Закрыть её с пустым Excel?"
+        recipient_count = await _thread(
+            recipient_service.active_count, actor_user_id=user_id
+        )
+        context = await _thread(recipient_service.access.get_context, user_id)
+        text = (
+            "⚠️ <b>В смене нет операций для отчёта.</b>\n\n"
+            if is_empty else "✅ <b>Обязательные позиции заполнены</b>\n\n"
+        )
+        text += (
+            f"Смена: {format_business_date(str(overview['shift']['business_date']))}\n"
+            f"Списание: {overview['writeoffs']}\n"
+            f"Перемещение: {overview['transfers']}\n"
+            f"Проработка: {overview.get('developments', 0)}\n"
+            f"Получатели: {recipient_count}\n\n"
+        )
+        if recipient_count:
+            text += "Закрыть смену, сформировать Excel и отправить?"
         else:
-            text = (
-                "✅ <b>Обязательные позиции заполнены</b>\n\n"
-                f"Списание: {overview['writeoffs']} записей\n"
-                f"Перемещение: {overview['transfers']} записей\n"
-                f"Проработка: {overview.get('developments', 0)} позиций в "
-                f"{overview.get('development_groups', 0)} проработках\n\n"
-                "Подготовить смену к формированию отчёта?"
+            text += (
+                "Активных получателей нет. Смена будет закрыта, а готовый "
+                "Excel можно будет скачать без отправки."
             )
         await edit_or_send_text(
             message,
@@ -166,6 +180,10 @@ async def _show_session(
                 int(session["id"]),
                 int(session["revision"]),
                 allow_empty=is_empty,
+                recipient_count=recipient_count,
+                can_manage_recipients=(
+                    context.can_manage_warehouse_report_recipients
+                ),
             ),
         )
         return
@@ -244,6 +262,7 @@ async def closing_start(
     callback: CallbackQuery,
     state: FSMContext,
     warehouse_closing_service: WarehouseClosingService,
+    warehouse_recipient_service: WarehouseRecipientService,
 ) -> None:
     try:
         session = await _thread(
@@ -261,6 +280,7 @@ async def closing_start(
             warehouse_closing_service,
             session,
             callback.from_user.id,
+            warehouse_recipient_service,
         )
 
 
@@ -270,6 +290,7 @@ async def closing_resume(
     callback_data: WarehouseCallback,
     state: FSMContext,
     warehouse_closing_service: WarehouseClosingService,
+    warehouse_recipient_service: WarehouseRecipientService,
 ) -> None:
     try:
         session = await _thread(
@@ -288,6 +309,7 @@ async def closing_resume(
             warehouse_closing_service,
             session,
             callback.from_user.id,
+            warehouse_recipient_service,
         )
 
 
@@ -297,6 +319,7 @@ async def closing_recommended(
     callback_data: WarehouseCallback,
     state: FSMContext,
     warehouse_closing_service: WarehouseClosingService,
+    warehouse_recipient_service: WarehouseRecipientService,
 ) -> None:
     try:
         session = await _thread(
@@ -313,6 +336,7 @@ async def closing_recommended(
         await _show_session(
             callback.message, state, warehouse_closing_service,
             session, callback.from_user.id,
+            warehouse_recipient_service,
         )
 
 
@@ -386,6 +410,7 @@ async def closing_quantity_save(
     callback_data: WarehouseCallback,
     state: FSMContext,
     warehouse_closing_service: WarehouseClosingService,
+    warehouse_recipient_service: WarehouseRecipientService,
 ) -> None:
     data = await state.get_data()
     preview = data.get("closing_preview")
@@ -410,6 +435,7 @@ async def closing_quantity_save(
         await _show_session(
             callback.message, state, warehouse_closing_service,
             session, callback.from_user.id,
+            warehouse_recipient_service,
         )
 
 
@@ -447,6 +473,7 @@ async def closing_not_applicable_choice(
     callback_data: WarehouseCallback,
     state: FSMContext,
     warehouse_closing_service: WarehouseClosingService,
+    warehouse_recipient_service: WarehouseRecipientService,
 ) -> None:
     try:
         session = await _thread(
@@ -464,6 +491,7 @@ async def closing_not_applicable_choice(
         await _show_session(
             callback.message, state, warehouse_closing_service,
             session, callback.from_user.id,
+            warehouse_recipient_service,
         )
 
 
@@ -498,6 +526,7 @@ async def closing_not_applicable_text(
     message: Message,
     state: FSMContext,
     warehouse_closing_service: WarehouseClosingService,
+    warehouse_recipient_service: WarehouseRecipientService,
 ) -> None:
     if message.from_user is None:
         return
@@ -514,7 +543,8 @@ async def closing_not_applicable_text(
         await message.answer(_safe_error(exc))
         return
     await _show_session(
-        message, state, warehouse_closing_service, session, message.from_user.id
+        message, state, warehouse_closing_service, session, message.from_user.id,
+        warehouse_recipient_service,
     )
 
 
@@ -550,6 +580,7 @@ async def closing_finalize(
     state: FSMContext,
     warehouse_closing_service: WarehouseClosingService,
     warehouse_report_service: WarehouseReportService,
+    warehouse_delivery_service: WarehouseReportDeliveryService,
 ) -> None:
     try:
         overview = await _thread(
@@ -589,6 +620,7 @@ async def closing_finalize(
         await build_and_send_final_report(
             callback.message,
             warehouse_report_service,
+            warehouse_delivery_service,
             shift_id=int(
                 result["shift"]["id"]
                 if "shift" in result

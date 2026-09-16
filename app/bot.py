@@ -15,6 +15,7 @@ from app.handlers import (
     voice,
     warehouse,
     warehouse_closing,
+    warehouse_recipients,
     warehouse_reports,
 )
 from app.handlers.admin import router as admin_router
@@ -29,11 +30,18 @@ from app.services.voice_processing_service import VoiceProcessingService
 from app.services.warehouse.operations_service import WarehouseOperationsService
 from app.services.warehouse.closing_service import WarehouseClosingService
 from app.services.warehouse.report_service import WarehouseReportService
+from app.services.warehouse.delivery_service import WarehouseReportDeliveryService
+from app.services.warehouse.recipient_service import WarehouseRecipientService
+from app.services.warehouse.telegram_delivery import (
+    TelegramChatVerifier,
+    TelegramReportSender,
+)
 from app.storage.json_storage import JsonCatalogStorage
 from app.storage.user_database import UserDatabase
 from app.storage.warehouse_operations_database import WarehouseOperationsDatabase
 from app.storage.warehouse_closing_database import WarehouseClosingDatabase
 from app.storage.warehouse_reports_database import WarehouseReportsDatabase
+from app.storage.warehouse_delivery_database import WarehouseDeliveryDatabase
 from app.telegram_commands import configure_bot_commands
 
 
@@ -46,6 +54,7 @@ def router_names(*, warehouse_enabled: bool) -> tuple[str, ...]:
     ]
     if warehouse_enabled:
         names.append("app.handlers.warehouse")
+        names.append("app.handlers.warehouse_recipients")
         names.append("app.handlers.warehouse_closing")
         names.append("app.handlers.warehouse_reports")
     names.append("app.handlers.admin")
@@ -67,6 +76,7 @@ def build_dispatcher(
     dispatcher.include_router(search.router)
     if warehouse_enabled:
         dispatcher.include_router(warehouse.router)
+        dispatcher.include_router(warehouse_recipients.router)
         dispatcher.include_router(warehouse_closing.router)
         dispatcher.include_router(warehouse_reports.router)
     dispatcher.include_router(admin_router)
@@ -113,6 +123,9 @@ async def main() -> None:
     warehouse_service = None
     warehouse_closing_service = None
     warehouse_report_service = None
+    warehouse_recipient_service = None
+    warehouse_delivery_service = None
+    warehouse_chat_verifier = None
     if settings.warehouse_enabled:
         warehouse_service = WarehouseOperationsService(
             WarehouseOperationsDatabase(settings.database_path),
@@ -129,6 +142,20 @@ async def main() -> None:
             auth_service,
             settings.warehouse_reports_path,
         )
+        warehouse_delivery_repository = WarehouseDeliveryDatabase(
+            settings.database_path
+        )
+        warehouse_recipient_service = WarehouseRecipientService(
+            warehouse_delivery_repository,
+            auth_service,
+        )
+        warehouse_delivery_service = WarehouseReportDeliveryService(
+            warehouse_delivery_repository,
+            warehouse_report_service,
+            auth_service,
+            TelegramReportSender(bot),
+        )
+        warehouse_chat_verifier = TelegramChatVerifier(bot)
     dispatcher = build_dispatcher(
         user_service,
         warehouse_enabled=settings.warehouse_enabled,
@@ -153,6 +180,9 @@ async def main() -> None:
             warehouse_service=warehouse_service,
             warehouse_closing_service=warehouse_closing_service,
             warehouse_report_service=warehouse_report_service,
+            warehouse_recipient_service=warehouse_recipient_service,
+            warehouse_delivery_service=warehouse_delivery_service,
+            warehouse_chat_verifier=warehouse_chat_verifier,
             close_bot_session=False,
         )
     finally:

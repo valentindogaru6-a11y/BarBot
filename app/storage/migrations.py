@@ -38,8 +38,14 @@ from app.storage.warehouse_v7_schema import (
     validate_warehouse_v7_schema,
     warehouse_v7_schema_is_absent,
 )
+from app.storage.warehouse_delivery_schema import (
+    WarehouseDeliverySchemaError,
+    create_warehouse_delivery_schema,
+    validate_warehouse_delivery_schema,
+    warehouse_delivery_schema_is_absent,
+)
 
-CURRENT_SCHEMA_VERSION = 7
+CURRENT_SCHEMA_VERSION = 8
 
 USER_COLUMNS = (
     "telegram_user_id",
@@ -311,6 +317,10 @@ def _migrate_v1_to_v2(connection: sqlite3.Connection) -> None:
 
 
 def _validate_schema(connection: sqlite3.Connection, version: int) -> None:
+    if version < 8 and not warehouse_delivery_schema_is_absent(connection):
+        raise SchemaValidationError(
+            "Warehouse delivery tables не должны существовать до schema v8"
+        )
     if version == 1:
         validate_users_schema(connection, 1)
         if (
@@ -431,6 +441,19 @@ def _validate_schema(connection: sqlite3.Connection, version: int) -> None:
         except (WarehouseClosingSchemaError, WarehouseV7SchemaError) as exc:
             raise SchemaValidationError(str(exc)) from exc
         return
+    if version == 8:
+        validate_users_schema(connection, 2)
+        try:
+            validate_warehouse_closing_schema(connection)
+            validate_warehouse_v7_schema(connection)
+            validate_warehouse_delivery_schema(connection)
+        except (
+            WarehouseClosingSchemaError,
+            WarehouseV7SchemaError,
+            WarehouseDeliverySchemaError,
+        ) as exc:
+            raise SchemaValidationError(str(exc)) from exc
+        return
     raise UnsupportedSchemaVersionError(
         f"Неподдерживаемая версия схемы SQLite: {version}"
     )
@@ -473,6 +496,13 @@ def _migrate_v6_to_v7(connection: sqlite3.Connection) -> None:
     _validate_schema(connection, 7)
 
 
+def _migrate_v7_to_v8(connection: sqlite3.Connection) -> None:
+    _validate_schema(connection, 7)
+    create_warehouse_delivery_schema(connection)
+    connection.execute("PRAGMA user_version = 8")
+    _validate_schema(connection, 8)
+
+
 def _create_fresh_v6(connection: sqlite3.Connection) -> None:
     if _table_sql(connection, "users") is not None:
         raise SchemaValidationError(
@@ -488,6 +518,7 @@ def _create_fresh_v6(connection: sqlite3.Connection) -> None:
         or not warehouse_closing_schema_is_absent(connection)
         or not warehouse_reports_schema_is_absent(connection)
         or not warehouse_v7_schema_is_absent(connection)
+        or not warehouse_delivery_schema_is_absent(connection)
     ):
         raise SchemaValidationError(
             "Warehouse tables существуют при нулевой версии схемы"
@@ -508,6 +539,11 @@ def _create_fresh_v7(connection: sqlite3.Connection) -> None:
     _migrate_v6_to_v7(connection)
 
 
+def _create_fresh_v8(connection: sqlite3.Connection) -> None:
+    _create_fresh_v7(connection)
+    _migrate_v7_to_v8(connection)
+
+
 Migration = Callable[[sqlite3.Connection], None]
 MIGRATIONS: dict[int, Migration] = {
     1: _migrate_v1_to_v2,
@@ -516,6 +552,7 @@ MIGRATIONS: dict[int, Migration] = {
     4: _migrate_v4_to_v5,
     5: _migrate_v5_to_v6,
     6: _migrate_v6_to_v7,
+    7: _migrate_v7_to_v8,
 }
 
 
@@ -568,7 +605,7 @@ def run_migrations(connection: sqlite3.Connection) -> None:
     if version == 0:
         _run_atomic_step(
             connection,
-            _create_fresh_v7,
+            _create_fresh_v8,
             disable_foreign_keys=True,
         )
         return

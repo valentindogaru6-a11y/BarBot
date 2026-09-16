@@ -50,11 +50,13 @@ def test_ready_history_card_and_retry_keyboards() -> None:
     assert "➡️" in _texts(history)
     assert _texts(report_card_keyboard(7, return_page=2)) == [
         "📥 Скачать",
+        "📨 Статусы доставки",
         "⬅️ Назад",
         "🏠 Главное меню",
     ]
     assert _texts(report_ready_keyboard(7)) == [
         "📄 Скачать ещё раз",
+        "📨 Статусы доставки",
         "📁 История отчётов",
         "🏠 Главное меню",
     ]
@@ -74,9 +76,11 @@ def test_final_caption_contains_counts_without_internal_metadata() -> None:
 
 
 def test_report_router_and_callbacks_are_compact() -> None:
-    assert len(router.observers["callback_query"].handlers) == 5
+    assert len(router.observers["callback_query"].handlers) == 8
     maximum = 9_223_372_036_854_775_807
-    for action in ("df", "hl", "hv", "hd", "fr", "ce"):
+    for action in (
+        "df", "hl", "hv", "hd", "fr", "ce", "ds", "dh", "da"
+    ):
         value = WarehouseCallback(
             action=action,
             object_id=maximum,

@@ -235,6 +235,9 @@ async def show_warehouse_home(
             can_manage_required_rules=(
                 context.can_manage_warehouse_required_rules
             ),
+            can_manage_report_recipients=(
+                context.can_manage_warehouse_report_recipients
+            ),
         ),
     )
 
