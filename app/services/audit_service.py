@@ -2,6 +2,7 @@
 
 import json
 import logging
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
@@ -14,6 +15,33 @@ class AuditService:
 
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
+
+    def _append(self, record: dict) -> bool:
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o750)
+            descriptor = os.open(
+                self.path,
+                os.O_APPEND | os.O_CREAT | os.O_WRONLY,
+                0o600,
+            )
+            try:
+                os.fchmod(descriptor, 0o600)
+                with os.fdopen(descriptor, "a", encoding="utf-8") as audit_file:
+                    descriptor = -1
+                    audit_file.write(
+                        json.dumps(
+                            record, ensure_ascii=False, separators=(",", ":")
+                        )
+                        + "\n"
+                    )
+                    audit_file.flush()
+            finally:
+                if descriptor >= 0:
+                    os.close(descriptor)
+            return True
+        except OSError:
+            logger.exception("Could not append administrative audit record")
+            return False
 
     def record(
         self,
@@ -40,18 +68,7 @@ class AuditService:
             "description": description,
             "status": status,
         }
-        try:
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            with self.path.open("a", encoding="utf-8") as audit_file:
-                audit_file.write(
-                    json.dumps(record, ensure_ascii=False, separators=(",", ":"))
-                    + "\n"
-                )
-                audit_file.flush()
-            return True
-        except OSError:
-            logger.exception("Could not append administrative audit record")
-            return False
+        return self._append(record)
 
     def record_user_event(
         self,
@@ -76,15 +93,4 @@ class AuditService:
             "status": status,
             "description": description,
         }
-        try:
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            with self.path.open("a", encoding="utf-8") as audit_file:
-                audit_file.write(
-                    json.dumps(record, ensure_ascii=False, separators=(",", ":"))
-                    + "\n"
-                )
-                audit_file.flush()
-            return True
-        except OSError:
-            logger.exception("Could not append user role audit record")
-            return False
+        return self._append(record)

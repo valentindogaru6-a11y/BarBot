@@ -1,5 +1,6 @@
 """ZIP/XML verification of generated XLSX without an Excel reader runtime."""
 
+import stat
 import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
@@ -96,6 +97,7 @@ def test_exact_sheets_columns_numeric_date_and_formatting(tmp_path: Path) -> Non
         project_root=tmp_path,
     )
     artifact = writer.build_final(_report())
+    assert stat.S_IMODE(artifact.path.stat().st_mode) == 0o600
 
     with zipfile.ZipFile(artifact.path) as archive:
         workbook = ET.fromstring(archive.read("xl/workbook.xml"))
@@ -191,6 +193,7 @@ def test_empty_workbook_keeps_both_header_only_sheets(tmp_path: Path) -> None:
         assert set(_cells(archive, "xl/worksheets/sheet3.xml")) == {
             f"{column}1" for column in "ABCDEF"
         }
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600
 
 
 def test_atomic_generation_failure_leaves_no_final_or_temp(
@@ -222,7 +225,9 @@ def test_repeat_publication_verifies_same_file_without_overwrite(
     )
     first = writer.build_final(_report())
     first_bytes = first.path.read_bytes()
+    first.path.chmod(0o644)
     second = writer.build_final(_report())
     assert second.path == first.path
     assert second.file_sha256 == first.file_sha256
     assert second.path.read_bytes() == first_bytes
+    assert stat.S_IMODE(second.path.stat().st_mode) == 0o600

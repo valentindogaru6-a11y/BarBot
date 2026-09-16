@@ -687,6 +687,20 @@ checklist перед подтверждением, выпускает следу
 retry доступны лишь `super_admin` и `admin`. Phase 9 завершена; production
 migration и deployment в рамках разработки не выполнялись.
 
+Phase 10A добавляет безопасный read-only preflight, migration/seed/offline-E2E
+rehearsals и runbooks для backup, rollout и rollback. Target schema — v11.
+Production deployment по-прежнему не выполнялся; Phase 10B допускается только
+после отдельного явного разрешения владельца.
+
+```bash
+python -m app.release_preflight --config-check-only --polling-owner-count 1
+```
+
+Команда читает только process environment и не открывает `.env` сама; значения
+секретов не выводятся. Полный порядок действий описан в
+`docs/production_readiness.md`, `docs/production_rollout.md` и
+`docs/production_rollback.md`.
+
 Backend распознаёт только точные triggers первой непустой строки:
 
 ```text

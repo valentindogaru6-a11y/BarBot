@@ -1,5 +1,6 @@
 """Tests for centralized role resolution and permissions."""
 
+import stat
 from pathlib import Path
 
 import pytest
@@ -201,3 +202,18 @@ def test_audit_failure_does_not_rollback_accountant_role(tmp_path: Path) -> None
 
     assert updated.role is Role.ACCOUNTANT
     assert users.get_user(80).role is Role.ACCOUNTANT
+
+
+def test_audit_log_is_forced_to_owner_only_mode(tmp_path: Path) -> None:
+    path = tmp_path / "logs" / "audit.jsonl"
+    path.parent.mkdir()
+    path.write_text("", encoding="utf-8")
+    path.chmod(0o644)
+    audit = AuditService(path)
+
+    assert audit.record_user_event(
+        actor_user_id=1, target_user_id=2, previous_role="user",
+        new_role="admin", action="role_changed", status="success",
+        description="safe",
+    )
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600

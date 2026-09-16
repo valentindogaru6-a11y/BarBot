@@ -16,6 +16,7 @@ from app.services.warehouse.import_service import WarehouseSeedImportService
 from app.storage.warehouse_seed_database import WarehouseSeedImportError
 
 PRODUCTION_DATABASE = (PROJECT_ROOT / "data" / "barbot.db").resolve()
+PRODUCTION_CONFIRMATION = "APPLY-WAREHOUSE-SEED"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -23,10 +24,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--database", required=True)
     parser.add_argument("--input", required=True)
     parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--allow-production", action="store_true")
+    parser.add_argument("--confirm-production-import")
     arguments = parser.parse_args(argv)
     database = Path(arguments.database)
     if database.resolve() == PRODUCTION_DATABASE:
-        parser.error("production database path is prohibited")
+        if not arguments.allow_production:
+            parser.error("production dry-run requires --allow-production")
+        if arguments.apply and (
+            arguments.confirm_production_import != PRODUCTION_CONFIRMATION
+        ):
+            parser.error(
+                "production apply requires --allow-production and "
+                f"--confirm-production-import {PRODUCTION_CONFIRMATION}"
+            )
     if not database.is_file():
         parser.error("database must already exist")
     try:

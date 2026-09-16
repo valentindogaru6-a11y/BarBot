@@ -247,3 +247,26 @@ def test_cli_requires_database_rejects_production_and_prints_dry_run(
     assert "create=414" in output
     assert "DRY-RUN" in output
     assert _count(database_path, "warehouse_products") == 0
+
+
+def test_cli_production_override_requires_all_explicit_guards(
+    prepared, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    database_path, seed_path, _ = prepared
+    monkeypatch.setattr(
+        import_warehouse_products, "PRODUCTION_DATABASE", database_path.resolve()
+    )
+    base = ["--database", str(database_path), "--input", str(seed_path)]
+    assert import_warehouse_products.main(base + ["--allow-production"]) == 0
+    assert _count(database_path, "warehouse_products") == 0
+    with pytest.raises(SystemExit):
+        import_warehouse_products.main(
+            base + ["--apply", "--allow-production",
+                    "--confirm-production-import", "WRONG"]
+        )
+
+    assert import_warehouse_products.main(
+        base + ["--apply", "--allow-production",
+                "--confirm-production-import", "APPLY-WAREHOUSE-SEED"]
+    ) == 0
+    assert _count(database_path, "warehouse_products") == 414

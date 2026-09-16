@@ -1,6 +1,7 @@
 """Tests for versioned SQLite initialization and migrations."""
 
 import sqlite3
+import stat
 from pathlib import Path
 
 import pytest
@@ -211,6 +212,7 @@ def test_fresh_database_is_created_directly_as_v6(tmp_path: Path) -> None:
         Role.ACCOUNTANT,
         actor_user_id=101,
     )[1].role is Role.ACCOUNTANT
+    assert stat.S_IMODE((tmp_path / "fresh.db").stat().st_mode) == 0o600
 
 
 def test_rejects_unknown_future_schema_version(tmp_path: Path) -> None:

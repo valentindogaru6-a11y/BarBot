@@ -1,5 +1,6 @@
 """SQLite persistence for users and local roles without an ORM."""
 
+import os
 import sqlite3
 from contextlib import contextmanager
 from datetime import UTC, datetime
@@ -48,8 +49,9 @@ class UserDatabase:
     def initialize(self) -> None:
         """Create or safely reuse the current schema."""
 
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o750)
         connection: sqlite3.Connection | None = None
+        initialized = False
         try:
             connection = sqlite3.connect(
                 self.path,
@@ -61,6 +63,7 @@ class UserDatabase:
             connection.execute("PRAGMA busy_timeout = 5000")
             connection.execute("PRAGMA journal_mode = WAL")
             run_migrations(connection)
+            initialized = True
         except sqlite3.Error as exc:
             raise UserDatabaseError(
                 "Не удалось инициализировать базу пользователей"
@@ -68,6 +71,14 @@ class UserDatabase:
         finally:
             if connection is not None:
                 connection.close()
+            if initialized:
+                for sqlite_path in (
+                    self.path,
+                    self.path.with_name(self.path.name + "-wal"),
+                    self.path.with_name(self.path.name + "-shm"),
+                ):
+                    if sqlite_path.exists():
+                        os.chmod(sqlite_path, 0o600)
 
     @staticmethod
     def _record(row: sqlite3.Row | None) -> UserRecord | None:

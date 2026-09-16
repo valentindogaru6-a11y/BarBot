@@ -320,6 +320,7 @@ class WarehouseXlsxReportService:
                         os.fsync(directory_fd)
                     finally:
                         os.close(directory_fd)
+                os.chmod(final_path, 0o600)
             return WarehouseReportArtifact(
                 path=final_path,
                 relative_file_path=relative,
@@ -341,6 +342,7 @@ class WarehouseXlsxReportService:
         destination = Path(directory) / f"warehouse_draft_{business_date}.xlsx"
         _write_workbook(destination, lines, business_date=business_date)
         _validate_xlsx(destination)
+        os.chmod(destination, 0o600)
         return destination
 
     def verify_ready(self, report: dict[str, Any]) -> WarehouseReportArtifact:
