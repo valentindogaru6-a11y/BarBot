@@ -7,7 +7,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove, User
 
-from app.handlers.common import edit_or_send_text
+from app.handlers.common import answer_callback_safely, edit_or_send_text
 from app.keyboards.admin import build_admin_panel_keyboard
 from app.keyboards.admin_callbacks import (
     AdminCancelCallback,
@@ -38,10 +38,13 @@ async def require_admin_callback(
 
     user = callback.from_user
     if not auth_service.is_admin(user.id):
-        await callback.answer("Недостаточно прав", show_alert=True)
+        await answer_callback_safely(
+            callback,
+            "Недостаточно прав",
+            show_alert=True,
+        )
         return False
-    await callback.answer()
-    return True
+    return await answer_callback_safely(callback)
 
 
 async def require_admin_message(

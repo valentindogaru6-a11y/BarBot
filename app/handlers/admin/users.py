@@ -16,7 +16,7 @@ from app.handlers.admin.user_states import (
     UserPickerStates,
     UserSearchStates,
 )
-from app.handlers.common import edit_or_send_text
+from app.handlers.common import answer_callback_safely, edit_or_send_text
 from app.keyboards.user_admin import (
     ROLE_LABELS,
     build_picker_inline_keyboard,
@@ -50,10 +50,13 @@ async def _require_callback(
     auth_service: AuthService,
 ) -> bool:
     if not auth_service.can_manage_users(callback.from_user.id):
-        await callback.answer("Недостаточно прав", show_alert=True)
+        await answer_callback_safely(
+            callback,
+            "Недостаточно прав",
+            show_alert=True,
+        )
         return False
-    await callback.answer()
-    return True
+    return await answer_callback_safely(callback)
 
 
 async def _require_message(

@@ -4,7 +4,8 @@ import logging
 from pathlib import Path
 
 from aiogram.exceptions import TelegramAPIError, TelegramBadRequest
-from aiogram.types import InlineKeyboardMarkup, Message
+from aiogram.methods import AnswerCallbackQuery
+from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 
 from app.models.catalog import Catalog
 from app.storage.json_storage import (
@@ -16,6 +17,43 @@ from app.storage.json_storage import (
 )
 
 logger = logging.getLogger(__name__)
+
+_EXPIRED_CALLBACK_ERROR_MARKERS = (
+    "query is too old",
+    "response timeout expired",
+    "query id is invalid",
+)
+
+
+def is_expired_callback_error(error: BaseException) -> bool:
+    """Return whether Telegram rejected an already expired callback query."""
+
+    if not isinstance(error, TelegramBadRequest) or not isinstance(
+        error.method,
+        AnswerCallbackQuery,
+    ):
+        return False
+    normalized = " ".join(str(error).casefold().split())
+    return any(
+        marker in normalized for marker in _EXPIRED_CALLBACK_ERROR_MARKERS
+    )
+
+
+async def answer_callback_safely(
+    callback: CallbackQuery,
+    *args: object,
+    **kwargs: object,
+) -> bool:
+    """Answer a callback, treating only confirmed expiry as unserviceable."""
+
+    try:
+        await callback.answer(*args, **kwargs)
+    except TelegramBadRequest as exc:
+        if not is_expired_callback_error(exc):
+            raise
+        logger.info("Expired Telegram callback answer ignored")
+        return False
+    return True
 
 
 def load_catalog(path: Path) -> Catalog:

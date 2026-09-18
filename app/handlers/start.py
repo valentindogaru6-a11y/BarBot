@@ -14,7 +14,7 @@ from aiogram.types import (
     ReplyKeyboardRemove,
 )
 
-from app.handlers.common import edit_or_send_text
+from app.handlers.common import edit_or_send_text, is_expired_callback_error
 from app.keyboards.callbacks import MainCallback
 from app.keyboards.main_menu import build_main_menu_keyboard
 from app.middlewares.access import BLOCKED_TEXT
@@ -212,6 +212,10 @@ async def handle_home(
 
 async def handle_unexpected_error(event: ErrorEvent) -> bool:
     """Log unexpected errors and show a safe generic response."""
+
+    if is_expired_callback_error(event.exception):
+        logger.info("Expired Telegram callback ignored")
+        return True
 
     logger.error(
         "Unhandled update error: %s",
