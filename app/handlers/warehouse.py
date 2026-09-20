@@ -382,23 +382,31 @@ async def _show_batch(
             )
             return
     if error_code in {
-        "unknown_destination", "ambiguous_destination", "same_source_destination",
+        "missing_destination", "unknown_destination", "ambiguous_destination",
+        "same_source_destination",
     } and problem.get("product_id"):
         destinations = await _thread(service.destination_options, actor_user_id=user_id)
         destination_text = escape(str(problem.get("destination_text") or ""))
-        destination_error = {
-            "unknown_destination": (
-                f"Направление “{destination_text}” не найдено."
-            ),
-            "ambiguous_destination": (
-                f"Не удалось точно определить направление “{destination_text}”."
-            ),
-            "same_source_destination": (
-                "Источник и направление не могут совпадать."
-            ),
-        }[error_code]
+        if error_code == "missing_destination":
+            quantity = format_scaled(
+                int(problem["quantity_scaled"]), str(problem["base_unit"])
+            )
+            prompt = f"Куда переместить «{escape(product_name)}» — {quantity}?"
+        else:
+            destination_error = {
+                "unknown_destination": (
+                    f"Направление “{destination_text}” не найдено."
+                ),
+                "ambiguous_destination": (
+                    f"Не удалось точно определить направление “{destination_text}”."
+                ),
+                "same_source_destination": (
+                    "Источник и направление не могут совпадать."
+                ),
+            }[error_code]
+            prompt = f"{destination_error}\n\nВыберите направление:"
         await message.answer(
-            f"{destination_error}\n\nВыберите направление:",
+            prompt,
             reply_markup=problem_line_keyboard(
                 int(batch["id"]),
                 int(problem["id"]),
@@ -1964,12 +1972,35 @@ async def edit_destination_start(
     callback_data: WarehouseCallback,
     state: FSMContext,
     auth_service: AuthService,
+    warehouse_service: WarehouseOperationsService,
 ) -> None:
-    await _start_operation_edit(
-        callback, callback_data, state, auth_service,
-        WarehouseOperationEditStates.destination,
-        "Введите новое место назначения.",
+    context = await _thread(auth_service.get_context, callback.from_user.id)
+    if not context.can_mutate_warehouse:
+        await callback.answer("Доступ только для чтения", show_alert=True)
+        return
+    operation = await _thread(
+        warehouse_service.operation_view,
+        callback_data.object_id,
+        actor_user_id=callback.from_user.id,
     )
+    if operation is None or operation["operation_type"] != "transfer":
+        await callback.answer("Перемещение не найдено", show_alert=True)
+        return
+    options = await _thread(
+        warehouse_service.destination_options,
+        actor_user_id=callback.from_user.id,
+    )
+    await callback.answer()
+    await state.set_state(WarehouseOperationEditStates.destination)
+    await state.update_data(
+        operation_id=callback_data.object_id,
+        revision=callback_data.aux,
+    )
+    if isinstance(callback.message, Message):
+        await callback.message.answer(
+            "Выберите новое место назначения:",
+            reply_markup=edit_destination_candidates(callback_data.object_id, options),
+        )
 
 
 @router.callback_query(WarehouseCallback.filter(F.action == "eg"))
@@ -2246,10 +2277,28 @@ async def edit_destination_choice(
     callback: CallbackQuery,
     callback_data: WarehouseCallback,
     state: FSMContext,
+    warehouse_service: WarehouseOperationsService,
 ) -> None:
     data = await state.get_data()
     if int(data.get("operation_id", 0)) != callback_data.object_id:
         await callback.answer("Устаревшая кнопка", show_alert=True)
+        return
+    try:
+        operation = await _thread(
+            warehouse_service.operation_view,
+            callback_data.object_id,
+            actor_user_id=callback.from_user.id,
+        )
+        options = await _thread(
+            warehouse_service.destination_options,
+            actor_user_id=callback.from_user.id,
+        )
+        if operation is None or callback_data.aux not in {
+            location.id for location in options
+        }:
+            raise WarehouseOperationsError("Destination not found")
+    except (AccessDeniedError, WarehouseOperationsError) as exc:
+        await callback.answer(_error_text(exc), show_alert=True)
         return
     await callback.answer()
     await state.set_state(WarehouseOperationEditStates.confirm)

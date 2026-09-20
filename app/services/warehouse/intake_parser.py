@@ -250,19 +250,23 @@ def parse_intake_message(raw_text: str) -> ParsedIntakeMessage:
                 left = core
                 destination = header.header_destination_text
             else:
-                if core.count("->") != 1:
+                arrow_count = core.count("->")
+                if arrow_count > 1:
                     raise IntakeParseError(
                         "invalid_transfer_arrow",
-                        "Перемещение требует ровно одну стрелку ->",
+                        "Перемещение допускает не более одной стрелки ->",
                         line_number=line_number,
                     )
-                left, destination = (part.strip() for part in core.split("->"))
-                if not destination or len(destination) > MAX_NAME_LENGTH:
-                    raise IntakeParseError(
-                        "invalid_destination",
-                        "Некорректное место назначения",
-                        line_number=line_number,
-                    )
+                if arrow_count == 1:
+                    left, destination = (part.strip() for part in core.split("->"))
+                    if not destination or len(destination) > MAX_NAME_LENGTH:
+                        raise IntakeParseError(
+                            "invalid_destination",
+                            "Некорректное место назначения",
+                            line_number=line_number,
+                        )
+                else:
+                    left = core
         else:
             if "->" in core:
                 raise IntakeParseError(

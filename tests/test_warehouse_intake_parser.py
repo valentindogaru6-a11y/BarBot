@@ -59,7 +59,6 @@ def test_final_parenthesized_comment_is_clean_and_not_part_of_product() -> None:
         ("списание: апельсин 1 кг ()", "empty_note"),
         ("списание: апельсин 1 кг (/start)", "invalid_note"),
         ("списание: апельсин 1 (а) (б)", "malformed_parentheses"),
-        ("перемещение: сахар 1 кг кухня", "invalid_transfer_arrow"),
         ("перемещение: сахар 1 кг -> кухня -> бар", "invalid_transfer_arrow"),
         ("перемещение: сахар 1 кг -> ", "invalid_destination"),
     ],
@@ -93,6 +92,27 @@ def test_missing_or_unknown_unit_does_not_pollute_product_text() -> None:
     ).lines[0]
     assert multiword.product_text == "кокосовое молоко"
     assert multiword.quantity_text == "много"
+
+
+@pytest.mark.parametrize("quantity", ("0,33", "0.33"))
+def test_transfer_without_arrow_preserves_parsed_fields(quantity: str) -> None:
+    line = parse_intake_message(
+        f"перемещение: морковь зачищ {quantity}кг (на заготовки)"
+    ).lines[0]
+    assert line.product_text == "морковь зачищ"
+    assert line.quantity_text == quantity
+    assert line.unit_text == "кг"
+    assert line.comment_text == "на заготовки"
+    assert line.destination_text is None
+    assert line.raw_line == f"морковь зачищ {quantity}кг (на заготовки)"
+
+
+def test_transfer_without_arrow_supports_product_name_with_digits() -> None:
+    line = parse_intake_message("перемещение: сироп 1883 1 л").lines[0]
+    assert line.product_text == "сироп 1883"
+    assert line.quantity_text == "1"
+    assert line.unit_text == "л"
+    assert line.destination_text is None
 
 
 def test_reason_and_raw_length_limits() -> None:

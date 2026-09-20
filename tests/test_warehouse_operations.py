@@ -616,3 +616,215 @@ def test_non_admin_cannot_create_unknown_product_and_source_is_kept(
                 operation_types={ProductOperationType.TRANSFER},
             ),
         )
+
+
+def test_transfer_without_destination_needs_button_resolution(
+    environment, monkeypatch
+) -> None:
+    _, _, repository, service, _ = environment
+    batch = _prepare(
+        service,
+        "перемещение: морковь зачищ 0,33 кг",
+        actor=20,
+        message=910,
+    )
+    line = batch["lines"][0]
+    assert batch["status"] == "needs_resolution"
+    assert line["error_code"] == "missing_destination"
+    assert line["product_name"] == "Морковь зачищ"
+    assert line["quantity_scaled"] == 330_000
+    assert line["base_unit"] == "kg"
+    assert line["destination_text"] is None
+    assert line["destination_location_id"] is None
+
+    state, message = _FakeState(), _FakeMessage()
+    monkeypatch.setattr(warehouse_handler, "Message", _FakeMessage)
+    asyncio.run(warehouse_handler._show_batch(message, state, service, batch, 20))
+    assert message.answer.await_args.args[0] == (
+        "Куда переместить «Морковь зачищ» — 0,33 кг?"
+    )
+    markup = message.answer.await_args.kwargs["reply_markup"]
+    assert [button.text for row in markup.inline_keyboard for button in row][:2] == [
+        "🍳 Кухня",
+        "🍰 Кондитерка",
+    ]
+    assert "Бар" not in {
+        button.text for row in markup.inline_keyboard for button in row
+    }
+    assert repository.list_operations(batch["shift_id"]) == []
+
+
+def test_transfer_destination_resolution_sets_both_fields_and_is_idempotent(
+    environment,
+) -> None:
+    _, _, repository, service, _ = environment
+    batch = _prepare(
+        service,
+        "перемещение: сахар 1 кг (на запас)",
+        actor=20,
+        message=911,
+    )
+    line = batch["lines"][0]
+    kitchen, confectionery = service.destination_options(actor_user_id=20)
+    assert (kitchen.name, confectionery.name) == ("Кухня", "Кондитерка")
+
+    resolved = service.resolve_destination(
+        batch["id"], line["id"], kitchen.id, actor_user_id=20
+    )
+    resolved_line = resolved["lines"][0]
+    assert resolved["status"] == "ready"
+    assert resolved_line["destination_text"] == "Кухня"
+    assert resolved_line["destination_location_id"] == kitchen.id
+    again = service.resolve_destination(
+        batch["id"], line["id"], kitchen.id, actor_user_id=20
+    )
+    assert again["lines"][0]["destination_location_id"] == kitchen.id
+    assert repository.list_operations(batch["shift_id"]) == []
+
+
+def test_transfer_destination_rejects_source_inactive_and_non_destination(
+    environment,
+) -> None:
+    path, _, repository, service, _ = environment
+    batch = _prepare(
+        service, "перемещение: сахар 1 кг", actor=20, message=912
+    )
+    line = batch["lines"][0]
+    source_id = int(repository.runtime_settings()["source_location_id"])
+    with pytest.raises(WarehouseOperationsError, match="differ"):
+        service.resolve_destination(
+            batch["id"], line["id"], source_id, actor_user_id=20
+        )
+
+    kitchen, confectionery = service.destination_options(actor_user_id=20)
+    with sqlite3.connect(path) as connection:
+        connection.execute(
+            "UPDATE warehouse_locations SET is_active=0 WHERE id=?", (kitchen.id,)
+        )
+        connection.execute(
+            "UPDATE warehouse_locations "
+            "SET can_be_source=1, can_be_destination=0 WHERE id=?",
+            (confectionery.id,),
+        )
+        connection.commit()
+    assert service.destination_options(actor_user_id=20) == ()
+    for location_id in (kitchen.id, confectionery.id):
+        with pytest.raises(WarehouseOperationsError, match="not found"):
+            service.resolve_destination(
+                batch["id"], line["id"], location_id, actor_user_id=20
+            )
+
+
+def test_transfer_destination_cannot_mutate_cancelled_or_committed_batch(
+    environment,
+) -> None:
+    _, _, _, service, _ = environment
+    kitchen = service.destination_options(actor_user_id=20)[0]
+    cancelled = _prepare(
+        service, "перемещение: сахар 1 кг", actor=20, message=913
+    )
+    cancelled_line = cancelled["lines"][0]
+    service.cancel_batch(cancelled["id"], actor_user_id=20)
+    with pytest.raises(WarehouseOperationsError, match="cannot be changed"):
+        service.resolve_destination(
+            cancelled["id"], cancelled_line["id"], kitchen.id, actor_user_id=20
+        )
+
+    committed = _prepare(
+        service, "перемещение: сахар 1 кг -> кухня", actor=20, message=914
+    )
+    committed_line = committed["lines"][0]
+    service.commit_batch(committed["id"], actor_user_id=20)
+    with pytest.raises(WarehouseOperationsError, match="cannot be changed"):
+        service.resolve_destination(
+            committed["id"], committed_line["id"], kitchen.id,
+            actor_user_id=20,
+        )
+
+
+def test_multiline_transfer_resolves_destinations_in_order_before_commit(
+    environment, monkeypatch
+) -> None:
+    _, _, repository, service, _ = environment
+    batch = _prepare(
+        service,
+        "перемещение:\nморковь зачищ 0,33 кг\nсахар 1 кг",
+        actor=20,
+        message=915,
+    )
+    first, second = batch["lines"]
+    kitchen, confectionery = service.destination_options(actor_user_id=20)
+    assert [line["error_code"] for line in batch["lines"]] == [
+        "missing_destination", "missing_destination"
+    ]
+    state = _FakeState({"batch_id": batch["id"]})
+    message = _FakeMessage()
+    monkeypatch.setattr(warehouse_handler, "Message", _FakeMessage)
+
+    asyncio.run(warehouse_handler._show_batch(message, state, service, batch, 20))
+    assert "Морковь зачищ" in message.answer.await_args.args[0]
+    first_callback = SimpleNamespace(
+        answer=AsyncMock(), from_user=SimpleNamespace(id=20), message=message
+    )
+    asyncio.run(warehouse_handler.batch_resolve_destination(
+        first_callback,
+        SimpleNamespace(object_id=first["id"], aux=kitchen.id),
+        state,
+        service,
+    ))
+    assert "Сахар" in message.answer.await_args.args[0]
+    assert repository.list_operations(batch["shift_id"]) == []
+
+    second_callback = SimpleNamespace(
+        answer=AsyncMock(), from_user=SimpleNamespace(id=20), message=message
+    )
+    asyncio.run(warehouse_handler.batch_resolve_destination(
+        second_callback,
+        SimpleNamespace(object_id=second["id"], aux=confectionery.id),
+        state,
+        service,
+    ))
+    stored = repository.get_batch(batch["id"])
+    assert [line["destination_name"] for line in stored["lines"]] == [
+        "Кухня", "Кондитерка"
+    ]
+    assert repository.list_operations(batch["shift_id"]) == []
+
+
+def test_transfer_without_destination_preserves_other_resolution_errors(
+    environment,
+) -> None:
+    _, _, _, service, _ = environment
+    missing_unit = _prepare(
+        service, "перемещение: морковь зачищ 0,33", actor=20, message=916
+    )
+    line = missing_unit["lines"][0]
+    assert line["error_code"] == "missing_unit"
+    after_unit = service.resolve_unit(
+        missing_unit["id"], line["id"], "кг", actor_user_id=20
+    )
+    assert after_unit["lines"][0]["error_code"] == "missing_destination"
+    service.cancel_batch(missing_unit["id"], actor_user_id=20)
+
+    unknown = _prepare(
+        service, "перемещение: новый продукт 0,25 л", actor=20, message=917
+    )
+    assert unknown["lines"][0]["error_code"] in {
+        "unknown_product", "ambiguous_product"
+    }
+    assert unknown["lines"][0]["destination_text"] is None
+
+
+def test_arrow_transfer_remains_ready_without_destination_prompt(
+    environment, monkeypatch
+) -> None:
+    _, _, _, service, _ = environment
+    batch = _prepare(
+        service, "перемещение: сахар 1 кг -> кухня", actor=20, message=918
+    )
+    assert batch["status"] == "ready"
+    assert batch["lines"][0]["error_code"] is None
+    state, message = _FakeState(), _FakeMessage()
+    monkeypatch.setattr(warehouse_handler, "Message", _FakeMessage)
+    asyncio.run(warehouse_handler._show_batch(message, state, service, batch, 20))
+    assert not message.answer.await_args.args[0].startswith("Куда переместить")

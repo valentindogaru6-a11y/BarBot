@@ -187,8 +187,12 @@ class WarehouseOperationsService:
             error_code=None,
         )
         if operation_type is WarehouseOperationType.TRANSFER:
+            if line.destination_text is None:
+                payload["status"] = "invalid"
+                payload["error_code"] = "missing_destination"
+                return payload
             destination = resolve_destination(
-                line.destination_text or "",
+                line.destination_text,
                 self.repository.locations(),
                 source_location_id=source_location_id,
             )
@@ -648,6 +652,13 @@ class WarehouseOperationsService:
                 actor_user_id=actor_user_id, now=self._now(),
             )
         if operation_type is WarehouseOperationType.TRANSFER and not line["destination_location_id"]:
+            if line.get("destination_text") is None:
+                line["error_code"] = "missing_destination"
+                line["status"] = "invalid"
+                return self.repository.replace_line(
+                    batch_id, line_id, line,
+                    actor_user_id=actor_user_id, now=self._now(),
+                )
             settings = self.repository.runtime_settings()
             destination = resolve_destination(
                 str(line["destination_text"]), self.repository.locations(),
@@ -703,6 +714,14 @@ class WarehouseOperationsService:
         )
         operation_type = WarehouseOperationType(str(batch["operation_type"]))
         if operation_type is WarehouseOperationType.TRANSFER:
+            if line.get("destination_text") is None:
+                line["destination_location_id"] = None
+                line["error_code"] = "missing_destination"
+                line["status"] = "invalid"
+                return self.repository.replace_line(
+                    batch_id, line_id, line,
+                    actor_user_id=actor_user_id, now=self._now(),
+                )
             settings = self.repository.runtime_settings()
             destination = resolve_destination(
                 str(line.get("destination_text") or ""),
@@ -740,11 +759,16 @@ class WarehouseOperationsService:
         if batch is None or location is None or not location.can_be_destination:
             raise WarehouseOperationsError("Destination not found")
         self._require_batch_owner(batch, actor_user_id)
+        if batch["status"] not in {"ready", "needs_resolution"}:
+            raise WarehouseOperationsError("Batch cannot be changed")
         if location.id == int(settings["source_location_id"]):
             raise WarehouseOperationsError("Source and destination must differ")
         line = next((item for item in batch["lines"] if item["id"] == line_id), None)
         if line is None or batch["operation_type"] != "transfer":
             raise WarehouseOperationsError("Transfer line not found")
+        if line.get("destination_location_id") == location.id:
+            return batch
+        line["destination_text"] = location.name
         line["destination_location_id"] = location.id
         line["error_code"] = None
         line["status"] = "resolved" if line.get("product_id") and line.get("quantity_scaled") else "invalid"
@@ -899,10 +923,13 @@ class WarehouseOperationsService:
         self.access.require_warehouse_mutation(actor_user_id)
         settings = self.repository.runtime_settings()
         source_id = int(settings["source_location_id"])
-        return tuple(
-            location for location in self.repository.locations()
-            if location.can_be_destination and location.id != source_id
-        )
+        return tuple(sorted(
+            (
+                location for location in self.repository.locations()
+                if location.can_be_destination and location.id != source_id
+            ),
+            key=lambda location: (location.id, location.name.casefold()),
+        ))
 
     def location_options(self, *, actor_user_id: int) -> tuple:
         """Return active locations for intake-only name validation."""

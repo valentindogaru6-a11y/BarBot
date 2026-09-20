@@ -9,6 +9,16 @@ from app.keyboards.callbacks import MainCallback
 from app.keyboards.warehouse_callbacks import WarehouseCallback
 
 
+def _destination_button_text(name: str) -> str:
+    normalized = name.casefold()
+    emoji = (
+        "🍳" if normalized == "кухня"
+        else "🍰" if normalized == "кондитерка"
+        else "📍"
+    )
+    return f"{emoji} {name}"
+
+
 def warehouse_home_keyboard(
     *,
     can_mutate: bool,
@@ -648,7 +658,7 @@ def problem_line_keyboard(
     elif destinations is not None:
         for location in destinations[:5]:
             builder.button(
-                text=location.name,
+                text=_destination_button_text(location.name),
                 callback_data=WarehouseCallback(action="rd", object_id=line_id, aux=location.id),
             )
     else:
@@ -827,7 +837,7 @@ def edit_destination_candidates(
     builder = InlineKeyboardBuilder()
     for location in locations[:5]:
         builder.button(
-            text=location.name[:64],
+            text=_destination_button_text(location.name)[:64],
             callback_data=WarehouseCallback(
                 action="de", object_id=operation_id, aux=location.id
             ),

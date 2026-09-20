@@ -7,10 +7,12 @@ from app.config import Settings
 from app.handlers.warehouse import WarehouseTriggerFilter, _configured
 from app.keyboards.main_menu import build_main_menu_keyboard
 from app.keyboards.warehouse import (
+    edit_destination_candidates,
     operation_keyboard,
     operation_list_keyboard,
     warehouse_home_keyboard,
 )
+from app.services.warehouse.resolution_service import LocationOption
 from app.keyboards.warehouse_callbacks import WarehouseCallback
 from app.models.user import Role
 from app.services.warehouse.formatting import (
@@ -111,6 +113,19 @@ def test_all_callbacks_fit_telegram_limit_with_64_bit_values() -> None:
             action=action, object_id=maximum, aux=maximum
         ).pack()
         assert len(packed.encode("utf-8")) <= 64
+
+
+def test_destination_keyboards_use_dynamic_location_ids_and_labels() -> None:
+    locations = (
+        LocationOption(17, "Кухня", "кухня", False, True),
+        LocationOption(29, "Кондитерка", "кондитерка", False, True),
+    )
+    markup = edit_destination_candidates(41, locations)
+    buttons = [button for row in markup.inline_keyboard for button in row]
+    assert [button.text for button in buttons[:2]] == ["🍳 Кухня", "🍰 Кондитерка"]
+    unpacked = [WarehouseCallback.unpack(button.callback_data) for button in buttons[:2]]
+    assert [(item.object_id, item.aux) for item in unpacked] == [(41, 17), (41, 29)]
+    assert all(len(button.callback_data.encode("utf-8")) <= 64 for button in buttons)
 
 
 def test_trigger_filter_is_anchored_and_rejects_commands() -> None:
