@@ -1,15 +1,22 @@
+import asyncio
 import shutil
 import sqlite3
 from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
 from app.models.user import Role
+from app.models.warehouse import BaseUnit, ProductOperationType, WarehouseProductCreate
+from app.handlers import warehouse as warehouse_handler
 from app.services.access_service import AccessDeniedError
 from app.services.auth_service import AuthService
 from app.services.user_service import UserService
 from app.services.warehouse.operations_service import WarehouseOperationsService
+from app.services.warehouse.nomenclature_service import WarehouseNomenclatureService
 from app.services.warehouse.seed_service import build_warehouse_seed
 from app.storage.user_database import UserDatabase
 from app.storage.warehouse_operations_database import (
@@ -17,6 +24,7 @@ from app.storage.warehouse_operations_database import (
     WarehouseOperationsError,
     WarehouseRevisionConflict,
 )
+from app.storage.warehouse_database import WarehouseDatabase
 from app.storage.warehouse_seed_database import WarehouseSeedDatabase
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -58,7 +66,7 @@ def environment(database_template: Path, tmp_path: Path):
     return path, users, repository, service, clock
 
 
-def _prepare(service, text="списание: апельсин 0.15", *, actor=20, message=1):
+def _prepare(service, text="списание: апельсин 0.15 кг", *, actor=20, message=1):
     return service.prepare_batch(
         actor_user_id=actor, source_chat_id=777,
         source_message_id=message, raw_text=text,
@@ -72,7 +80,7 @@ def test_prepare_ready_batch_shift_snapshot_and_idempotency(environment) -> None
     assert first["id"] == second["id"]
     assert first["status"] == "ready"
     assert first["lines"][0]["quantity_scaled"] == 150_000
-    assert first["lines"][0]["input_unit_text"] is None
+    assert first["lines"][0]["input_unit_text"] == "кг"
     assert first["shift_id"] == second["shift_id"]
     clock.value = datetime(2026, 9, 8, 21, 1, tzinfo=UTC)
     assert service.repository.get_batch(first["id"])["shift_id"] == first["shift_id"]
@@ -80,7 +88,7 @@ def test_prepare_ready_batch_shift_snapshot_and_idempotency(environment) -> None
 
 def test_unresolved_persists_and_can_be_corrected_or_cancelled(environment) -> None:
     _, _, _, service, _ = environment
-    batch = _prepare(service, "списание: совершенно неизвестное 1", message=2)
+    batch = _prepare(service, "списание: совершенно неизвестное 1 кг", message=2)
     assert batch["status"] == "needs_resolution"
     assert batch["lines"][0]["error_code"] in {"unknown_product", "ambiguous_product"}
     fixed = service.replace_line_input(
@@ -101,7 +109,7 @@ def test_syntax_error_persists_and_only_its_line_is_reparsed(environment) -> Non
         message=222,
     )
     assert batch["status"] == "needs_resolution"
-    assert batch["lines"][0]["error_code"] == "invalid_line"
+    assert batch["lines"][0]["error_code"] == "invalid_quantity"
     assert batch["lines"][1]["status"] == "resolved"
 
     fixed = service.replace_line_input(
@@ -118,7 +126,7 @@ def test_syntax_error_persists_and_only_its_line_is_reparsed(environment) -> Non
 
 def test_fuzzy_candidate_requires_explicit_product_resolution(environment) -> None:
     _, _, repository, service, _ = environment
-    batch = _prepare(service, "списание: апелсин 1", message=22)
+    batch = _prepare(service, "списание: апелсин 1 кг", message=22)
     line = batch["lines"][0]
     assert line["status"] == "ambiguous"
     assert line["product_id"] is None
@@ -134,7 +142,7 @@ def test_fuzzy_candidate_requires_explicit_product_resolution(environment) -> No
     with sqlite3.connect(repository.path) as connection:
         connection.execute("UPDATE warehouse_products SET is_active=0 WHERE id=?", (lime.id,))
         connection.commit()
-    inactive = _prepare(service, "списание: лайм 1", message=23)
+    inactive = _prepare(service, "списание: лайм 1 кг", message=23)
     assert inactive["lines"][0]["product_id"] is None
     assert lime.id not in {
         item["product_id"] for item in inactive["lines"][0]["candidates"]
@@ -144,7 +152,7 @@ def test_fuzzy_candidate_requires_explicit_product_resolution(environment) -> No
 def test_commit_is_atomic_creates_snapshots_and_audit(environment, monkeypatch) -> None:
     path, _, repository, service, _ = environment
     batch = _prepare(
-        service, "списание:\nапельсин 0.15\nлайм 100 г (испорчен)", message=3
+        service, "списание:\nапельсин 0.15 кг\nлайм 100 г (испорчен)", message=3
     )
     operations = service.commit_batch(batch["id"], actor_user_id=20)
     assert len(operations) == 2
@@ -159,7 +167,7 @@ def test_commit_is_atomic_creates_snapshots_and_audit(environment, monkeypatch) 
     with pytest.raises(WarehouseOperationsError, match="not ready"):
         service.commit_batch(batch["id"], actor_user_id=20)
 
-    other = _prepare(service, "списание:\nапельсин 1\nлайм 1", message=4)
+    other = _prepare(service, "списание:\nапельсин 1 кг\nлайм 1 кг", message=4)
     original_audit = repository._audit
     calls = 0
 
@@ -180,7 +188,7 @@ def test_commit_is_atomic_creates_snapshots_and_audit(environment, monkeypatch) 
 
 def test_commit_revalidates_product_and_rolls_back_all_lines(environment) -> None:
     path, _, repository, service, _ = environment
-    batch = _prepare(service, "списание:\nапельсин 1\nлайм 1", message=5)
+    batch = _prepare(service, "списание:\nапельсин 1 кг\nлайм 1 кг", message=5)
     product_id = batch["lines"][-1]["product_id"]
     with sqlite3.connect(path) as connection:
         connection.execute(
@@ -275,9 +283,9 @@ def test_only_one_active_batch_and_batch_ownership(environment) -> None:
 
 def test_aggregates_and_pages_exclude_soft_deleted_operations(environment) -> None:
     _, _, _, service, _ = environment
-    first = _prepare(service, "списание: апельсин 0.15", message=72)
+    first = _prepare(service, "списание: апельсин 0.15 кг", message=72)
     operation = service.commit_batch(first["id"], actor_user_id=20)[0]
-    second = _prepare(service, "списание: апельсин 0.35", message=73)
+    second = _prepare(service, "списание: апельсин 0.35 кг", message=73)
     service.commit_batch(second["id"], actor_user_id=20)
     totals = service.aggregates(operation["shift_id"], actor_user_id=30)
     orange = next(item for item in totals if item["product_name_snapshot"] == "Апельсин")
@@ -341,3 +349,270 @@ def test_role_change_after_prepare_is_rechecked(environment) -> None:
     users.set_role(20, Role.USER, actor_user_id=10)
     with pytest.raises(AccessDeniedError):
         service.commit_batch(batch["id"], actor_user_id=20)
+
+
+class _FakeState:
+    def __init__(self, data: dict | None = None) -> None:
+        self.data = dict(data or {})
+        self.state = None
+
+    async def get_data(self) -> dict:
+        return dict(self.data)
+
+    async def update_data(self, **values) -> None:
+        self.data.update(values)
+
+    async def set_state(self, value) -> None:
+        self.state = value
+
+
+class _FakeMessage:
+    def __init__(self) -> None:
+        self.answer = AsyncMock()
+
+
+def _nomenclature(environment) -> WarehouseNomenclatureService:
+    path, _, _, operations, _ = environment
+    return WarehouseNomenclatureService(WarehouseDatabase(path), operations.access)
+
+
+def _create_product(
+    environment,
+    name: str,
+    *,
+    base_unit: BaseUnit,
+    operations: set[ProductOperationType],
+):
+    return _nomenclature(environment).create_product(
+        10,
+        WarehouseProductCreate(
+            official_name=name,
+            base_unit=base_unit,
+            operation_types=operations,
+        ),
+    )
+
+
+def test_missing_unit_is_not_unknown_product_and_requires_confirmation(
+    environment, monkeypatch
+) -> None:
+    _, _, _, service, _ = environment
+    product = _create_product(
+        environment,
+        "Кокосовое молоко",
+        base_unit=BaseUnit.L,
+        operations={ProductOperationType.TRANSFER},
+    )
+    batch = _prepare(
+        service,
+        "перемещение: кокосовое молоко 0.25 -> кухня",
+        actor=10,
+        message=901,
+    )
+    line = batch["lines"][0]
+    assert line["product_text"] == "кокосовое молоко"
+    assert line["input_quantity_text"] == "0.25"
+    assert line["input_unit_text"] is None
+    assert line["destination_text"] == "кухня"
+    assert line["product_id"] == product.id
+    assert line["error_code"] == "missing_unit"
+    assert line["candidates"] == []
+
+    state = _FakeState()
+    message = _FakeMessage()
+    monkeypatch.setattr(warehouse_handler, "Message", _FakeMessage)
+    asyncio.run(warehouse_handler._show_batch(message, state, service, batch, 10))
+    prompt = message.answer.await_args.args[0]
+    assert prompt == (
+        "Для “Кокосовое молоко” не указана единица измерения. "
+        "Выберите единицу:"
+    )
+
+    resolved = service.resolve_unit(
+        batch["id"], line["id"], "л", actor_user_id=10
+    )
+    resolved_line = resolved["lines"][0]
+    assert resolved["status"] == "ready"
+    assert resolved_line["quantity_scaled"] == 250_000
+    assert Decimal(resolved_line["input_quantity_text"]) == Decimal("0.25")
+    assert not isinstance(resolved_line["input_quantity_text"], float)
+
+
+def test_unknown_product_uses_clean_product_text(environment, monkeypatch) -> None:
+    _, _, _, service, _ = environment
+    batch = _prepare(
+        service,
+        "перемещение: новый сироп 0.25 л -> кухня",
+        actor=10,
+        message=902,
+    )
+    line = batch["lines"][0]
+    assert line["product_text"] == "новый сироп"
+    assert line["input_quantity_text"] == "0.25"
+    assert line["input_unit_text"] == "л"
+    assert line["destination_text"] == "кухня"
+    assert line["product_id"] is None
+    assert line["error_code"] in {"unknown_product", "ambiguous_product"}
+
+    state = _FakeState()
+    message = _FakeMessage()
+    monkeypatch.setattr(warehouse_handler, "Message", _FakeMessage)
+    asyncio.run(warehouse_handler._show_batch(message, state, service, batch, 10))
+    assert message.answer.await_args.args[0].startswith(
+        "Продукт “новый сироп” не найден в номенклатуре."
+    )
+    markup = message.answer.await_args.kwargs["reply_markup"]
+    texts = {button.text for row in markup.inline_keyboard for button in row}
+    assert "➕ Добавить “новый сироп” в номенклатуру" in texts
+    assert {"✏️ Ввести строку заново", "🗑 Убрать строку", "❌ Отменить всё"} <= texts
+
+
+@pytest.mark.parametrize(
+    "value",
+    (
+        "Новый сироп 0.25 л",
+        "Новый сироп -> кухня",
+        "Новый сироп (для кухни)",
+    ),
+)
+def test_canonical_product_name_rejects_intake_fragments(value) -> None:
+    with pytest.raises(ValueError):
+        warehouse_handler._canonical_product_name(value)
+
+
+@pytest.mark.parametrize("value", ("Новый сироп в кухню", "Новый сироп из бара"))
+def test_canonical_product_name_rejects_locations(value) -> None:
+    with pytest.raises(ValueError):
+        warehouse_handler._canonical_product_name(value, ("Кухня", "Бар"))
+
+
+def test_confirmed_unknown_product_creation_continues_and_is_idempotent(
+    environment, monkeypatch
+) -> None:
+    path, _, _, service, _ = environment
+    nomenclature = _nomenclature(environment)
+    batch = _prepare(
+        service,
+        "перемещение: новый сироп 0.25 л -> кухня",
+        actor=10,
+        message=903,
+    )
+    line = batch["lines"][0]
+    state = _FakeState(
+        {
+            "batch_id": batch["id"],
+            "current_line_id": line["id"],
+            "new_product_name": "Новый сироп",
+            "new_product_base_unit": "l",
+            "unknown_product_operation_type": "transfer",
+        }
+    )
+    message = _FakeMessage()
+    callback = SimpleNamespace(
+        answer=AsyncMock(),
+        from_user=SimpleNamespace(id=10),
+        message=message,
+    )
+    callback_data = SimpleNamespace(object_id=line["id"])
+    monkeypatch.setattr(warehouse_handler, "Message", _FakeMessage)
+    shown = AsyncMock()
+    monkeypatch.setattr(warehouse_handler, "_show_batch", shown)
+    before = len(nomenclature.list_products(10))
+
+    for _ in range(2):
+        asyncio.run(
+            warehouse_handler.unknown_product_create_confirm(
+                callback,
+                callback_data,
+                state,
+                service,
+                nomenclature,
+            )
+        )
+
+    assert len(nomenclature.list_products(10)) == before + 1
+    stored = service.repository.get_batch(batch["id"])
+    assert stored["status"] == "ready"
+    assert stored["lines"][0]["product_name"] == "Новый сироп"
+    assert stored["lines"][0]["quantity_scaled"] == 250_000
+    assert shown.await_count == 2
+    with sqlite3.connect(path) as connection:
+        assert connection.execute(
+            "SELECT COUNT(*) FROM warehouse_products WHERE normalized_name='новый сироп'"
+        ).fetchone()[0] == 1
+
+
+def test_unknown_product_add_cancel_creates_nothing(environment, monkeypatch) -> None:
+    _, _, _, service, _ = environment
+    nomenclature = _nomenclature(environment)
+    batch = _prepare(
+        service,
+        "перемещение: отменяемый сироп 0.25 л -> кухня",
+        actor=10,
+        message=904,
+    )
+    line = batch["lines"][0]
+    state = _FakeState({"batch_id": batch["id"], "current_line_id": line["id"]})
+    message = _FakeMessage()
+    callback = SimpleNamespace(
+        answer=AsyncMock(), from_user=SimpleNamespace(id=10), message=message
+    )
+    monkeypatch.setattr(warehouse_handler, "Message", _FakeMessage)
+    monkeypatch.setattr(warehouse_handler, "_show_batch", AsyncMock())
+    before = len(nomenclature.list_products(10))
+
+    asyncio.run(
+        warehouse_handler.unknown_product_add_cancel(
+            callback, SimpleNamespace(object_id=line["id"]), state, service
+        )
+    )
+
+    assert len(nomenclature.list_products(10)) == before
+    assert service.repository.get_batch(batch["id"])["status"] == "needs_resolution"
+
+
+def test_non_admin_cannot_create_unknown_product_and_source_is_kept(
+    environment, monkeypatch
+) -> None:
+    _, _, _, service, _ = environment
+    nomenclature = _nomenclature(environment)
+    batch = _prepare(
+        service,
+        "перемещение: барменский сироп 0.25 л -> кухня",
+        actor=20,
+        message=905,
+    )
+    line = batch["lines"][0]
+    state = _FakeState({"batch_id": batch["id"], "current_line_id": line["id"]})
+    message = _FakeMessage()
+    callback = SimpleNamespace(
+        answer=AsyncMock(), from_user=SimpleNamespace(id=20), message=message
+    )
+    callback_data = SimpleNamespace(object_id=line["id"])
+    monkeypatch.setattr(warehouse_handler, "Message", _FakeMessage)
+    before = len(nomenclature.list_products(10))
+
+    asyncio.run(
+        warehouse_handler.unknown_product_add_start(
+            callback, callback_data, state, service.access, service
+        )
+    )
+
+    assert len(nomenclature.list_products(10)) == before
+    assert state.data["unknown_product_text"] == "барменский сироп"
+    assert state.data["unknown_product_raw_line"] == (
+        "барменский сироп 0.25 л -> кухня"
+    )
+    markup = message.answer.await_args.kwargs["reply_markup"]
+    assert "📨 Отправить запрос администратору" in {
+        button.text for row in markup.inline_keyboard for button in row
+    }
+    with pytest.raises(AccessDeniedError):
+        nomenclature.create_product(
+            20,
+            WarehouseProductCreate(
+                official_name="Барменский сироп",
+                base_unit=BaseUnit.L,
+                operation_types={ProductOperationType.TRANSFER},
+            ),
+        )

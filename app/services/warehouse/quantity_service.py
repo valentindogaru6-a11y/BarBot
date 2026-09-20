@@ -29,6 +29,12 @@ _BASE_DIMENSION = {
     BaseUnit.PCS: "count",
 }
 
+_UNIT_CHOICES = {
+    BaseUnit.KG: (("кг", "кг"), ("г", "г")),
+    BaseUnit.L: (("л", "л"), ("мл", "мл")),
+    BaseUnit.PCS: (("шт", "шт"),),
+}
+
 
 class QuantityError(ValueError):
     def __init__(self, code: str, message: str) -> None:
@@ -43,6 +49,14 @@ class ParsedQuantity:
     input_quantity_text: str
     input_unit_text: str | None
     unit_was_defaulted: bool
+
+
+def compatible_unit_choices(
+    base_unit: BaseUnit | str,
+) -> tuple[tuple[str, str], ...]:
+    """Return explicit input values and user-facing labels for a base unit."""
+
+    return _UNIT_CHOICES[BaseUnit(base_unit)]
 
 
 def parse_quantity(

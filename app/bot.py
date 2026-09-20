@@ -31,6 +31,7 @@ from app.services.speech_service import SpeechService
 from app.services.user_service import UserService
 from app.services.voice_processing_service import VoiceProcessingService
 from app.services.warehouse.operations_service import WarehouseOperationsService
+from app.services.warehouse.nomenclature_service import WarehouseNomenclatureService
 from app.services.warehouse.closing_service import WarehouseClosingService
 from app.services.warehouse.report_service import WarehouseReportService
 from app.services.warehouse.correction_service import WarehouseCorrectionService
@@ -47,6 +48,7 @@ from app.services.warehouse.schedule_service import WarehouseScheduleService
 from app.storage.json_storage import JsonCatalogStorage
 from app.storage.user_database import UserDatabase
 from app.storage.warehouse_operations_database import WarehouseOperationsDatabase
+from app.storage.warehouse_database import WarehouseDatabase
 from app.storage.warehouse_closing_database import WarehouseClosingDatabase
 from app.storage.warehouse_reports_database import WarehouseReportsDatabase
 from app.storage.warehouse_correction_database import WarehouseCorrectionDatabase
@@ -164,6 +166,7 @@ async def main() -> None:
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
     warehouse_service = None
+    warehouse_nomenclature_service = None
     warehouse_closing_service = None
     warehouse_report_service = None
     warehouse_correction_service = None
@@ -176,6 +179,10 @@ async def main() -> None:
     if settings.warehouse_enabled:
         warehouse_service = WarehouseOperationsService(
             WarehouseOperationsDatabase(settings.database_path),
+            auth_service,
+        )
+        warehouse_nomenclature_service = WarehouseNomenclatureService(
+            WarehouseDatabase(settings.database_path),
             auth_service,
         )
         warehouse_closing_service = WarehouseClosingService(
@@ -246,6 +253,7 @@ async def main() -> None:
             voice_processing_service=voice_processing_service,
             warehouse_enabled=settings.warehouse_enabled,
             warehouse_service=warehouse_service,
+            warehouse_nomenclature_service=warehouse_nomenclature_service,
             warehouse_closing_service=warehouse_closing_service,
             warehouse_report_service=warehouse_report_service,
             warehouse_correction_service=warehouse_correction_service,

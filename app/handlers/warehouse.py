@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from html import escape
 
-from aiogram import F, Router
+from aiogram import Bot, F, Router
 from aiogram.filters import BaseFilter, Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
@@ -25,6 +26,9 @@ from app.keyboards.warehouse import (
     edit_destination_candidates,
     edit_product_candidates,
     intake_prompt_keyboard,
+    nomenclature_confirm_keyboard,
+    nomenclature_request_keyboard,
+    nomenclature_unit_keyboard,
     operation_keyboard,
     operation_list_keyboard,
     problem_line_keyboard,
@@ -34,6 +38,12 @@ from app.keyboards.warehouse import (
 )
 from app.keyboards.warehouse_callbacks import WarehouseCallback
 from app.models.user import Role
+from app.models.warehouse import (
+    BaseUnit,
+    ProductOperationType,
+    WarehouseProduct,
+    WarehouseProductCreate,
+)
 from app.models.warehouse.operations import WarehouseOperationType
 from app.services.access_service import AccessDeniedError
 from app.services.auth_service import AuthService
@@ -55,12 +65,19 @@ from app.services.warehouse.operations_service import (
     WarehouseIntakeError,
     WarehouseOperationsService,
 )
+from app.services.warehouse.nomenclature_service import WarehouseNomenclatureService
 from app.services.warehouse.closing_service import WarehouseClosingService
-from app.services.warehouse.quantity_service import QuantityError, parse_quantity
+from app.services.warehouse.quantity_service import (
+    QuantityError,
+    compatible_unit_choices,
+    parse_quantity,
+)
+from app.storage.warehouse_database import WarehouseNameConflictError
 from app.storage.warehouse_operations_database import (
     WarehouseOperationsError,
     WarehouseRevisionConflict,
 )
+from app.utils.warehouse import normalize_warehouse_name
 
 router = Router(name=__name__)
 logger = logging.getLogger(__name__)
@@ -68,9 +85,9 @@ logger = logging.getLogger(__name__)
 WAREHOUSE_TITLE = "📦 <b>Складские операции</b>"
 WRITEOFF_PROMPT = (
     "Отправьте одну или несколько позиций, каждую с новой строки.\n\n"
-    "Пример:\nапельсин 0.15\nморковь 300 г (сгнила)\n\n"
-    "Единицу можно не указывать — тогда будет использована основная "
-    "единица продукта."
+    "Пример:\nапельсин 0.15 кг\nморковь 300 г (сгнила)\n\n"
+    "Указывайте единицу явно. Если её пропустить, бот попросит выбрать "
+    "единицу перед сохранением."
 )
 TRANSFER_PROMPT = (
     "Отправьте одну или несколько позиций, каждую с новой строки.\n\n"
@@ -82,6 +99,53 @@ DEVELOPMENT_BODY_PROMPT = (
     "Пример:\nоблепиха 0.25 кг\nпюре маракуйя 0.1 кг\n"
     "сироп сахарный 0.15 л"
 )
+
+_BASE_UNITS = (BaseUnit.KG, BaseUnit.L, BaseUnit.PCS)
+_NUMBER_TOKEN_RE = re.compile(
+    r"(?:^|\s)[+-]?(?:\d+(?:[.,]\d+)?|[.,]\d+)(?:\s|$)"
+)
+_UNIT_TOKEN_RE = re.compile(
+    r"(?:^|\s)(?:кг|kg|г|гр|g|л|l|мл|ml|шт\.?|pcs)(?:\s|$)",
+    re.IGNORECASE,
+)
+
+
+def _canonical_product_name(
+    value: str,
+    location_names: tuple[str, ...] = (),
+) -> str:
+    """Reject intake syntax so only a product name reaches nomenclature."""
+
+    cleaned = value.strip()
+    if not cleaned or len(cleaned) > 200:
+        raise ValueError("Название должно содержать от 1 до 200 символов.")
+    if "->" in cleaned or "(" in cleaned or ")" in cleaned:
+        raise ValueError(
+            "Введите только название — без стрелки, направления и комментария."
+        )
+    if _NUMBER_TOKEN_RE.search(cleaned) or _UNIT_TOKEN_RE.search(cleaned):
+        raise ValueError(
+            "Введите только название — без количества и единицы измерения."
+        )
+    normalized = normalize_warehouse_name(cleaned)
+    for location_name in location_names:
+        location = normalize_warehouse_name(location_name)
+        variants = {location}
+        if location.endswith("а"):
+            variants.add(location[:-1] + "у")
+        elif location.endswith("я"):
+            variants.add(location[:-1] + "ю")
+        elif location and location[-1].isalpha():
+            variants.add(location + "а")
+        if any(
+            normalized == variant
+            or normalized.endswith((f" из {variant}", f" в {variant}", f" на {variant}"))
+            for variant in variants
+        ):
+            raise ValueError(
+                "Введите только название — без источника или направления."
+            )
+    return cleaned
 
 
 class WarehouseTriggerFilter(BaseFilter):
@@ -274,21 +338,58 @@ async def _show_batch(
         current_line_id=int(problem["id"]),
     )
     raw = escape(str(problem["raw_line"]))
+    product_text = str(problem.get("product_text") or "").strip()
+    product_name = str(problem.get("product_name") or product_text).strip()
+    error_code = str(problem.get("error_code") or "")
     candidates = problem.get("candidates") or []
-    if candidates:
+    if error_code in {"unknown_product", "ambiguous_product"} and product_text:
         await message.answer(
-            f"Не удалось точно определить продукт:\n\n«{raw}»\n\n"
-            "Выберите продукт:",
+            f"Продукт “{escape(product_text)}” не найден в номенклатуре.\n\n"
+            + ("Возможно, вы имели в виду:" if candidates else ""),
             reply_markup=problem_line_keyboard(
-                int(batch["id"]), int(problem["id"]), candidates
+                int(batch["id"]), int(problem["id"]), candidates,
+                unknown_product_text=product_text,
             ),
         )
         return
-    if problem.get("destination_text") and problem.get("product_id"):
+    if error_code in {"missing_unit", "unsupported_unit", "incompatible_unit"}:
+        product = await _thread(
+            service.product_option,
+            int(problem["product_id"]),
+            actor_user_id=user_id,
+        )
+        if product is not None:
+            lead = (
+                f"Для “{escape(product_name)}” не указана единица измерения."
+                if error_code == "missing_unit"
+                else f"Для “{escape(product_name)}” указана неизвестная или несовместимая единица."
+            )
+            await message.answer(
+                f"{lead} Выберите единицу:",
+                reply_markup=problem_line_keyboard(
+                    int(batch["id"]), int(problem["id"]), [],
+                    units=compatible_unit_choices(product.base_unit),
+                ),
+            )
+            return
+    if error_code in {
+        "unknown_destination", "ambiguous_destination", "same_source_destination",
+    } and problem.get("product_id"):
         destinations = await _thread(service.destination_options, actor_user_id=user_id)
+        destination_text = escape(str(problem.get("destination_text") or ""))
+        destination_error = {
+            "unknown_destination": (
+                f"Направление “{destination_text}” не найдено."
+            ),
+            "ambiguous_destination": (
+                f"Не удалось точно определить направление “{destination_text}”."
+            ),
+            "same_source_destination": (
+                "Источник и направление не могут совпадать."
+            ),
+        }[error_code]
         await message.answer(
-            f"Не удалось точно определить место:\n\n«{raw}»\n\n"
-            "Выберите место:",
+            f"{destination_error}\n\nВыберите направление:",
             reply_markup=problem_line_keyboard(
                 int(batch["id"]),
                 int(problem["id"]),
@@ -298,7 +399,7 @@ async def _show_batch(
         )
         return
     reasons = {
-        "invalid_line": "не найдено корректное количество",
+        "invalid_line": "неверное количество",
         "invalid_transfer_arrow": "нужна ровно одна стрелка -> и место назначения",
         "invalid_destination": "не указано корректное место назначения",
         "header_destination_conflict": (
@@ -308,6 +409,9 @@ async def _show_batch(
         "incompatible_unit": "единица несовместима с основной единицей продукта",
         "unsupported_unit": "единица измерения не поддерживается",
         "invalid_quantity": "не найдено корректное количество",
+        "non_positive_quantity": "количество должно быть больше нуля",
+        "excess_precision": "у количества слишком высокая точность",
+        "quantity_overflow": "количество превышает допустимый предел",
         "unknown_product": "продукт не найден",
     }
     reason = reasons.get(str(problem.get("error_code")), "строка содержит ошибку")
@@ -705,6 +809,327 @@ async def batch_resolve_product(
             await callback.message.answer(_error_text(exc))
         return
     if isinstance(callback.message, Message):
+        await _show_batch(
+            callback.message, state, warehouse_service, batch, callback.from_user.id
+        )
+
+
+@router.callback_query(WarehouseCallback.filter(F.action == "ru"))
+async def batch_resolve_unit(
+    callback: CallbackQuery,
+    callback_data: WarehouseCallback,
+    state: FSMContext,
+    warehouse_service: WarehouseOperationsService,
+) -> None:
+    await callback.answer()
+    data = await state.get_data()
+    batch_id = int(data.get("batch_id", 0))
+    try:
+        batch = await _thread(
+            warehouse_service.owned_batch,
+            batch_id,
+            actor_user_id=callback.from_user.id,
+        )
+        line = next(
+            item for item in batch["lines"]
+            if int(item["id"]) == callback_data.object_id
+        )
+        product = await _thread(
+            warehouse_service.product_option,
+            int(line["product_id"]),
+            actor_user_id=callback.from_user.id,
+        )
+        if product is None or callback_data.aux not in range(
+            1, len(compatible_unit_choices(product.base_unit)) + 1
+        ):
+            raise WarehouseOperationsError("Unit choice is not available")
+        choices = compatible_unit_choices(product.base_unit)
+        unit_text = choices[callback_data.aux - 1][0]
+        batch = await _thread(
+            warehouse_service.resolve_unit,
+            batch_id,
+            callback_data.object_id,
+            unit_text,
+            actor_user_id=callback.from_user.id,
+        )
+    except Exception as exc:
+        if isinstance(callback.message, Message):
+            await callback.message.answer(_error_text(exc))
+        return
+    if isinstance(callback.message, Message):
+        await _show_batch(
+            callback.message, state, warehouse_service, batch, callback.from_user.id
+        )
+
+
+@router.callback_query(WarehouseCallback.filter(F.action == "np"))
+async def unknown_product_add_start(
+    callback: CallbackQuery,
+    callback_data: WarehouseCallback,
+    state: FSMContext,
+    auth_service: AuthService,
+    warehouse_service: WarehouseOperationsService,
+) -> None:
+    await callback.answer()
+    data = await state.get_data()
+    batch_id = int(data.get("batch_id", 0))
+    try:
+        batch = await _thread(
+            warehouse_service.owned_batch,
+            batch_id,
+            actor_user_id=callback.from_user.id,
+        )
+        line = next(
+            item for item in batch["lines"]
+            if int(item["id"]) == callback_data.object_id
+        )
+        product_text = str(line.get("product_text") or "").strip()
+        if not product_text or line.get("product_id") is not None:
+            raise WarehouseOperationsError("Unknown product line not found")
+    except (AccessDeniedError, StopIteration, WarehouseOperationsError) as exc:
+        if isinstance(callback.message, Message):
+            await callback.message.answer(_error_text(exc))
+        return
+    await state.update_data(
+        batch_id=batch_id,
+        current_line_id=callback_data.object_id,
+        unknown_product_text=product_text,
+        unknown_product_raw_line=str(line["raw_line"]),
+        unknown_product_operation_type=str(batch["operation_type"]),
+    )
+    context = auth_service.get_context(callback.from_user.id)
+    if not context.can_manage_warehouse_nomenclature:
+        if isinstance(callback.message, Message):
+            await callback.message.answer(
+                "У вас нет прав на изменение номенклатуры. "
+                "Можно отправить запрос администратору.",
+                reply_markup=nomenclature_request_keyboard(callback_data.object_id),
+            )
+        return
+    await state.set_state(WarehouseIntakeStates.new_product_name)
+    if isinstance(callback.message, Message):
+        await callback.message.answer(
+            f"Введите каноническое название продукта.\n\n"
+            f"Распознано: “{escape(product_text)}”\n\n"
+            "Укажите только название, без количества, единицы, направления и комментария."
+        )
+
+
+@router.message(WarehouseIntakeStates.new_product_name, F.text)
+async def unknown_product_name_input(
+    message: Message,
+    state: FSMContext,
+    warehouse_service: WarehouseOperationsService,
+) -> None:
+    try:
+        if message.from_user is None:
+            return
+        locations = await _thread(
+            warehouse_service.location_options,
+            actor_user_id=message.from_user.id,
+        )
+        name = _canonical_product_name(
+            message.text or "",
+            tuple(location.name for location in locations),
+        )
+    except ValueError as exc:
+        await message.answer(str(exc))
+        return
+    data = await state.get_data()
+    await state.update_data(new_product_name=name)
+    await state.set_state(WarehouseIntakeStates.new_product_unit)
+    await message.answer(
+        f"Выберите базовую единицу для “{escape(name)}”:",
+        reply_markup=nomenclature_unit_keyboard(int(data["current_line_id"])),
+    )
+
+
+@router.callback_query(WarehouseCallback.filter(F.action == "nu"))
+async def unknown_product_unit_choice(
+    callback: CallbackQuery,
+    callback_data: WarehouseCallback,
+    state: FSMContext,
+) -> None:
+    await callback.answer()
+    data = await state.get_data()
+    if (
+        int(data.get("current_line_id", 0)) != callback_data.object_id
+        or callback_data.aux not in range(1, len(_BASE_UNITS) + 1)
+        or not data.get("new_product_name")
+    ):
+        if isinstance(callback.message, Message):
+            await callback.message.answer("Сценарий добавления устарел. Начните заново.")
+        return
+    base_unit = _BASE_UNITS[callback_data.aux - 1]
+    await state.update_data(new_product_base_unit=base_unit.value)
+    await state.set_state(WarehouseIntakeStates.new_product_confirm)
+    if isinstance(callback.message, Message):
+        await callback.message.answer(
+            "Проверьте новый продукт:\n\n"
+            f"Название: <b>{escape(str(data['new_product_name']))}</b>\n"
+            f"Базовая единица: <b>{base_unit.value}</b>\n\n"
+            "Продукт будет создан только после подтверждения.",
+            reply_markup=nomenclature_confirm_keyboard(callback_data.object_id),
+        )
+
+
+def _operation_product_type(value: str) -> ProductOperationType:
+    return {
+        WarehouseOperationType.WRITEOFF.value: ProductOperationType.PRODUCT_WRITEOFF,
+        WarehouseOperationType.TRANSFER.value: ProductOperationType.TRANSFER,
+        WarehouseOperationType.DEVELOPMENT.value: ProductOperationType.DEVELOPMENT,
+    }[value]
+
+
+def _create_or_reuse_intake_product(
+    service: WarehouseNomenclatureService,
+    actor_user_id: int,
+    command: WarehouseProductCreate,
+) -> WarehouseProduct:
+    """Create once, or reuse the same active product after a repeated callback."""
+
+    try:
+        return service.create_product(actor_user_id, command)
+    except WarehouseNameConflictError:
+        normalized = normalize_warehouse_name(command.official_name)
+        return next(
+            product
+            for product in service.list_products(
+                actor_user_id, include_inactive=False
+            )
+            if product.normalized_name == normalized
+            and product.base_unit == command.base_unit
+            and command.operation_types.issubset(product.operation_types)
+        )
+
+
+@router.callback_query(WarehouseCallback.filter(F.action == "nc"))
+async def unknown_product_create_confirm(
+    callback: CallbackQuery,
+    callback_data: WarehouseCallback,
+    state: FSMContext,
+    warehouse_service: WarehouseOperationsService,
+    warehouse_nomenclature_service: WarehouseNomenclatureService,
+) -> None:
+    await callback.answer()
+    data = await state.get_data()
+    if int(data.get("current_line_id", 0)) != callback_data.object_id:
+        if isinstance(callback.message, Message):
+            await callback.message.answer("Сценарий добавления устарел. Начните заново.")
+        return
+    try:
+        locations = await _thread(
+            warehouse_service.location_options,
+            actor_user_id=callback.from_user.id,
+        )
+        name = _canonical_product_name(
+            str(data["new_product_name"]),
+            tuple(location.name for location in locations),
+        )
+        base_unit = BaseUnit(str(data["new_product_base_unit"]))
+        operation_type = _operation_product_type(
+            str(data["unknown_product_operation_type"])
+        )
+        command = WarehouseProductCreate(
+            official_name=name,
+            base_unit=base_unit,
+            aliases=[],
+            operation_types={operation_type},
+        )
+        product = await _thread(
+            _create_or_reuse_intake_product,
+            warehouse_nomenclature_service,
+            callback.from_user.id,
+            command,
+        )
+        batch = await _thread(
+            warehouse_service.resolve_product,
+            int(data["batch_id"]),
+            callback_data.object_id,
+            product.id,
+            actor_user_id=callback.from_user.id,
+        )
+    except (AccessDeniedError, KeyError, StopIteration, ValueError, WarehouseOperationsError) as exc:
+        if isinstance(callback.message, Message):
+            await callback.message.answer(_error_text(exc))
+        return
+    await state.set_state(WarehouseIntakeStates.resolving)
+    if isinstance(callback.message, Message):
+        await callback.message.answer(f"Продукт “{escape(product.official_name)}” создан.")
+        await _show_batch(
+            callback.message, state, warehouse_service, batch, callback.from_user.id
+        )
+
+
+@router.callback_query(WarehouseCallback.filter(F.action == "nr"))
+async def unknown_product_request_admin(
+    callback: CallbackQuery,
+    callback_data: WarehouseCallback,
+    state: FSMContext,
+    bot: Bot,
+    auth_service: AuthService,
+) -> None:
+    await callback.answer()
+    data = await state.get_data()
+    if int(data.get("current_line_id", 0)) != callback_data.object_id:
+        return
+    recipients = set(auth_service.super_admin_ids)
+    if auth_service.user_service is not None:
+        admins, _, _ = await _thread(
+            auth_service.user_service.list_users,
+            role=Role.ADMIN,
+            page_size=100_000,
+        )
+        recipients.update(
+            user.telegram_user_id
+            for user in admins
+            if user.is_active and user.has_started
+        )
+    recipients.discard(callback.from_user.id)
+    sent = 0
+    request_text = (
+        "📨 <b>Запрос на добавление складского продукта</b>\n\n"
+        f"Продукт: “{escape(str(data.get('unknown_product_text') or ''))}”\n"
+        f"Исходная строка: “{escape(str(data.get('unknown_product_raw_line') or ''))}”"
+    )
+    for recipient in recipients:
+        try:
+            await bot.send_message(recipient, request_text)
+            sent += 1
+        except Exception:
+            logger.warning("Warehouse nomenclature request delivery failed")
+    if isinstance(callback.message, Message):
+        await callback.message.answer(
+            "Запрос отправлен администратору. Исходная строка сохранена."
+            if sent
+            else "Не удалось доставить запрос администратору. Исходная строка сохранена."
+        )
+
+
+@router.callback_query(WarehouseCallback.filter(F.action == "nx"))
+async def unknown_product_add_cancel(
+    callback: CallbackQuery,
+    callback_data: WarehouseCallback,
+    state: FSMContext,
+    warehouse_service: WarehouseOperationsService,
+) -> None:
+    await callback.answer()
+    data = await state.get_data()
+    if int(data.get("current_line_id", 0)) != callback_data.object_id:
+        if isinstance(callback.message, Message):
+            await callback.message.answer("Сценарий добавления устарел. Начните заново.")
+        return
+    try:
+        batch = await _thread(
+            warehouse_service.owned_batch,
+            int(data.get("batch_id", 0)),
+            actor_user_id=callback.from_user.id,
+        )
+    except (AccessDeniedError, WarehouseOperationsError):
+        batch = None
+    await state.set_state(WarehouseIntakeStates.resolving)
+    if isinstance(callback.message, Message) and batch is not None:
+        await callback.message.answer("Добавление продукта отменено.")
         await _show_batch(
             callback.message, state, warehouse_service, batch, callback.from_user.id
         )

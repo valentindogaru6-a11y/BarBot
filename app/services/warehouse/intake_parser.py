@@ -25,9 +25,18 @@ _UNIT_PATTERN = (
     r"л|l|литр(?:а|ов)?|мл|ml|миллилитр(?:а|ов)?|"
     r"шт\.|шт|pcs|штук(?:а|и)?"
 )
+_NUMBER_PATTERN = r"(?:\d+(?:[.,]\d+)?|[.,]\d+)"
 _LEFT_RE = re.compile(
-    rf"^(?P<product>.+?)\s+(?P<quantity>(?:\d+(?:[.,]\d+)?|[.,]\d+))"
-    rf"\s*(?P<unit>{_UNIT_PATTERN})?$",
+    rf"^(?P<product>.+?)\s+(?P<quantity>{_NUMBER_PATTERN})"
+    r"(?:\s*(?P<unit>\S+))?$",
+    re.IGNORECASE,
+)
+_INVALID_QUANTITY_WITH_UNIT_RE = re.compile(
+    rf"^(?P<product>.+?)\s+(?P<quantity>\S+)\s+(?P<unit>{_UNIT_PATTERN})$",
+    re.IGNORECASE,
+)
+_INVALID_QUANTITY_RE = re.compile(
+    r"^(?P<product>.+?)\s+(?P<quantity>\S+)$",
     re.IGNORECASE,
 )
 
@@ -162,11 +171,18 @@ def _extract_final_note(value: str, line_number: int) -> tuple[str, str | None]:
 def _parse_left(value: str, line_number: int) -> tuple[str, str, str | None]:
     match = _LEFT_RE.fullmatch(value.strip())
     if match is None:
-        raise IntakeParseError(
-            "invalid_line",
-            "Ожидаются название продукта и положительное количество",
-            line_number=line_number,
-        )
+        # Preserve the product part even when the quantity token is malformed.
+        # This lets the service report an invalid quantity independently from
+        # product matching instead of treating the complete line as a name.
+        match = _INVALID_QUANTITY_WITH_UNIT_RE.fullmatch(value.strip())
+        if match is None:
+            match = _INVALID_QUANTITY_RE.fullmatch(value.strip())
+        if match is None:
+            raise IntakeParseError(
+                "invalid_line",
+                "Ожидаются название продукта и количество",
+                line_number=line_number,
+            )
     product = match.group("product").strip()
     if not product or len(product) > MAX_NAME_LENGTH:
         raise IntakeParseError(
@@ -174,7 +190,7 @@ def _parse_left(value: str, line_number: int) -> tuple[str, str, str | None]:
             "Некорректное название продукта",
             line_number=line_number,
         )
-    return product, match.group("quantity"), match.group("unit")
+    return product, match.group("quantity"), match.groupdict().get("unit")
 
 
 def parse_intake_message(raw_text: str) -> ParsedIntakeMessage:

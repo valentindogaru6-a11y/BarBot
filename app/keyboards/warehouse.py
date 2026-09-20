@@ -576,9 +576,19 @@ def problem_line_keyboard(
     candidates: list[dict],
     *,
     destinations: tuple | None = None,
+    units: tuple[tuple[str, str], ...] | None = None,
+    unknown_product_text: str | None = None,
 ) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    if destinations is not None:
+    if units is not None:
+        for index, (_, label) in enumerate(units, start=1):
+            builder.button(
+                text=label,
+                callback_data=WarehouseCallback(
+                    action="ru", object_id=line_id, aux=index
+                ),
+            )
+    elif destinations is not None:
         for location in destinations[:5]:
             builder.button(
                 text=location.name,
@@ -592,9 +602,60 @@ def problem_line_keyboard(
                     action="rp", object_id=line_id, aux=int(candidate["product_id"])
                 ),
             )
+    if unknown_product_text is not None:
+        label = f"➕ Добавить “{unknown_product_text}” в номенклатуру"
+        builder.button(
+            text=label[:64],
+            callback_data=WarehouseCallback(action="np", object_id=line_id),
+        )
     builder.button(text="✏️ Ввести строку заново", callback_data=WarehouseCallback(action="cl", object_id=line_id))
     builder.button(text="🗑 Убрать строку", callback_data=WarehouseCallback(action="rl", object_id=line_id))
     builder.button(text="❌ Отменить всё", callback_data=WarehouseCallback(action="bx", object_id=batch_id))
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def nomenclature_unit_keyboard(line_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for index, label in enumerate(("кг", "л", "шт"), start=1):
+        builder.button(
+            text=label,
+            callback_data=WarehouseCallback(
+                action="nu", object_id=line_id, aux=index
+            ),
+        )
+    builder.button(
+        text="❌ Отменить добавление",
+        callback_data=WarehouseCallback(action="nx", object_id=line_id),
+    )
+    builder.adjust(3, 1)
+    return builder.as_markup()
+
+
+def nomenclature_confirm_keyboard(line_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text="✅ Создать продукт",
+        callback_data=WarehouseCallback(action="nc", object_id=line_id),
+    )
+    builder.button(
+        text="❌ Отменить добавление",
+        callback_data=WarehouseCallback(action="nx", object_id=line_id),
+    )
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def nomenclature_request_keyboard(line_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text="📨 Отправить запрос администратору",
+        callback_data=WarehouseCallback(action="nr", object_id=line_id),
+    )
+    builder.button(
+        text="⬅️ Вернуться к строке",
+        callback_data=WarehouseCallback(action="nx", object_id=line_id),
+    )
     builder.adjust(1)
     return builder.as_markup()
 

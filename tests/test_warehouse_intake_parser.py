@@ -42,13 +42,37 @@ def test_reason_transfer_comment_and_product_digits() -> None:
         ("перемещение: сахар 1 кг кухня", "invalid_transfer_arrow"),
         ("перемещение: сахар 1 кг -> кухня -> бар", "invalid_transfer_arrow"),
         ("перемещение: сахар 1 кг -> ", "invalid_destination"),
-        ("списание: сахар xx", "invalid_line"),
     ],
 )
 def test_invalid_grammar(text, code) -> None:
     with pytest.raises(IntakeParseError) as caught:
         parse_intake_message(text)
     assert caught.value.code == code
+
+
+def test_missing_or_unknown_unit_does_not_pollute_product_text() -> None:
+    missing = parse_intake_message(
+        "перемещение:\nкокосовое молоко 0.25 -> кухня"
+    ).lines[0]
+    assert missing.product_text == "кокосовое молоко"
+    assert missing.quantity_text == "0.25"
+    assert missing.unit_text is None
+    assert missing.destination_text == "кухня"
+
+    unknown = parse_intake_message("списание: сахар 1 ведро").lines[0]
+    assert unknown.product_text == "сахар"
+    assert unknown.quantity_text == "1"
+    assert unknown.unit_text == "ведро"
+
+    invalid = parse_intake_message("списание: сахар много").lines[0]
+    assert invalid.product_text == "сахар"
+    assert invalid.quantity_text == "много"
+
+    multiword = parse_intake_message(
+        "списание: кокосовое молоко много"
+    ).lines[0]
+    assert multiword.product_text == "кокосовое молоко"
+    assert multiword.quantity_text == "много"
 
 
 def test_reason_and_raw_length_limits() -> None:
