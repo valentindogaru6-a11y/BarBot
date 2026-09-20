@@ -555,6 +555,63 @@ def batch_keyboard(batch_id: int) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
+def line_comment_choice_keyboard(
+    batch_id: int,
+    line_id: int,
+) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text="💬 Добавить комментарий",
+        callback_data=WarehouseCallback(action="ja", object_id=line_id),
+    )
+    builder.button(
+        text="⏭ Без комментария",
+        callback_data=WarehouseCallback(action="js", object_id=line_id),
+    )
+    builder.button(
+        text="✏️ Исправить позицию",
+        callback_data=WarehouseCallback(action="cl", object_id=line_id),
+    )
+    builder.button(
+        text="❌ Отменить",
+        callback_data=WarehouseCallback(action="bx", object_id=batch_id),
+    )
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def line_comment_confirm_keyboard(
+    batch_id: int,
+    line_id: int,
+    *,
+    has_comment: bool,
+) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text="✅ Подтвердить",
+        callback_data=WarehouseCallback(action="jc", object_id=line_id),
+    )
+    builder.button(
+        text="✏️ Изменить позицию",
+        callback_data=WarehouseCallback(action="cl", object_id=line_id),
+    )
+    builder.button(
+        text="💬 Изменить комментарий",
+        callback_data=WarehouseCallback(action="jm", object_id=line_id),
+    )
+    if has_comment:
+        builder.button(
+            text="🗑 Удалить комментарий",
+            callback_data=WarehouseCallback(action="jd", object_id=line_id),
+        )
+    builder.button(
+        text="❌ Отменить",
+        callback_data=WarehouseCallback(action="bx", object_id=batch_id),
+    )
+    builder.adjust(1)
+    return builder.as_markup()
+
+
 def batch_lines_keyboard(batch: dict) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for number, line in enumerate(batch["lines"], start=1):

@@ -152,11 +152,17 @@ def _extract_final_note(value: str, line_number: int) -> tuple[str, str | None]:
             "Комментарий должен быть в одной паре скобок в конце строки",
             line_number=line_number,
         )
-    note = match.group(1).strip()
+    note = " ".join(match.group(1).split())
     if not note:
         raise IntakeParseError(
             "empty_note",
             "Пустой комментарий",
+            line_number=line_number,
+        )
+    if note.startswith("/"):
+        raise IntakeParseError(
+            "invalid_note",
+            "Команда не может быть комментарием",
             line_number=line_number,
         )
     if len(note) > MAX_NOTE_LENGTH:

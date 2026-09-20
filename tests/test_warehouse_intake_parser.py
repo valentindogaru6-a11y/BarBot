@@ -30,6 +30,24 @@ def test_reason_transfer_comment_and_product_digits() -> None:
     assert moved.lines[0].comment_text == "для десертов"
 
 
+def test_final_parenthesized_comment_is_clean_and_not_part_of_product() -> None:
+    written = parse_intake_message(
+        "списание: морковь 0,5 кг (  сгнила: партия № 12!  )"
+    ).lines[0]
+    assert written.product_text == "морковь"
+    assert written.quantity_text == "0,5"
+    assert written.unit_text == "кг"
+    assert written.reason_text == "сгнила: партия № 12!"
+    assert "(" not in written.product_text and ")" not in written.product_text
+
+    moved = parse_intake_message(
+        "перемещение: кокосовое молоко 0,25 л -> кухня (передано кондитеру)"
+    ).lines[0]
+    assert moved.product_text == "кокосовое молоко"
+    assert moved.destination_text == "кухня"
+    assert moved.comment_text == "передано кондитеру"
+
+
 @pytest.mark.parametrize(
     ("text", "code"),
     [
@@ -38,6 +56,8 @@ def test_reason_transfer_comment_and_product_digits() -> None:
         ("/списание: апельсин 1", "not_trigger"),
         ("списание:", "empty_body"),
         ("списание: апельсин 1 (плохо", "malformed_parentheses"),
+        ("списание: апельсин 1 кг ()", "empty_note"),
+        ("списание: апельсин 1 кг (/start)", "invalid_note"),
         ("списание: апельсин 1 (а) (б)", "malformed_parentheses"),
         ("перемещение: сахар 1 кг кухня", "invalid_transfer_arrow"),
         ("перемещение: сахар 1 кг -> кухня -> бар", "invalid_transfer_arrow"),

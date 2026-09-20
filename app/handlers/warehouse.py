@@ -26,6 +26,8 @@ from app.keyboards.warehouse import (
     edit_destination_candidates,
     edit_product_candidates,
     intake_prompt_keyboard,
+    line_comment_choice_keyboard,
+    line_comment_confirm_keyboard,
     nomenclature_confirm_keyboard,
     nomenclature_request_keyboard,
     nomenclature_unit_keyboard,
@@ -171,6 +173,8 @@ def _error_text(error: Exception) -> str:
         return "Эта запись уже подтверждена или больше не готова к сохранению."
     if "belongs to another" in value:
         return "Эта незавершённая запись принадлежит другому сотруднику."
+    if "подтвердите комментарий" in value:
+        return "Сначала подтвердите комментарий для каждой позиции."
     if isinstance(error, QuantityError):
         return str(error)
     if isinstance(error, WarehouseIntakeError):
@@ -324,6 +328,11 @@ async def _show_batch(
         None,
     )
     if problem is None:
+        if (
+            batch["operation_type"] in {"writeoff", "transfer"}
+            and await _show_next_comment_line(message, state, batch)
+        ):
+            return
         await state.set_state(WarehouseIntakeStates.resolving)
         await state.update_data(batch_id=int(batch["id"]), current_line_id=0)
         await _send_chunks(
@@ -422,6 +431,106 @@ async def _show_batch(
             int(batch["id"]), int(problem["id"]), []
         ),
     )
+
+
+def _line_note(batch: dict, line: dict) -> str | None:
+    value = (
+        line.get("reason_text")
+        if batch["operation_type"] == "writeoff"
+        else line.get("comment_text")
+    )
+    return str(value) if value else None
+
+
+def _line_confirmation_text(batch: dict, line: dict) -> str:
+    name = escape(str(line.get("product_name") or line.get("product_text") or "—"))
+    quantity = format_scaled(int(line["quantity_scaled"]), str(line["base_unit"]))
+    kind = "списание" if batch["operation_type"] == "writeoff" else "перемещение"
+    lines = [
+        "<b>Позиция распознана:</b>",
+        f"{name} — {quantity}",
+        f"Операция: {kind}",
+    ]
+    if batch["operation_type"] == "transfer":
+        destination = escape(
+            str(line.get("destination_name") or line.get("destination_text") or "—")
+        )
+        lines.extend(("Из: Бар", f"В: {destination}"))
+    note = _line_note(batch, line)
+    lines.append(
+        f"Комментарий: {escape(note) if note else 'без комментария'}"
+    )
+    return "\n".join(lines)
+
+
+async def _show_line_confirmation(
+    message: Message,
+    state: FSMContext,
+    batch: dict,
+    line: dict,
+) -> None:
+    await state.set_state(WarehouseIntakeStates.comment_confirm)
+    await state.update_data(
+        batch_id=int(batch["id"]),
+        current_line_id=int(line["id"]),
+    )
+    await message.answer(
+        _line_confirmation_text(batch, line),
+        reply_markup=line_comment_confirm_keyboard(
+            int(batch["id"]),
+            int(line["id"]),
+            has_comment=_line_note(batch, line) is not None,
+        ),
+    )
+
+
+async def _show_next_comment_line(
+    message: Message,
+    state: FSMContext,
+    batch: dict,
+) -> bool:
+    data = await state.get_data()
+    same_batch = int(data.get("batch_id", 0)) == int(batch["id"])
+    confirmed = {
+        int(value)
+        for value in data.get("comment_confirmed_line_ids", [])
+    } if same_batch else set()
+    valid_ids = {int(line["id"]) for line in batch["lines"]}
+    confirmed &= valid_ids
+    line = next(
+        (item for item in batch["lines"] if int(item["id"]) not in confirmed),
+        None,
+    )
+    await state.update_data(
+        batch_id=int(batch["id"]),
+        comment_confirmed_line_ids=sorted(confirmed),
+    )
+    if line is None:
+        return False
+    if _line_note(batch, line) is not None:
+        await _show_line_confirmation(message, state, batch, line)
+        return True
+    await state.set_state(WarehouseIntakeStates.comment_choice)
+    await state.update_data(current_line_id=int(line["id"]))
+    name = escape(str(line.get("product_name") or line.get("product_text") or "—"))
+    quantity = format_scaled(int(line["quantity_scaled"]), str(line["base_unit"]))
+    kind = "списание" if batch["operation_type"] == "writeoff" else "перемещение"
+    direction = ""
+    if batch["operation_type"] == "transfer":
+        destination = escape(
+            str(line.get("destination_name") or line.get("destination_text") or "—")
+        )
+        direction = f"\nИз: Бар\nВ: {destination}"
+    await message.answer(
+        "<b>Позиция распознана:</b>\n"
+        f"{name} — {quantity}\n"
+        f"Операция: {kind}{direction}\n\n"
+        "Хотите добавить комментарий?",
+        reply_markup=line_comment_choice_keyboard(
+            int(batch["id"]), int(line["id"])
+        ),
+    )
+    return True
 
 
 async def _prepare(
@@ -1162,6 +1271,223 @@ async def batch_resolve_destination(
         )
 
 
+async def _comment_batch_line(
+    state: FSMContext,
+    service: WarehouseOperationsService,
+    *,
+    actor_user_id: int,
+    line_id: int,
+    expected_states: set[str],
+) -> tuple[dict, dict]:
+    current_state = await state.get_state()
+    data = await state.get_data()
+    if (
+        current_state not in expected_states
+        or int(data.get("current_line_id", 0)) != line_id
+    ):
+        raise WarehouseOperationsError("Comment step is no longer active")
+    batch = await _thread(
+        service.owned_batch,
+        int(data.get("batch_id", 0)),
+        actor_user_id=actor_user_id,
+    )
+    if batch is None or batch["operation_type"] not in {"writeoff", "transfer"}:
+        raise WarehouseOperationsError("Comment batch is not available")
+    line = next(
+        (item for item in batch["lines"] if int(item["id"]) == line_id),
+        None,
+    )
+    if line is None or line["status"] != "resolved":
+        raise WarehouseOperationsError("Comment line is not available")
+    return batch, line
+
+
+@router.callback_query(WarehouseCallback.filter(F.action == "ja"))
+@router.callback_query(WarehouseCallback.filter(F.action == "jm"))
+async def line_comment_input_start(
+    callback: CallbackQuery,
+    callback_data: WarehouseCallback,
+    state: FSMContext,
+    warehouse_service: WarehouseOperationsService,
+) -> None:
+    await callback.answer()
+    expected = {
+        WarehouseIntakeStates.comment_choice.state
+        if callback_data.action == "ja"
+        else WarehouseIntakeStates.comment_confirm.state
+    }
+    try:
+        await _comment_batch_line(
+            state,
+            warehouse_service,
+            actor_user_id=callback.from_user.id,
+            line_id=callback_data.object_id,
+            expected_states=expected,
+        )
+    except (AccessDeniedError, WarehouseOperationsError) as exc:
+        if isinstance(callback.message, Message):
+            await callback.message.answer(_error_text(exc))
+        return
+    await state.set_state(WarehouseIntakeStates.comment_text)
+    await state.update_data(comment_mode=callback_data.action)
+    if isinstance(callback.message, Message):
+        await callback.message.answer(
+            "Напишите, что произошло с продуктом.\n"
+            "Например: испортился, упал, использован для проработки"
+        )
+
+
+@router.message(WarehouseIntakeStates.comment_text, F.text)
+async def line_comment_text(
+    message: Message,
+    state: FSMContext,
+    warehouse_service: WarehouseOperationsService,
+) -> None:
+    if message.from_user is None:
+        return
+    value = message.text or ""
+    if value.lstrip().startswith("/"):
+        await message.answer("Команда не может быть комментарием. Введите обычный текст.")
+        return
+    cleaned = " ".join(value.split())
+    if not cleaned:
+        await message.answer("Комментарий не может быть пустым.")
+        return
+    if len(cleaned) > 500:
+        await message.answer("Комментарий слишком длинный. Максимум — 500 символов.")
+        return
+    data = await state.get_data()
+    line_id = int(data.get("current_line_id", 0))
+    try:
+        batch, _ = await _comment_batch_line(
+            state,
+            warehouse_service,
+            actor_user_id=message.from_user.id,
+            line_id=line_id,
+            expected_states={WarehouseIntakeStates.comment_text.state},
+        )
+        batch = await _thread(
+            warehouse_service.update_intake_line_comment,
+            int(batch["id"]),
+            line_id,
+            cleaned,
+            actor_user_id=message.from_user.id,
+        )
+    except (AccessDeniedError, WarehouseIntakeError, WarehouseOperationsError) as exc:
+        await message.answer(_error_text(exc))
+        return
+    line = next(item for item in batch["lines"] if int(item["id"]) == line_id)
+    await _show_line_confirmation(message, state, batch, line)
+
+
+@router.callback_query(WarehouseCallback.filter(F.action == "js"))
+async def line_comment_skip(
+    callback: CallbackQuery,
+    callback_data: WarehouseCallback,
+    state: FSMContext,
+    warehouse_service: WarehouseOperationsService,
+) -> None:
+    await callback.answer()
+    try:
+        batch, _ = await _comment_batch_line(
+            state,
+            warehouse_service,
+            actor_user_id=callback.from_user.id,
+            line_id=callback_data.object_id,
+            expected_states={WarehouseIntakeStates.comment_choice.state},
+        )
+        batch = await _thread(
+            warehouse_service.update_intake_line_comment,
+            int(batch["id"]),
+            callback_data.object_id,
+            None,
+            actor_user_id=callback.from_user.id,
+        )
+    except (AccessDeniedError, WarehouseIntakeError, WarehouseOperationsError) as exc:
+        if isinstance(callback.message, Message):
+            await callback.message.answer(_error_text(exc))
+        return
+    if isinstance(callback.message, Message):
+        line = next(
+            item for item in batch["lines"]
+            if int(item["id"]) == callback_data.object_id
+        )
+        await _show_line_confirmation(callback.message, state, batch, line)
+
+
+@router.callback_query(WarehouseCallback.filter(F.action == "jd"))
+async def line_comment_delete(
+    callback: CallbackQuery,
+    callback_data: WarehouseCallback,
+    state: FSMContext,
+    warehouse_service: WarehouseOperationsService,
+) -> None:
+    await callback.answer()
+    try:
+        batch, line = await _comment_batch_line(
+            state,
+            warehouse_service,
+            actor_user_id=callback.from_user.id,
+            line_id=callback_data.object_id,
+            expected_states={WarehouseIntakeStates.comment_confirm.state},
+        )
+        if _line_note(batch, line) is None:
+            raise WarehouseOperationsError("Comment is already absent")
+        batch = await _thread(
+            warehouse_service.update_intake_line_comment,
+            int(batch["id"]),
+            callback_data.object_id,
+            None,
+            actor_user_id=callback.from_user.id,
+        )
+    except (AccessDeniedError, WarehouseIntakeError, WarehouseOperationsError) as exc:
+        if isinstance(callback.message, Message):
+            await callback.message.answer(_error_text(exc))
+        return
+    if isinstance(callback.message, Message):
+        line = next(
+            item for item in batch["lines"]
+            if int(item["id"]) == callback_data.object_id
+        )
+        await _show_line_confirmation(callback.message, state, batch, line)
+
+
+@router.callback_query(WarehouseCallback.filter(F.action == "jc"))
+async def line_comment_confirm(
+    callback: CallbackQuery,
+    callback_data: WarehouseCallback,
+    state: FSMContext,
+    warehouse_service: WarehouseOperationsService,
+) -> None:
+    await callback.answer()
+    try:
+        batch, _ = await _comment_batch_line(
+            state,
+            warehouse_service,
+            actor_user_id=callback.from_user.id,
+            line_id=callback_data.object_id,
+            expected_states={WarehouseIntakeStates.comment_confirm.state},
+        )
+    except (AccessDeniedError, WarehouseOperationsError) as exc:
+        if isinstance(callback.message, Message):
+            await callback.message.answer(_error_text(exc))
+        return
+    data = await state.get_data()
+    confirmed = {
+        int(value) for value in data.get("comment_confirmed_line_ids", [])
+    }
+    confirmed.add(callback_data.object_id)
+    await state.update_data(comment_confirmed_line_ids=sorted(confirmed))
+    if isinstance(callback.message, Message):
+        await _show_batch(
+            callback.message,
+            state,
+            warehouse_service,
+            batch,
+            callback.from_user.id,
+        )
+
+
 @router.callback_query(WarehouseCallback.filter(F.action == "cl"))
 async def line_correction_start(
     callback: CallbackQuery,
@@ -1170,10 +1496,15 @@ async def line_correction_start(
 ) -> None:
     await callback.answer()
     data = await state.get_data()
+    confirmed = {
+        int(value) for value in data.get("comment_confirmed_line_ids", [])
+    }
+    confirmed.discard(callback_data.object_id)
     await state.set_state(WarehouseIntakeStates.correcting_line)
     await state.update_data(
         batch_id=int(data.get("batch_id", 0)),
         current_line_id=callback_data.object_id,
+        comment_confirmed_line_ids=sorted(confirmed),
     )
     if isinstance(callback.message, Message):
         await callback.message.answer("Отправьте исправленную строку целиком.")
@@ -1287,6 +1618,28 @@ async def batch_commit(
 ) -> None:
     await callback.answer()
     try:
+        batch = await _thread(
+            warehouse_service.owned_batch,
+            callback_data.object_id,
+            actor_user_id=callback.from_user.id,
+        )
+        if batch is None:
+            raise WarehouseOperationsError("Batch is not available")
+        if batch["operation_type"] in {"writeoff", "transfer"}:
+            data = await state.get_data()
+            confirmed = {
+                int(value)
+                for value in data.get("comment_confirmed_line_ids", [])
+            }
+            line_ids = {int(line["id"]) for line in batch["lines"]}
+            if (
+                int(data.get("batch_id", 0)) != int(batch["id"])
+                or not line_ids
+                or not line_ids <= confirmed
+            ):
+                raise WarehouseOperationsError(
+                    "Сначала подтвердите комментарий для каждой позиции"
+                )
         operations = await _thread(
             warehouse_service.commit_batch,
             callback_data.object_id,

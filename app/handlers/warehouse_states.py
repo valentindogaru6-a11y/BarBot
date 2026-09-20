@@ -14,6 +14,9 @@ class WarehouseIntakeStates(StatesGroup):
     new_product_name = State()
     new_product_unit = State()
     new_product_confirm = State()
+    comment_choice = State()
+    comment_text = State()
+    comment_confirm = State()
 
 
 class WarehouseOperationEditStates(StatesGroup):

@@ -79,13 +79,19 @@ def batch_preview(batch: dict) -> list[str]:
         quantity = format_scaled(int(line["quantity_scaled"]), str(line["base_unit"]))
         suffix = " <i>(единица подставлена)</i>" if not line.get("input_unit_text") else ""
         lines.append(f"{number}. {name} — {quantity}{suffix}")
-        if line.get("reason_text"):
-            lines.append(f"   Причина: {escape(str(line['reason_text']))}")
-        if line.get("comment_text"):
-            lines.append(f"   Комментарий: {escape(str(line['comment_text']))}")
         if batch["operation_type"] == "transfer":
             destination = escape(str(line.get("destination_name") or line.get("destination_text") or "—"))
             lines.append(f"   Бар → {destination}")
+        note = (
+            line.get("reason_text")
+            if batch["operation_type"] == "writeoff"
+            else line.get("comment_text")
+        )
+        if batch["operation_type"] in {"writeoff", "transfer"}:
+            rendered_note = escape(str(note)) if note else "без комментария"
+            lines.append(f"   Комментарий: {rendered_note}")
+        elif line.get("comment_text"):
+            lines.append(f"   Комментарий: {escape(str(line['comment_text']))}")
     lines.extend(("", f"Всего позиций: {len(batch['lines'])}"))
     return split_telegram_lines(lines)
 

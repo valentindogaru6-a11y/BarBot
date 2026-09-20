@@ -752,6 +752,54 @@ class WarehouseOperationsService:
             batch_id, line_id, line, actor_user_id=actor_user_id, now=self._now()
         )
 
+    def update_intake_line_comment(
+        self,
+        batch_id: int,
+        line_id: int,
+        comment: str | None,
+        *,
+        actor_user_id: int,
+    ) -> dict[str, Any]:
+        """Persist an explicitly reviewed per-line note in an uncommitted batch."""
+
+        self.access.require_warehouse_mutation(actor_user_id)
+        batch = self.repository.get_batch(batch_id)
+        if batch is None:
+            raise WarehouseOperationsError("Batch not found")
+        self._require_batch_owner(batch, actor_user_id)
+        operation_type = WarehouseOperationType(str(batch["operation_type"]))
+        if operation_type not in {
+            WarehouseOperationType.WRITEOFF,
+            WarehouseOperationType.TRANSFER,
+        }:
+            raise WarehouseOperationsError(
+                "Comments are managed separately for this operation type"
+            )
+        line = next((item for item in batch["lines"] if item["id"] == line_id), None)
+        if line is None or line["status"] != "resolved":
+            raise WarehouseOperationsError("Resolved batch line not found")
+        cleaned = " ".join(comment.split()) if comment is not None else None
+        if cleaned == "":
+            raise WarehouseIntakeError("empty_comment: Комментарий не может быть пустым")
+        if cleaned is not None and len(cleaned) > 500:
+            raise WarehouseIntakeError(
+                "comment_too_long: Максимальная длина комментария — 500 символов"
+            )
+        if operation_type is WarehouseOperationType.WRITEOFF:
+            line["reason_text"] = cleaned
+            line["comment_text"] = None
+        else:
+            line["reason_text"] = None
+            line["comment_text"] = cleaned
+        line["candidates"] = []
+        return self.repository.replace_line(
+            batch_id,
+            line_id,
+            line,
+            actor_user_id=actor_user_id,
+            now=self._now(),
+        )
+
     def cancel_batch(self, batch_id: int, *, actor_user_id: int) -> dict[str, Any]:
         self.access.require_warehouse_mutation(actor_user_id)
         batch = self.repository.get_batch(batch_id)

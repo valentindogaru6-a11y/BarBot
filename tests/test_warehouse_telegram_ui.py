@@ -105,6 +105,7 @@ def test_all_callbacks_fit_telegram_limit_with_64_bit_values() -> None:
         "ki", "ks", "ke", "k1", "k2", "k3", "k4", "k5", "ku", "kj",
         "ky", "kx", "kz", "kr", "kb", "kn", "km", "kh",
         "ru", "np", "nu", "nc", "nr", "nx",
+        "ja", "js", "jc", "jm", "jd",
     ):
         packed = WarehouseCallback(
             action=action, object_id=maximum, aux=maximum
