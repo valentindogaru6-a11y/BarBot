@@ -2,12 +2,21 @@
 
 from __future__ import annotations
 
+import re
+from collections import Counter
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 
 from app.models.warehouse.nomenclature import BaseUnit
 from app.models.warehouse.operations import WarehouseOperationType
 from app.utils.warehouse import normalize_warehouse_name
+
+_SEARCH_PUNCTUATION_RE = re.compile(r"[^\w\s]+", re.UNICODE)
+
+
+def _search_normalize(value: str) -> str:
+    normalized = normalize_warehouse_name(value).replace("_", " ")
+    return " ".join(_SEARCH_PUNCTUATION_RE.sub(" ", normalized).split())
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,8 +45,67 @@ class Resolution:
     error_code: str | None
 
 
+def _ratio(left: str, right: str) -> float:
+    return SequenceMatcher(None, left, right).ratio()
+
+
+def _product_score(
+    query: str,
+    variant: str,
+    token_frequency: Counter[str],
+) -> int:
+    query_tokens = tuple(query.split())
+    variant_tokens = tuple(variant.split())
+    if not query_tokens or not variant_tokens:
+        return 0
+
+    pairs = sorted(
+        (
+            (_ratio(query_token, variant_token), query_index, variant_index)
+            for query_index, query_token in enumerate(query_tokens)
+            for variant_index, variant_token in enumerate(variant_tokens)
+        ),
+        reverse=True,
+    )
+    matched_query: set[int] = set()
+    matched_variant: set[int] = set()
+    for score, query_index, variant_index in pairs:
+        if score < 0.72:
+            break
+        if query_index in matched_query or variant_index in matched_variant:
+            continue
+        matched_query.add(query_index)
+        matched_variant.add(variant_index)
+    matched = len(matched_query)
+    shorter = min(len(query_tokens), len(variant_tokens))
+    if matched < shorter:
+        return 0
+    if shorter == 1:
+        matching_query_tokens = [
+            token for index, token in enumerate(query_tokens)
+            if index in matched_query
+        ]
+        distinctive = any(token_frequency[token] <= 1 for token in matching_query_tokens)
+        if not distinctive and max(_ratio(query, variant), _ratio(
+            " ".join(sorted(query_tokens)),
+            " ".join(sorted(variant_tokens)),
+        )) < 0.75:
+            return 0
+
+    precision = matched / len(query_tokens)
+    recall = matched / len(variant_tokens)
+    token_f1 = 2 * precision * recall / (precision + recall)
+    ordered = _ratio(query, variant)
+    orderless = _ratio(
+        " ".join(sorted(query_tokens)),
+        " ".join(sorted(variant_tokens)),
+    )
+    score = round((0.15 * ordered + 0.45 * orderless + 0.40 * token_f1) * 10_000)
+    return score if score >= 5_800 else 0
+
+
 def _score(left: str, right: str) -> int:
-    return round(SequenceMatcher(None, left, right).ratio() * 10_000)
+    return round(_ratio(left, right) * 10_000)
 
 
 def resolve_product(
@@ -47,7 +115,7 @@ def resolve_product(
     *,
     limit: int = 5,
 ) -> Resolution:
-    normalized = normalize_warehouse_name(text)
+    search_normalized = _search_normalize(text)
     required_operation = (
         "product_writeoff"
         if operation_type is WarehouseOperationType.WRITEOFF
@@ -56,26 +124,40 @@ def resolve_product(
     eligible = tuple(
         product for product in products if required_operation in product.operation_types
     )
-    official = [p for p in eligible if p.normalized_name == normalized]
+    official = [
+        p for p in eligible
+        if _search_normalize(p.normalized_name) == search_normalized
+    ]
     if len(official) == 1:
         return Resolution(official[0].id, (), None)
     aliases = [
         product
         for product in eligible
-        if normalized in {
-            normalize_warehouse_name(alias) for alias in product.aliases
+        if search_normalized in {
+            _search_normalize(alias) for alias in product.aliases
         }
     ]
     if len(aliases) == 1:
         return Resolution(aliases[0].id, (), None)
 
+    variants_by_product = {
+        product.id: tuple(dict.fromkeys(
+            (_search_normalize(product.normalized_name),)
+            + tuple(_search_normalize(alias) for alias in product.aliases)
+        ))
+        for product in eligible
+    }
+    token_frequency: Counter[str] = Counter()
+    for variants in variants_by_product.values():
+        token_frequency.update({token for variant in variants for token in variant.split()})
+
     ranked: list[tuple[int, str, int]] = []
     for product in eligible:
-        variants = (product.normalized_name,) + tuple(
-            normalize_warehouse_name(alias) for alias in product.aliases
+        score = max(
+            _product_score(search_normalized, variant, token_frequency)
+            for variant in variants_by_product[product.id]
         )
-        score = max(_score(normalized, variant) for variant in variants)
-        if score >= 3_500:
+        if score:
             ranked.append((product.id, product.official_name, score))
     ranked.sort(key=lambda item: (-item[2], item[1].casefold(), item[0]))
     candidates = tuple(ranked[:limit])

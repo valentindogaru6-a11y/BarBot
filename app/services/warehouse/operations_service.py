@@ -19,7 +19,12 @@ from app.services.warehouse.intake_parser import (
     parse_intake_header,
     parse_intake_message,
 )
-from app.services.warehouse.quantity_service import QuantityError, parse_quantity
+from app.services.warehouse.quantity_service import (
+    QuantityError,
+    parse_quantity,
+    parse_quantity_input,
+    split_quantity_input,
+)
 from app.services.warehouse.resolution_service import (
     Resolution,
     ProductOption,
@@ -165,6 +170,10 @@ class WarehouseOperationsService:
             return payload
         product = next(item for item in products if item.id == product_result.exact_id)
         payload["product_id"] = product.id
+        if line.quantity_text is None:
+            payload["status"] = "invalid"
+            payload["error_code"] = "missing_quantity"
+            return payload
         if line.unit_text is None:
             try:
                 parse_quantity(line.quantity_text, None, product.base_unit)
@@ -586,6 +595,48 @@ class WarehouseOperationsService:
             batch_id, line_id, payload, actor_user_id=actor_user_id, now=self._now()
         )
 
+    def replace_line_product_text(
+        self,
+        batch_id: int,
+        line_id: int,
+        product_text: str,
+        *,
+        actor_user_id: int,
+    ) -> dict[str, Any]:
+        """Re-resolve only product text while preserving every other parsed field."""
+
+        self.access.require_warehouse_mutation(actor_user_id)
+        batch = self.repository.get_batch(batch_id)
+        if batch is None:
+            raise WarehouseOperationsError("Batch not found")
+        self._require_batch_owner(batch, actor_user_id)
+        cleaned = " ".join(product_text.split())
+        if not cleaned or len(cleaned) > 200:
+            raise WarehouseIntakeError("invalid_product: Некорректное название продукта")
+        line = next((item for item in batch["lines"] if item["id"] == line_id), None)
+        if line is None:
+            raise WarehouseOperationsError("Batch line not found")
+        operation_type = WarehouseOperationType(str(batch["operation_type"]))
+        result = resolve_product(cleaned, operation_type, self.repository.products())
+        line.update(
+            product_text=cleaned,
+            product_id=result.exact_id,
+            quantity_scaled=None,
+            base_unit=None,
+            status="ambiguous" if result.candidates else "invalid",
+            error_code=result.error_code,
+            candidates=result.candidates,
+        )
+        updated = self.repository.replace_line(
+            batch_id, line_id, line,
+            actor_user_id=actor_user_id, now=self._now(),
+        )
+        if result.exact_id is None:
+            return updated
+        return self.resolve_product(
+            batch_id, line_id, result.exact_id, actor_user_id=actor_user_id
+        )
+
     def resolve_product(
         self,
         batch_id: int,
@@ -612,6 +663,15 @@ class WarehouseOperationsService:
         if required not in product.operation_types:
             raise WarehouseOperationsError("Product does not support operation")
         line.update(product_id=product.id, candidates=[])
+        if line["input_quantity_text"] is None:
+            line.update(
+                status="invalid", quantity_scaled=None,
+                base_unit=product.base_unit.value, error_code="missing_quantity",
+            )
+            return self.repository.replace_line(
+                batch_id, line_id, line,
+                actor_user_id=actor_user_id, now=self._now(),
+            )
         if line["input_unit_text"] is None:
             try:
                 parse_quantity(
@@ -676,6 +736,82 @@ class WarehouseOperationsService:
         )
         return self.repository.replace_line(
             batch_id, line_id, line, actor_user_id=actor_user_id, now=self._now()
+        )
+
+    def resolve_quantity_input(
+        self,
+        batch_id: int,
+        line_id: int,
+        value: str,
+        *,
+        actor_user_id: int,
+    ) -> dict[str, Any]:
+        """Resolve only quantity/unit for a line whose product is already selected."""
+
+        self.access.require_warehouse_mutation(actor_user_id)
+        batch = self.repository.get_batch(batch_id)
+        if batch is None:
+            raise WarehouseOperationsError("Batch not found")
+        self._require_batch_owner(batch, actor_user_id)
+        line = next((item for item in batch["lines"] if item["id"] == line_id), None)
+        if line is None or line.get("product_id") is None:
+            raise WarehouseOperationsError("Resolved product is required")
+        product = self.repository.product(int(line["product_id"]))
+        if product is None:
+            raise WarehouseOperationsError("Active product not found")
+        cleaned = value.strip()
+        quantity_text: str | None = None
+        unit_text: str | None = None
+        try:
+            quantity_text, unit_text = split_quantity_input(cleaned)
+            quantity = parse_quantity_input(cleaned, product.base_unit)
+        except QuantityError as exc:
+            line.update(
+                input_quantity_text=quantity_text or cleaned or None,
+                input_unit_text=unit_text,
+                quantity_scaled=None,
+                base_unit=product.base_unit.value,
+                status="invalid",
+                error_code=exc.code,
+                candidates=[],
+            )
+            return self.repository.replace_line(
+                batch_id, line_id, line,
+                actor_user_id=actor_user_id, now=self._now(),
+            )
+        line.update(
+            input_quantity_text=quantity.input_quantity_text,
+            input_unit_text=quantity.input_unit_text,
+            quantity_scaled=quantity.quantity_scaled,
+            base_unit=quantity.base_unit.value,
+            error_code=None,
+            candidates=[],
+        )
+        operation_type = WarehouseOperationType(str(batch["operation_type"]))
+        if operation_type is WarehouseOperationType.TRANSFER:
+            if line.get("destination_location_id") is None:
+                if line.get("destination_text") is None:
+                    line["error_code"] = "missing_destination"
+                else:
+                    settings = self.repository.runtime_settings()
+                    destination = resolve_destination(
+                        str(line["destination_text"]), self.repository.locations(),
+                        source_location_id=int(settings["source_location_id"]),
+                    )
+                    line["destination_location_id"] = destination.exact_id
+                    line["error_code"] = destination.error_code
+        line["status"] = (
+            "resolved"
+            if line.get("quantity_scaled")
+            and (
+                operation_type is not WarehouseOperationType.TRANSFER
+                or line.get("destination_location_id")
+            )
+            else "invalid"
+        )
+        return self.repository.replace_line(
+            batch_id, line_id, line,
+            actor_user_id=actor_user_id, now=self._now(),
         )
 
     def resolve_unit(

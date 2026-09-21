@@ -11,6 +11,8 @@ class WarehouseIntakeStates(StatesGroup):
     missing_development_title = State()
     resolving = State()
     correcting_line = State()
+    correcting_product = State()
+    quantity = State()
     new_product_name = State()
     new_product_unit = State()
     new_product_confirm = State()

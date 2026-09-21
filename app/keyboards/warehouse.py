@@ -645,6 +645,7 @@ def problem_line_keyboard(
     destinations: tuple | None = None,
     units: tuple[tuple[str, str], ...] | None = None,
     unknown_product_text: str | None = None,
+    product_only: bool = False,
 ) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     if units is not None:
@@ -675,7 +676,13 @@ def problem_line_keyboard(
             text=label[:64],
             callback_data=WarehouseCallback(action="np", object_id=line_id),
         )
-    builder.button(text="✏️ Ввести строку заново", callback_data=WarehouseCallback(action="cl", object_id=line_id))
+    builder.button(
+        text=(
+            "✏️ Ввести другое название"
+            if product_only else "✏️ Ввести строку заново"
+        ),
+        callback_data=WarehouseCallback(action="cl", object_id=line_id),
+    )
     builder.button(text="🗑 Убрать строку", callback_data=WarehouseCallback(action="rl", object_id=line_id))
     builder.button(text="❌ Отменить всё", callback_data=WarehouseCallback(action="bx", object_id=batch_id))
     builder.adjust(1)

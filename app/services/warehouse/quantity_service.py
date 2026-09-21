@@ -11,6 +11,10 @@ from app.models.warehouse.nomenclature import BaseUnit
 SCALE = 1_000_000
 MAX_QUANTITY_SCALED = 1_000_000_000_000_000
 _NUMBER_RE = re.compile(r"^(?:\d+(?:[.,]\d+)?|[.,]\d+)$")
+_QUANTITY_INPUT_RE = re.compile(
+    r"^\s*(?P<quantity>(?:\d+(?:[.,]\d+)?|[.,]\d+))"
+    r"(?:\s*(?P<unit>\S+))?\s*$"
+)
 
 _UNITS: dict[str, tuple[str, Decimal]] = {}
 for aliases, dimension, factor in (
@@ -101,6 +105,25 @@ def parse_quantity(
         input_unit_text=unit_text.strip() if unit_text else None,
         unit_was_defaulted=unit_text is None,
     )
+
+
+def parse_quantity_input(
+    value: str,
+    base_unit: BaseUnit | str,
+) -> ParsedQuantity:
+    """Parse a standalone quantity answer, defaulting only to the known base unit."""
+
+    quantity_text, unit_text = split_quantity_input(value)
+    return parse_quantity(quantity_text, unit_text, base_unit)
+
+
+def split_quantity_input(value: str) -> tuple[str, str | None]:
+    """Split a standalone answer without applying product-specific conversion."""
+
+    match = _QUANTITY_INPUT_RE.fullmatch(value)
+    if match is None:
+        raise QuantityError("invalid_quantity", "Некорректное количество")
+    return match.group("quantity"), match.group("unit")
 
 
 def format_quantity(quantity_scaled: int, base_unit: BaseUnit | str) -> str:

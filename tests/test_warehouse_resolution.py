@@ -59,6 +59,73 @@ def test_operation_type_filters_products() -> None:
     assert result.exact_id is None
 
 
+def test_product_normalization_case_yo_spacing_and_safe_punctuation() -> None:
+    products = (
+        _product(1, "Молоко альтернативное"),
+        _product(2, "Ёжевичное пюре", aliases=("пюре ёжевики",)),
+    )
+    assert resolve_product(
+        "  МОЛОКО,   АЛЬТЕРНАТИВНОЕ! ",
+        WarehouseOperationType.WRITEOFF,
+        products,
+    ).exact_id == 1
+    assert resolve_product(
+        "ПЮРЕ ЕЖЕВИКИ", WarehouseOperationType.WRITEOFF, products
+    ).exact_id == 2
+
+
+def test_token_order_typo_extra_and_missing_token_rank_deterministically() -> None:
+    products = (
+        _product(10, "Молоко альтернативное"),
+        _product(11, "Молоко"),
+        _product(12, "Остаток молока в питчерах"),
+    )
+    for query in (
+        "альтернативное молоко",
+        "молоко альтернасивное",
+        "молоко альтернативное овсяное",
+        "альтернативное",
+    ):
+        result = resolve_product(query, WarehouseOperationType.WRITEOFF, products)
+        assert result.exact_id is None
+        assert result.candidates[0][0] == 10
+        assert result.error_code == "ambiguous_product"
+    first = resolve_product(
+        "альтернативное молоко", WarehouseOperationType.WRITEOFF, products
+    ).candidates
+    second = resolve_product(
+        "альтернативное молоко", WarehouseOperationType.WRITEOFF, products
+    ).candidates
+    assert first == second
+
+
+def test_one_common_generic_token_does_not_create_dangerous_candidates() -> None:
+    products = (
+        _product(1, "Молоко"),
+        _product(2, "Молоко альтернативное"),
+        _product(3, "Остаток молока в питчерах"),
+    )
+    result = resolve_product(
+        "ванильное молоко", WarehouseOperationType.WRITEOFF, products
+    )
+    assert result.exact_id is None
+    assert result.candidates == ()
+    assert result.error_code == "unknown_product"
+
+
+def test_candidate_order_is_stable_when_scores_are_equal() -> None:
+    products = (
+        _product(2, "Сироп ягодный Б"),
+        _product(1, "Сироп ягодный А"),
+    )
+    result = resolve_product(
+        "ягодный сироп", WarehouseOperationType.WRITEOFF, products
+    )
+    assert [candidate[1] for candidate in result.candidates] == [
+        "Сироп ягодный А", "Сироп ягодный Б"
+    ]
+
+
 def test_destination_exact_fuzzy_and_same_source() -> None:
     locations = (
         LocationOption(1, "Бар",

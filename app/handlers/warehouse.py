@@ -358,10 +358,30 @@ async def _show_batch(
             reply_markup=problem_line_keyboard(
                 int(batch["id"]), int(problem["id"]), candidates,
                 unknown_product_text=product_text,
+                product_only=True,
             ),
         )
         return
-    if error_code in {"missing_unit", "unsupported_unit", "incompatible_unit"}:
+    if error_code in {
+        "missing_quantity", "invalid_quantity", "non_positive_quantity",
+        "excess_precision", "quantity_overflow", "unsupported_unit",
+        "incompatible_unit",
+    } and problem.get("product_id"):
+        await state.set_state(WarehouseIntakeStates.quantity)
+        await state.update_data(
+            batch_id=int(batch["id"]), current_line_id=int(problem["id"])
+        )
+        lead = (
+            f"Для “{escape(product_name)}” не указано количество."
+            if error_code == "missing_quantity"
+            else f"Для “{escape(product_name)}” указано некорректное количество или единица."
+        )
+        await message.answer(
+            f"{lead}\n\nВведите количество, например: 0,5; 0.5; 500 мл; 0,5 л. "
+            "Если единицу не указать, будет использована базовая единица продукта."
+        )
+        return
+    if error_code == "missing_unit":
         product = await _thread(
             service.product_option,
             int(problem["product_id"]),
@@ -1501,6 +1521,7 @@ async def line_correction_start(
     callback: CallbackQuery,
     callback_data: WarehouseCallback,
     state: FSMContext,
+    warehouse_service: WarehouseOperationsService,
 ) -> None:
     await callback.answer()
     data = await state.get_data()
@@ -1508,14 +1529,64 @@ async def line_correction_start(
         int(value) for value in data.get("comment_confirmed_line_ids", [])
     }
     confirmed.discard(callback_data.object_id)
-    await state.set_state(WarehouseIntakeStates.correcting_line)
+    try:
+        batch = await _thread(
+            warehouse_service.owned_batch,
+            int(data.get("batch_id", 0)),
+            actor_user_id=callback.from_user.id,
+        )
+        line = next(
+            item for item in batch["lines"]
+            if int(item["id"]) == callback_data.object_id
+        )
+    except (AccessDeniedError, StopIteration, WarehouseOperationsError):
+        if isinstance(callback.message, Message):
+            await callback.message.answer("Незавершённая строка недоступна.")
+        return
+    product_only = line.get("error_code") in {
+        "unknown_product", "ambiguous_product"
+    }
+    await state.set_state(
+        WarehouseIntakeStates.correcting_product
+        if product_only else WarehouseIntakeStates.correcting_line
+    )
     await state.update_data(
         batch_id=int(data.get("batch_id", 0)),
         current_line_id=callback_data.object_id,
         comment_confirmed_line_ids=sorted(confirmed),
     )
     if isinstance(callback.message, Message):
-        await callback.message.answer("Отправьте исправленную строку целиком.")
+        await callback.message.answer(
+            "Введите другое название продукта. Количество и остальные поля сохранятся."
+            if product_only else "Отправьте исправленную строку целиком."
+        )
+
+
+@router.message(WarehouseIntakeStates.correcting_product, F.text)
+async def line_product_correction_text(
+    message: Message,
+    state: FSMContext,
+    warehouse_service: WarehouseOperationsService,
+) -> None:
+    if message.from_user is None:
+        return
+    text = (message.text or "").strip()
+    if text.startswith("/"):
+        await message.answer("Команда не может быть названием продукта.")
+        return
+    data = await state.get_data()
+    try:
+        batch = await _thread(
+            warehouse_service.replace_line_product_text,
+            int(data["batch_id"]),
+            int(data["current_line_id"]),
+            text,
+            actor_user_id=message.from_user.id,
+        )
+    except (WarehouseIntakeError, WarehouseOperationsError) as exc:
+        await message.answer(_error_text(exc))
+        return
+    await _show_batch(message, state, warehouse_service, batch, message.from_user.id)
 
 
 @router.message(WarehouseIntakeStates.correcting_line, F.text)
@@ -1533,6 +1604,33 @@ async def line_correction_text(
             int(data["batch_id"]),
             int(data["current_line_id"]),
             message.text or "",
+            actor_user_id=message.from_user.id,
+        )
+    except (WarehouseIntakeError, WarehouseOperationsError) as exc:
+        await message.answer(_error_text(exc))
+        return
+    await _show_batch(message, state, warehouse_service, batch, message.from_user.id)
+
+
+@router.message(WarehouseIntakeStates.quantity, F.text)
+async def line_quantity_text(
+    message: Message,
+    state: FSMContext,
+    warehouse_service: WarehouseOperationsService,
+) -> None:
+    if message.from_user is None:
+        return
+    text = (message.text or "").strip()
+    if text.startswith("/"):
+        await message.answer("Команда не может быть количеством.")
+        return
+    data = await state.get_data()
+    try:
+        batch = await _thread(
+            warehouse_service.resolve_quantity_input,
+            int(data["batch_id"]),
+            int(data["current_line_id"]),
+            text,
             actor_user_id=message.from_user.id,
         )
     except (WarehouseIntakeError, WarehouseOperationsError) as exc:

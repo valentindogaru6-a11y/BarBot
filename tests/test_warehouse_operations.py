@@ -1,4 +1,5 @@
 import asyncio
+import json
 import shutil
 import sqlite3
 from datetime import UTC, datetime
@@ -12,12 +13,16 @@ import pytest
 from app.models.user import Role
 from app.models.warehouse import BaseUnit, ProductOperationType, WarehouseProductCreate
 from app.handlers import warehouse as warehouse_handler
+from app.handlers.warehouse_states import WarehouseIntakeStates
 from app.services.access_service import AccessDeniedError
 from app.services.auth_service import AuthService
 from app.services.user_service import UserService
 from app.services.warehouse.operations_service import WarehouseOperationsService
 from app.services.warehouse.nomenclature_service import WarehouseNomenclatureService
-from app.services.warehouse.seed_service import build_warehouse_seed
+from app.services.warehouse.seed_service import (
+    build_warehouse_seed,
+    validate_warehouse_seed,
+)
 from app.storage.user_database import UserDatabase
 from app.storage.warehouse_operations_database import (
     WarehouseOperationsDatabase,
@@ -105,7 +110,7 @@ def test_syntax_error_persists_and_only_its_line_is_reparsed(environment) -> Non
     _, _, _, service, _ = environment
     batch = _prepare(
         service,
-        "списание:\nапельсин много\nлайм 100 г",
+        "списание:\nапельсин 1,2,3 кг\nлайм 100 г",
         message=222,
     )
     assert batch["status"] == "needs_resolution"
@@ -464,7 +469,7 @@ def test_unknown_product_uses_clean_product_text(environment, monkeypatch) -> No
     markup = message.answer.await_args.kwargs["reply_markup"]
     texts = {button.text for row in markup.inline_keyboard for button in row}
     assert "➕ Добавить “новый сироп” в номенклатуру" in texts
-    assert {"✏️ Ввести строку заново", "🗑 Убрать строку", "❌ Отменить всё"} <= texts
+    assert {"✏️ Ввести другое название", "🗑 Убрать строку", "❌ Отменить всё"} <= texts
 
 
 @pytest.mark.parametrize(
@@ -828,3 +833,274 @@ def test_arrow_transfer_remains_ready_without_destination_prompt(
     monkeypatch.setattr(warehouse_handler, "Message", _FakeMessage)
     asyncio.run(warehouse_handler._show_batch(message, state, service, batch, 20))
     assert not message.answer.await_args.args[0].startswith("Куда переместить")
+
+
+def test_exact_product_without_quantity_is_persistent_and_prompts_separately(
+    environment, monkeypatch
+) -> None:
+    _, _, repository, service, _ = environment
+    batch = _prepare(
+        service, "списание: молоко альтернативное", actor=20, message=920
+    )
+    line = batch["lines"][0]
+    assert batch["status"] == "needs_resolution"
+    assert line["product_name"] == "Молоко альтернативное"
+    assert line["product_id"] is not None
+    assert line["input_quantity_text"] is None
+    assert line["error_code"] == "missing_quantity"
+    assert repository.list_operations(batch["shift_id"]) == []
+
+    state, message = _FakeState(), _FakeMessage()
+    monkeypatch.setattr(warehouse_handler, "Message", _FakeMessage)
+    asyncio.run(warehouse_handler._show_batch(message, state, service, batch, 20))
+    assert state.state == WarehouseIntakeStates.quantity
+    assert "не указано количество" in message.answer.await_args.args[0]
+    assert "0,5; 0.5; 500 мл; 0,5 л" in message.answer.await_args.args[0]
+
+
+@pytest.mark.parametrize(
+    ("answer", "expected_scaled", "expected_unit"),
+    (("0,5", 500_000, None), ("0.5", 500_000, None),
+     ("500 мл", 500_000, "мл"), ("0,5 л", 500_000, "л")),
+)
+def test_standalone_quantity_answers_resolve_without_repeating_product(
+    environment, answer, expected_scaled, expected_unit
+) -> None:
+    _, _, _, service, _ = environment
+    batch = _prepare(
+        service, "списание: молоко альтернативное", actor=20, message=921
+    )
+    line = batch["lines"][0]
+    resolved = service.resolve_quantity_input(
+        batch["id"], line["id"], answer, actor_user_id=20
+    )
+    resolved_line = resolved["lines"][0]
+    assert resolved["status"] == "ready"
+    assert resolved_line["product_name"] == "Молоко альтернативное"
+    assert resolved_line["quantity_scaled"] == expected_scaled
+    assert resolved_line["input_unit_text"] == expected_unit
+
+
+def test_invalid_and_incompatible_quantity_keep_selected_product(environment) -> None:
+    _, _, repository, service, _ = environment
+    batch = _prepare(
+        service, "списание: молоко альтернативное", actor=20, message=922
+    )
+    line = batch["lines"][0]
+    product_id = line["product_id"]
+    invalid = service.resolve_quantity_input(
+        batch["id"], line["id"], "много", actor_user_id=20
+    )
+    assert invalid["lines"][0]["product_id"] == product_id
+    assert invalid["lines"][0]["error_code"] == "invalid_quantity"
+    incompatible = service.resolve_quantity_input(
+        batch["id"], line["id"], "500 кг", actor_user_id=20
+    )
+    assert incompatible["lines"][0]["product_id"] == product_id
+    assert incompatible["lines"][0]["input_unit_text"] == "кг"
+    assert incompatible["lines"][0]["error_code"] == "incompatible_unit"
+    assert repository.list_operations(batch["shift_id"]) == []
+    resolved = service.resolve_quantity_input(
+        batch["id"], line["id"], "500 мл", actor_user_id=20
+    )
+    assert resolved["status"] == "ready"
+    assert resolved["lines"][0]["product_id"] == product_id
+
+
+def test_fuzzy_product_without_quantity_requires_choice_then_quantity(
+    environment,
+) -> None:
+    _, _, _, service, _ = environment
+    batch = _prepare(
+        service, "списание: альтернативное молоко", actor=20, message=923
+    )
+    line = batch["lines"][0]
+    assert line["product_id"] is None
+    assert line["input_quantity_text"] is None
+    assert line["error_code"] == "ambiguous_product"
+    assert line["candidates"][0]["official_name"] == "Молоко альтернативное"
+    selected = service.resolve_product(
+        batch["id"], line["id"], line["candidates"][0]["product_id"],
+        actor_user_id=20,
+    )
+    assert selected["lines"][0]["error_code"] == "missing_quantity"
+    assert selected["lines"][0]["product_name"] == "Молоко альтернативное"
+
+
+def test_product_only_correction_preserves_original_quantity_and_unit(
+    environment, monkeypatch
+) -> None:
+    _, _, _, service, _ = environment
+    batch = _prepare(
+        service, "списание: ванильное молоко 0,5л", actor=20, message=924
+    )
+    line = batch["lines"][0]
+    assert line["error_code"] == "unknown_product"
+    assert line["input_quantity_text"] == "0,5"
+    assert line["input_unit_text"] == "л"
+
+    state = _FakeState({"batch_id": batch["id"], "current_line_id": line["id"]})
+    message = _FakeMessage()
+    callback = SimpleNamespace(
+        answer=AsyncMock(), from_user=SimpleNamespace(id=20), message=message
+    )
+    monkeypatch.setattr(warehouse_handler, "Message", _FakeMessage)
+    asyncio.run(warehouse_handler.line_correction_start(
+        callback, SimpleNamespace(object_id=line["id"]), state, service
+    ))
+    assert state.state == WarehouseIntakeStates.correcting_product
+    correction = SimpleNamespace(
+        text="молоко альтернасивное", from_user=SimpleNamespace(id=20),
+        answer=AsyncMock(),
+    )
+    asyncio.run(warehouse_handler.line_product_correction_text(
+        correction, state, service
+    ))
+    changed = service.repository.get_batch(batch["id"])["lines"][0]
+    assert changed["input_quantity_text"] == "0,5"
+    assert changed["input_unit_text"] == "л"
+    assert changed["candidates"][0]["official_name"] == "Молоко альтернативное"
+    selected = service.resolve_product(
+        batch["id"], line["id"], changed["candidates"][0]["product_id"],
+        actor_user_id=20,
+    )
+    assert selected["status"] == "ready"
+    assert selected["lines"][0]["quantity_scaled"] == 500_000
+    assert selected["lines"][0]["product_name"] == "Молоко альтернативное"
+
+
+def test_real_seed_milk_resolution_examples_use_temporary_database(tmp_path) -> None:
+    path = tmp_path / "real-seed.db"
+    UserDatabase(path).initialize()
+    payload = json.loads(
+        (ROOT / "source" / "warehouse_products_seed.json").read_text()
+    )
+    WarehouseSeedDatabase(path).import_seed(
+        validate_warehouse_seed(payload), apply=True
+    )
+    users = UserService(UserDatabase(path))
+    users.ensure_user(10)
+    users.set_role(10, Role.ADMIN, actor_user_id=1)
+    service = WarehouseOperationsService(
+        WarehouseOperationsDatabase(path), AuthService(frozenset({1}), users),
+        clock=FrozenClock(),
+    )
+    products = {product.official_name: product for product in service.repository.products()}
+    assert products["Молоко"].aliases == ()
+    assert products["Молоко альтернативное"].aliases == ()
+    assert set(products["Остаток молока в питчерах"].aliases) == {
+        "молоко в питчерах", "остаток молока", "молоко с питчеров",
+        "молоко из питчеров",
+    }
+
+    vanilla = service.find_product(
+        "ванильное молоко", "writeoff", actor_user_id=10
+    )
+    reordered = service.find_product(
+        "альтернативное молоко", "writeoff", actor_user_id=10
+    )
+    exact = service.find_product(
+        "молоко альтернативное", "writeoff", actor_user_id=10
+    )
+    typo = service.find_product(
+        "молоко альтернасивное", "writeoff", actor_user_id=10
+    )
+    assert vanilla.error_code == "unknown_product" and vanilla.candidates == ()
+    assert reordered.exact_id is None and reordered.candidates[0][1] == (
+        "Молоко альтернативное"
+    )
+    assert exact.exact_id == products["Молоко альтернативное"].id
+    assert typo.exact_id is None and typo.candidates[0][1] == (
+        "Молоко альтернативное"
+    )
+
+
+def test_quantity_fsm_keeps_product_and_advances_to_confirmation(
+    environment, monkeypatch
+) -> None:
+    _, _, _, service, _ = environment
+    batch = _prepare(
+        service, "списание: молоко альтернативное", actor=20, message=925
+    )
+    state = _FakeState()
+
+    class InputMessage(_FakeMessage):
+        def __init__(self, text: str) -> None:
+            super().__init__()
+            self.text = text
+            self.from_user = SimpleNamespace(id=20)
+
+    message = InputMessage("0,5")
+    monkeypatch.setattr(warehouse_handler, "Message", InputMessage)
+    asyncio.run(warehouse_handler._show_batch(message, state, service, batch, 20))
+    assert state.state == WarehouseIntakeStates.quantity
+    asyncio.run(warehouse_handler.line_quantity_text(message, state, service))
+    stored = service.repository.get_batch(batch["id"])
+    assert stored["status"] == "ready"
+    assert stored["lines"][0]["product_name"] == "Молоко альтернативное"
+    assert stored["lines"][0]["quantity_scaled"] == 500_000
+    assert state.state == WarehouseIntakeStates.comment_choice
+
+
+def test_product_resolution_callback_guards_and_idempotency(environment) -> None:
+    _, _, _, service, _ = environment
+    batch = _prepare(
+        service, "списание: альтернативное молоко 0,5л",
+        actor=20, message=926,
+    )
+    line = batch["lines"][0]
+    candidate_id = line["candidates"][0]["product_id"]
+    with pytest.raises(WarehouseOperationsError, match="another user"):
+        service.resolve_product(
+            batch["id"], line["id"], candidate_id, actor_user_id=10
+        )
+    with pytest.raises(WarehouseOperationsError, match="line not found"):
+        service.resolve_product(
+            batch["id"], 999_999, candidate_id, actor_user_id=20
+        )
+    first = service.resolve_product(
+        batch["id"], line["id"], candidate_id, actor_user_id=20
+    )
+    second = service.resolve_product(
+        batch["id"], line["id"], candidate_id, actor_user_id=20
+    )
+    assert first["status"] == second["status"] == "ready"
+    service.commit_batch(batch["id"], actor_user_id=20)
+    with pytest.raises(WarehouseOperationsError, match="cannot be changed"):
+        service.resolve_product(
+            batch["id"], line["id"], candidate_id, actor_user_id=20
+        )
+
+    cancelled = _prepare(
+        service, "списание: альтернативное молоко 0,5л",
+        actor=20, message=927,
+    )
+    cancelled_line = cancelled["lines"][0]
+    cancelled_candidate = cancelled_line["candidates"][0]["product_id"]
+    service.cancel_batch(cancelled["id"], actor_user_id=20)
+    with pytest.raises(WarehouseOperationsError, match="cannot be changed"):
+        service.resolve_product(
+            cancelled["id"], cancelled_line["id"], cancelled_candidate,
+            actor_user_id=20,
+        )
+
+
+def test_multiline_missing_fields_are_resolved_independently(environment) -> None:
+    _, _, repository, service, _ = environment
+    batch = _prepare(
+        service,
+        "списание:\nмолоко альтернативное\nапельсин 0,2 кг",
+        actor=20,
+        message=928,
+    )
+    first, second = batch["lines"]
+    assert first["error_code"] == "missing_quantity"
+    assert second["status"] == "resolved"
+    assert repository.list_operations(batch["shift_id"]) == []
+    resolved = service.resolve_quantity_input(
+        batch["id"], first["id"], "500 мл", actor_user_id=20
+    )
+    assert resolved["status"] == "ready"
+    assert resolved["lines"][0]["quantity_scaled"] == 500_000
+    assert resolved["lines"][1]["quantity_scaled"] == 200_000
+    assert repository.list_operations(batch["shift_id"]) == []

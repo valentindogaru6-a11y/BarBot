@@ -84,14 +84,14 @@ def test_missing_or_unknown_unit_does_not_pollute_product_text() -> None:
     assert unknown.unit_text == "ведро"
 
     invalid = parse_intake_message("списание: сахар много").lines[0]
-    assert invalid.product_text == "сахар"
-    assert invalid.quantity_text == "много"
+    assert invalid.product_text == "сахар много"
+    assert invalid.quantity_text is None
 
     multiword = parse_intake_message(
         "списание: кокосовое молоко много"
     ).lines[0]
-    assert multiword.product_text == "кокосовое молоко"
-    assert multiword.quantity_text == "много"
+    assert multiword.product_text == "кокосовое молоко много"
+    assert multiword.quantity_text is None
 
 
 @pytest.mark.parametrize("quantity", ("0,33", "0.33"))

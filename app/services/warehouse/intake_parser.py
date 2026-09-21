@@ -35,12 +35,6 @@ _INVALID_QUANTITY_WITH_UNIT_RE = re.compile(
     rf"^(?P<product>.+?)\s+(?P<quantity>\S+)\s+(?P<unit>{_UNIT_PATTERN})$",
     re.IGNORECASE,
 )
-_INVALID_QUANTITY_RE = re.compile(
-    r"^(?P<product>.+?)\s+(?P<quantity>\S+)$",
-    re.IGNORECASE,
-)
-
-
 class IntakeParseError(ValueError):
     def __init__(
         self,
@@ -67,7 +61,7 @@ class ParsedIntakeLine:
     line_number: int
     raw_line: str
     product_text: str
-    quantity_text: str
+    quantity_text: str | None
     unit_text: str | None
     destination_text: str | None
     reason_text: str | None
@@ -174,21 +168,24 @@ def _extract_final_note(value: str, line_number: int) -> tuple[str, str | None]:
     return value[: match.start()].rstrip(), note
 
 
-def _parse_left(value: str, line_number: int) -> tuple[str, str, str | None]:
+def _parse_left(
+    value: str, line_number: int
+) -> tuple[str, str | None, str | None]:
     match = _LEFT_RE.fullmatch(value.strip())
     if match is None:
-        # Preserve the product part even when the quantity token is malformed.
-        # This lets the service report an invalid quantity independently from
-        # product matching instead of treating the complete line as a name.
+        # A known unit makes the preceding token an explicit (possibly invalid)
+        # quantity. Without it, preserve the complete phrase as product text so
+        # product and quantity can be resolved independently.
         match = _INVALID_QUANTITY_WITH_UNIT_RE.fullmatch(value.strip())
         if match is None:
-            match = _INVALID_QUANTITY_RE.fullmatch(value.strip())
-        if match is None:
-            raise IntakeParseError(
-                "invalid_line",
-                "Ожидаются название продукта и количество",
-                line_number=line_number,
-            )
+            product = value.strip()
+            if not product or len(product) > MAX_NAME_LENGTH:
+                raise IntakeParseError(
+                    "invalid_product",
+                    "Некорректное название продукта",
+                    line_number=line_number,
+                )
+            return product, None, None
     product = match.group("product").strip()
     if not product or len(product) > MAX_NAME_LENGTH:
         raise IntakeParseError(

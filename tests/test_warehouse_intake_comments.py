@@ -259,9 +259,9 @@ def test_edit_current_line_keeps_other_lines(environment, monkeypatch) -> None:
     asyncio.run(warehouse_handler._show_batch(message, state, service, batch, 10))
     first, second = batch["lines"]
     asyncio.run(
-        warehouse_handler.line_correction_start(
-            callback(message), data("cl", first["id"]), state
-        )
+            warehouse_handler.line_correction_start(
+                callback(message), data("cl", first["id"]), state, service
+            )
     )
     asyncio.run(
         warehouse_handler.line_correction_text(
