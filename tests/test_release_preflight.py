@@ -64,7 +64,7 @@ def test_valid_temporary_configuration_and_database_pass(tmp_path: Path) -> None
     result, _ = _run(tmp_path)
 
     assert result.exit_code == 0
-    assert _check(result, "schema.target").detail == "v11; expected v11"
+    assert _check(result, "schema.target").detail == "v12; expected v12"
     assert _check(result, "database.schema").status is Status.PASS
     assert _check(result, "seed.validation").detail == (
         "products=414 active=414 owner_required=2"
@@ -210,7 +210,7 @@ def test_multiple_polling_owners_and_future_database_fail(tmp_path: Path) -> Non
     environment, paths = _setup(tmp_path / "future")
     import sqlite3
     with sqlite3.connect(paths["database"]) as connection:
-        connection.execute("PRAGMA user_version=12")
+        connection.execute("PRAGMA user_version=13")
     future = run_preflight(
         environment, database_path=paths["database"], report_path=paths["reports"],
         audit_path=paths["audit"], catalog_path=paths["catalog"],

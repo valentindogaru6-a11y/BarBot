@@ -13,6 +13,7 @@ def build_main_menu_keyboard(
     can_view_catalog: bool = True,
     can_manage_catalog: bool = False,
     can_view_warehouse: bool = False,
+    attendance_open: bool | None = None,
 ) -> InlineKeyboardMarkup | None:
     """Build the static top-level menu without catalog business logic."""
 
@@ -36,7 +37,12 @@ def build_main_menu_keyboard(
             text="📦 Складские операции",
             callback_data=WarehouseCallback(action="h"),
         )
-    if not can_view_catalog and not can_manage_catalog and not can_view_warehouse:
+    if attendance_open is not None:
+        builder.button(
+            text="🔴 Закрыть смену" if attendance_open else "🟢 Открыть смену",
+            callback_data=WarehouseCallback(action="ac" if attendance_open else "ao"),
+        )
+    if not can_view_catalog and not can_manage_catalog and not can_view_warehouse and attendance_open is None:
         return None
     builder.adjust(1)
     return builder.as_markup()

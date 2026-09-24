@@ -175,7 +175,12 @@ class WarehouseReminderDatabase:
                 if cursor.rowcount:
                     self._audit(connection, shift_id=int(row["shift_id"]), actor_user_id=None, event_type="warehouse_reminder_cancelled", entity_id=event_id, now=now)
                 return None
-            if not row["enabled"] or row["target_chat_id"] is None or row["status"] not in {"pending", "failed"}:
+            participants = connection.execute(
+                "SELECT COUNT(*) FROM warehouse_shift_sessions WHERE warehouse_shift_id=? AND status='open'",
+                (row["shift_id"],),
+            ).fetchone()[0]
+            if (not row["enabled"] or (row["target_chat_id"] is None and not participants)
+                    or row["status"] not in {"pending", "failed"}):
                 return None
             cursor = connection.execute(
                 """UPDATE warehouse_reminder_events SET status='sending', attempt_count=attempt_count+1,
@@ -191,6 +196,44 @@ class WarehouseReminderDatabase:
             claimed["target_chat_id"] = row["target_chat_id"]
             claimed["business_date"] = row["business_date"]
             return claimed
+
+    def active_recipients(self, shift_id: int) -> list[int]:
+        with self._connection() as connection:
+            return [int(row[0]) for row in connection.execute(
+                "SELECT DISTINCT user_id FROM warehouse_shift_sessions WHERE warehouse_shift_id=? AND status='open' ORDER BY user_id",
+                (shift_id,),
+            )]
+
+    def claim_delivery(self, event_id: int, user_id: int, now: str) -> bool:
+        with self._transaction() as connection:
+            existing = connection.execute(
+                "SELECT status FROM warehouse_reminder_event_deliveries WHERE event_id=? AND user_id=?",
+                (event_id,user_id),
+            ).fetchone()
+            if existing is not None and existing["status"] in {"sending","sent"}:
+                return False
+            if existing is None:
+                connection.execute(
+                    "INSERT INTO warehouse_reminder_event_deliveries(event_id,user_id,status,attempted_at_utc,updated_at_utc) VALUES (?,?,'sending',?,?)",
+                    (event_id,user_id,now,now),
+                )
+            else:
+                connection.execute(
+                    "UPDATE warehouse_reminder_event_deliveries SET status='sending',last_error_code=NULL,attempted_at_utc=?,updated_at_utc=? WHERE event_id=? AND user_id=? AND status='failed'",
+                    (now,now,event_id,user_id),
+                )
+            return True
+
+    def finish_delivery(self, event_id: int, user_id: int, now: str,
+                        message_id: int | None = None, error_code: str | None = None) -> None:
+        with self._transaction() as connection:
+            connection.execute(
+                """UPDATE warehouse_reminder_event_deliveries
+                   SET status=?,telegram_message_id=?,last_error_code=?,updated_at_utc=?
+                   WHERE event_id=? AND user_id=? AND status='sending'""",
+                ("failed" if error_code else "sent", message_id,
+                 error_code[:100] if error_code else None, now,event_id,user_id),
+            )
 
     def finish(self, event_id: int, telegram_message_id: int | None, now: str, error: tuple[str, str] | None = None) -> None:
         with self._transaction() as connection:

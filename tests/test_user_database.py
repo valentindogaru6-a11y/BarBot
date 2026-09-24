@@ -26,7 +26,7 @@ def test_creates_and_reinitializes_database(tmp_path: Path) -> None:
         "journal_mode": "wal",
         "busy_timeout": 5000,
         "foreign_keys": 1,
-        "user_version": 11,
+        "user_version": 12,
     }
 
 

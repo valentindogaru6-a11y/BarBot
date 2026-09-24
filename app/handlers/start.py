@@ -21,6 +21,7 @@ from app.middlewares.access import BLOCKED_TEXT
 from app.models.user import Role
 from app.services.access_service import UserContext
 from app.services.auth_service import AuthService
+from app.services.warehouse.attendance_service import WarehouseAttendanceService
 from app.telegram_commands import update_user_commands
 
 router = Router(name=__name__)
@@ -69,12 +70,21 @@ ACCOUNTANT_WAREHOUSE_HELP_TEXT = (
 def _main_menu_for(
     context: UserContext,
     warehouse_enabled: bool = False,
+    attendance_open: bool | None = None,
 ) -> InlineKeyboardMarkup | None:
     return build_main_menu_keyboard(
         can_view_catalog=context.can_view_catalog,
         can_manage_catalog=context.can_manage_catalog,
         can_view_warehouse=warehouse_enabled and context.can_view_warehouse,
+        attendance_open=(attendance_open if warehouse_enabled and context.can_use_warehouse_attendance else None),
     )
+
+
+async def _attendance_open(service: WarehouseAttendanceService | None, context: UserContext,
+                           warehouse_enabled: bool) -> bool | None:
+    if not warehouse_enabled or service is None or not context.can_use_warehouse_attendance:
+        return None
+    return await __import__("asyncio").to_thread(service.status, context.telegram_user_id) is not None
 
 
 @router.message(CommandStart())
@@ -84,6 +94,7 @@ async def handle_start(
     auth_service: AuthService,
     bot: Bot,
     warehouse_enabled: bool = False,
+    warehouse_attendance_service: WarehouseAttendanceService | None = None,
 ) -> None:
     """Show the main menu and reset an unfinished interaction."""
 
@@ -113,7 +124,8 @@ async def handle_start(
         )
     await message.answer(
         text,
-        reply_markup=_main_menu_for(context, warehouse_enabled),
+        reply_markup=_main_menu_for(context, warehouse_enabled, await _attendance_open(
+            warehouse_attendance_service, context, warehouse_enabled)),
     )
 
 
@@ -177,6 +189,7 @@ async def handle_home(
     state: FSMContext,
     auth_service: AuthService,
     warehouse_enabled: bool = False,
+    warehouse_attendance_service: WarehouseAttendanceService | None = None,
 ) -> None:
     """Return to the main menu."""
 
@@ -206,7 +219,8 @@ async def handle_home(
                 if context.role is Role.ACCOUNTANT
                 else WELCOME_TEXT
             ),
-            _main_menu_for(context, warehouse_enabled),
+            _main_menu_for(context, warehouse_enabled, await _attendance_open(
+                warehouse_attendance_service, context, warehouse_enabled)),
         )
 
 

@@ -19,7 +19,7 @@ forward automatically.
   reminder worker, and the schedule worker in one process.
 - Shutdown: `finally` cancels and awaits both workers, then closes the bot HTTP
   session. SIGTERM must be allowed enough time to complete this path.
-- SQLite target: schema v11. `UserDatabase.initialize()` performs the
+- SQLite target: schema v12. `UserDatabase.initialize()` performs the
   transactional migration/validation and enables WAL.
 - Seed entrypoint: `scripts/import_warehouse_products.py`; dry-run is default,
   writes require `--apply`. The production path additionally requires two
@@ -91,7 +91,7 @@ runs `UserDatabase.initialize()`, migrations, `journal_mode`, a WAL checkpoint,
 or `chmod`, but operators must treat sidecars as live runtime state. Never
 delete them while the service is running. Git ignores SQLite sidecars.
 
-Strict mode still requires schema v11 and existing runtime paths. An explicitly
+Strict mode still requires schema v12 and existing runtime paths. An explicitly
 authorized controlled Stage 0 may add:
 
 ```bash
@@ -118,7 +118,7 @@ only for offline automated tests and must not be used in production.
 Checks cover Python/imports, key presence, timezone/cutoff, normalized paths,
 safe path types and separation, non-temporary report location, access based on
 existing permissions without probe writes, declared polling ownership,
-entrypoint/router/callback imports, schema target v11, the 414-product seed,
+entrypoint/router/callback imports, schema target v12, the 414-product seed,
 the application-fixed audit path, and the real Telegram delivery adapter. It
 also requires the report directory to resolve inside the repository, matching
 runtime configuration validation. It never imports seed, migrates SQLite,
@@ -146,8 +146,8 @@ warnings reports `READY FOR BACKUP WITH REQUIRED POST-BACKUP HARDENING`.
 
 All Phase 10A rehearsals use pytest temporary directories:
 
-- fresh SQLite → v11 and repeated v11 initialization;
-- legacy v1/full migration suite and v10 → v11;
+- fresh SQLite → v12 and repeated v12 initialization;
+- legacy v1/full migration suite and sequential v11 → v12;
 - future-version rejection and atomic rollback on injected failure;
 - schema validation, `integrity_check`, and `foreign_key_check`;
 - seed dry-run/apply/repeat with 414 active products, 8 aliases, two owner

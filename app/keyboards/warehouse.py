@@ -28,6 +28,7 @@ def warehouse_home_keyboard(
     can_manage_report_recipients: bool = False,
     can_manage_reminders: bool = False,
     can_manage_delivery_schedules: bool = False,
+    can_manage_attendance: bool = False,
 ) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     if can_mutate and shift_status in {"open", "waiting_required"}:
@@ -58,6 +59,9 @@ def warehouse_home_keyboard(
         builder.button(text="🔔 Напоминания", callback_data=WarehouseCallback(action="mr"))
     if can_manage_delivery_schedules:
         builder.button(text="🗓 Автоотправка", callback_data=WarehouseCallback(action="sd"))
+    if can_manage_attendance:
+        builder.button(text="📊 Табель смен XLSX", callback_data=WarehouseCallback(action="tx"))
+        builder.button(text="🕒 Незакрытые рабочие смены", callback_data=WarehouseCallback(action="af"))
     if shift_status in {"open", "waiting_required", "closing"}:
         builder.button(
             text="📄 Скачать текущий Excel",

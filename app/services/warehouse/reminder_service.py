@@ -53,13 +53,46 @@ class WarehouseReminderService:
             claim = await asyncio.to_thread(self.repository.claim, int(row["id"]), stamp)
             if claim is None:
                 continue
-            try:
-                message_id = await self.sender.send_reminder(chat_id=int(claim["target_chat_id"]), text=f"⏰ Смена за {claim['business_date']} ещё не закрыта.\n\nПроверьте записи и обязательные списания.", reply_markup=reminder_notification_keyboard())
-            except Exception as exc:
-                # Do not retain Telegram's raw exception or traceback.
-                await asyncio.to_thread(self.repository.finish, int(claim["id"]), None, stamp, (type(exc).__name__.casefold(), "Telegram не принял напоминание"))
+            text = f"⏰ Смена за {claim['business_date']} ещё не закрыта.\n\nПроверьте записи и обязательные списания."
+            recipients = await asyncio.to_thread(
+                self.repository.active_recipients, int(claim["shift_id"])
+            )
+            failed = False
+            last_message_id: int | None = None
+            for recipient in recipients:
+                owned = await asyncio.to_thread(
+                    self.repository.claim_delivery, int(claim["id"]), recipient, stamp
+                )
+                if not owned:
+                    continue
+                try:
+                    last_message_id = int(await self.sender.send_reminder(
+                        chat_id=recipient, text=text,
+                        reply_markup=reminder_notification_keyboard()))
+                except Exception as exc:
+                    failed = True
+                    await asyncio.to_thread(self.repository.finish_delivery,
+                        int(claim["id"]),recipient,stamp,error_code=type(exc).__name__.casefold())
+                else:
+                    await asyncio.to_thread(self.repository.finish_delivery,
+                        int(claim["id"]),recipient,stamp,message_id=last_message_id)
+            # The configured chat is an escalation/fallback, not a parallel recipient.
+            if (not recipients or failed) and claim.get("target_chat_id") is not None:
+                try:
+                    last_message_id = int(await self.sender.send_reminder(
+                        chat_id=int(claim["target_chat_id"]), text=text,
+                        reply_markup=reminder_notification_keyboard()))
+                    failed = False
+                except Exception as exc:
+                    failed = True
+                    error_type = type(exc).__name__.casefold()
+            if failed:
+                await asyncio.to_thread(self.repository.finish, int(claim["id"]), None,
+                    stamp, (error_type if 'error_type' in locals() else "delivery_failed",
+                            "Telegram не принял напоминание"))
             else:
-                await asyncio.to_thread(self.repository.finish, int(claim["id"]), int(message_id), stamp)
+                await asyncio.to_thread(self.repository.finish, int(claim["id"]),
+                                        last_message_id, stamp)
 
     async def run_forever(self, interval: int = 45) -> None:
         """Run until cancelled by the application shutdown path."""

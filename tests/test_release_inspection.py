@@ -52,7 +52,7 @@ def test_supported_old_schema_is_strict_by_default_and_warns_when_allowed(
 
     assert strict[0].status is Status.FAIL
     assert controlled[0].status is Status.WARN
-    assert controlled[0].detail == f"supported migration required: v{version} → v11"
+    assert controlled[0].detail == f"supported migration required: v{version} → v12"
 
 
 def test_current_and_future_schema_decisions(tmp_path: Path) -> None:
@@ -63,7 +63,7 @@ def test_current_and_future_schema_decisions(tmp_path: Path) -> None:
     future = tmp_path / "v12.db"
     UserDatabase(future).initialize()
     with sqlite3.connect(future) as connection:
-        connection.execute("PRAGMA user_version=12")
+        connection.execute("PRAGMA user_version=13")
     assert _check_database(future, allow_supported_upgrade=True)[0].status is Status.FAIL
 
 
@@ -146,7 +146,7 @@ def test_inspection_does_not_initialize_migrate_or_change_logical_database(
             "SELECT type,name,sql FROM sqlite_master ORDER BY type,name"
         ).fetchall() == before_schema
         assert connection.execute("SELECT COUNT(*) FROM warehouse_locations").fetchone()[0] == before_rows
-    assert result.version == 11
+    assert result.version == 12
     assert _digest(database) == before_digest
 
 
@@ -187,7 +187,7 @@ def test_existing_wal_sidecars_are_accepted_and_not_deleted(tmp_path: Path) -> N
 
         result = inspect_sqlite_database(database)
 
-        assert result.version == 11
+        assert result.version == 12
         assert wal.exists() and shm.exists()
     finally:
         writer.close()

@@ -14,6 +14,7 @@ from app.handlers import (
     start,
     voice,
     warehouse,
+    warehouse_attendance,
     warehouse_closing,
     warehouse_corrections,
     warehouse_recipients,
@@ -45,6 +46,8 @@ from app.services.warehouse.telegram_delivery import (
 from app.services.warehouse.reminder_service import WarehouseReminderService
 from app.services.warehouse.reminder_service import WarehouseReminderSettingsService
 from app.services.warehouse.schedule_service import WarehouseScheduleService
+from app.services.warehouse.attendance_service import WarehouseAttendanceService
+from app.services.warehouse.attendance_xlsx_service import WarehouseAttendanceXlsxService
 from app.storage.json_storage import JsonCatalogStorage
 from app.storage.user_database import UserDatabase
 from app.storage.warehouse_operations_database import WarehouseOperationsDatabase
@@ -55,6 +58,7 @@ from app.storage.warehouse_correction_database import WarehouseCorrectionDatabas
 from app.storage.warehouse_delivery_database import WarehouseDeliveryDatabase
 from app.storage.warehouse_reminder_database import WarehouseReminderDatabase
 from app.storage.warehouse_schedule_database import WarehouseScheduleDatabase
+from app.storage.warehouse_attendance_database import WarehouseAttendanceDatabase
 from app.telegram_commands import configure_bot_commands
 
 
@@ -66,6 +70,7 @@ def router_names(*, warehouse_enabled: bool) -> tuple[str, ...]:
         "app.handlers.search",
     ]
     if warehouse_enabled:
+        names.append("app.handlers.warehouse_attendance")
         names.append("app.handlers.warehouse")
         names.append("app.handlers.warehouse_recipients")
         names.append("app.handlers.warehouse_reminders")
@@ -91,6 +96,7 @@ def build_dispatcher(
     dispatcher.include_router(voice.router)
     dispatcher.include_router(search.router)
     if warehouse_enabled:
+        dispatcher.include_router(warehouse_attendance.router)
         dispatcher.include_router(warehouse.router)
         dispatcher.include_router(warehouse_recipients.router)
         dispatcher.include_router(warehouse_reminders.router)
@@ -176,7 +182,16 @@ async def main() -> None:
     warehouse_reminder_service = None
     warehouse_reminder_settings_service = None
     warehouse_schedule_service = None
+    warehouse_attendance_service = None
+    warehouse_attendance_xlsx_service = None
     if settings.warehouse_enabled:
+        warehouse_attendance_repository = WarehouseAttendanceDatabase(settings.database_path)
+        warehouse_attendance_service = WarehouseAttendanceService(
+            warehouse_attendance_repository, auth_service
+        )
+        warehouse_attendance_xlsx_service = WarehouseAttendanceXlsxService(
+            warehouse_attendance_repository, auth_service, settings.warehouse_reports_path
+        )
         warehouse_service = WarehouseOperationsService(
             WarehouseOperationsDatabase(settings.database_path),
             auth_service,
@@ -262,6 +277,8 @@ async def main() -> None:
             warehouse_chat_verifier=warehouse_chat_verifier,
             warehouse_reminder_settings_service=warehouse_reminder_settings_service,
             warehouse_schedule_service=warehouse_schedule_service,
+            warehouse_attendance_service=warehouse_attendance_service,
+            warehouse_attendance_xlsx_service=warehouse_attendance_xlsx_service,
             close_bot_session=False,
         )
     finally:

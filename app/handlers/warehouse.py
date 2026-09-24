@@ -74,6 +74,7 @@ from app.services.warehouse.quantity_service import (
     compatible_unit_choices,
     parse_quantity,
 )
+from app.services.warehouse.attendance_service import WarehouseAttendanceService
 from app.storage.warehouse_database import WarehouseNameConflictError
 from app.storage.warehouse_operations_database import (
     WarehouseOperationsError,
@@ -226,6 +227,7 @@ async def show_warehouse_home(
     service: WarehouseOperationsService,
     user_id: int,
     closing_service: WarehouseClosingService | None = None,
+    attendance_service: WarehouseAttendanceService | None = None,
 ) -> None:
     context = await _thread(auth_service.get_context, user_id)
     if not context.can_view_warehouse:
@@ -283,6 +285,17 @@ async def show_warehouse_home(
         "closing": "ожидает отчёта",
     }.get(str(shift["status"]), "закрыта")
     requirements_text = ""
+    attendance_text = ""
+    if attendance_service is not None:
+        own = await _thread(attendance_service.repository.active_for_user, user_id)
+        active = (
+            await _thread(attendance_service.repository.active_for_shift, int(shift["id"]))
+            if shift["id"] is not None else []
+        )
+        attendance_text = (
+            f"\nВаша рабочая смена: открыта с {_local_attendance_time(str(own['opened_at_utc']))}"
+            if own else "\nВаша рабочая смена: не открыта"
+        ) + f"\nАктивные сотрудники: {len(active)}"
     if closing_overview is not None:
         requirements_text = (
             "\nОбязательные позиции: "
@@ -293,7 +306,7 @@ async def show_warehouse_home(
         message,
         f"{WAREHOUSE_TITLE}\n\n"
         f"Смена: {format_business_date(str(shift['business_date']))}\n"
-        f"Статус: {status_label}{requirements_text}\n\nВыберите действие:",
+        f"Статус: {status_label}{requirements_text}{attendance_text}\n\nВыберите действие:",
         warehouse_home_keyboard(
             can_mutate=context.can_mutate_warehouse,
             shift_status=str(shift["status"]),
@@ -308,8 +321,17 @@ async def show_warehouse_home(
             ),
             can_manage_reminders=context.can_manage_warehouse_reminders,
             can_manage_delivery_schedules=context.can_manage_warehouse_delivery_schedules,
+            can_manage_attendance=context.can_manage_warehouse_attendance,
         ),
     )
+
+
+def _local_attendance_time(value: str) -> str:
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(
+        ZoneInfo("Europe/Kyiv")
+    ).strftime("%H:%M")
 
 
 async def _show_batch(
@@ -615,11 +637,13 @@ async def warehouse_command(
     auth_service: AuthService,
     warehouse_service: WarehouseOperationsService,
     warehouse_closing_service: WarehouseClosingService,
+    warehouse_attendance_service: WarehouseAttendanceService | None = None,
 ) -> None:
     if message.from_user is not None:
         await show_warehouse_home(
             message, state, auth_service, warehouse_service, message.from_user.id,
             warehouse_closing_service,
+            warehouse_attendance_service,
         )
 
 
@@ -630,6 +654,7 @@ async def warehouse_home(
     auth_service: AuthService,
     warehouse_service: WarehouseOperationsService,
     warehouse_closing_service: WarehouseClosingService,
+    warehouse_attendance_service: WarehouseAttendanceService | None = None,
 ) -> None:
     context = await _thread(auth_service.get_context, callback.from_user.id)
     if not context.can_view_warehouse:
@@ -641,6 +666,7 @@ async def warehouse_home(
             callback.message, state, auth_service, warehouse_service,
             callback.from_user.id,
             warehouse_closing_service,
+            warehouse_attendance_service,
         )
 
 

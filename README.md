@@ -688,9 +688,23 @@ retry доступны лишь `super_admin` и `admin`. Phase 9 заверше
 migration и deployment в рамках разработки не выполнялись.
 
 Phase 10A добавляет безопасный read-only preflight, migration/seed/offline-E2E
-rehearsals и runbooks для backup, rollout и rollback. Target schema — v11.
+rehearsals и runbooks для backup, rollout и rollback. Target schema — v12.
 Production deployment по-прежнему не выполнялся; Phase 10B допускается только
 после отдельного явного разрешения владельца.
+
+Schema v12 добавляет личные рабочие интервалы сотрудников отдельно от общей
+складской смены. При включённом warehouse-модуле bartender, admin и
+super-admin открывают и закрывают свой интервал одной динамической кнопкой;
+несколько сотрудников могут одновременно работать в одной общей смене.
+Напоминания идут активным участникам лично, а настроенный reminder chat служит
+fallback при отсутствии участников или ошибке доставки.
+
+Admin и super-admin могут скачать XLSX-табель с листами «Смены», «Итоги по
+сотрудникам» и «Календарь» и принудительно закрыть зависший интервал с
+обязательной причиной и audit trail. Незакрытые интервалы не входят в
+подтверждённое время. Ставки и расчёт зарплаты не выполняются. Production
+migration/deployment и генерация табеля на production data в этом этапе не
+выполнялись.
 
 Policy различает безопасный default development и поэтапный controlled
 production rollout. Ограниченный Stage 0 разрешает только read-only inspection;

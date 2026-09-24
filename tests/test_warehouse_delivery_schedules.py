@@ -82,7 +82,7 @@ def test_v10_fresh_v9_upgrade_repeat_and_rollback(tmp_path: Path, monkeypatch):
     path=tmp_path/'v9.db'
     with sqlite3.connect(path) as c: c.execute('BEGIN');migrations._create_fresh_v9(c);c.commit()
     UserDatabase(path).initialize();UserDatabase(path).initialize()
-    with sqlite3.connect(path) as c: assert c.execute('PRAGMA user_version').fetchone()[0]==11
+    with sqlite3.connect(path) as c: assert c.execute('PRAGMA user_version').fetchone()[0]==12
     failed=tmp_path/'failed.db'
     with sqlite3.connect(failed) as c: c.execute('BEGIN');migrations._create_fresh_v9(c);c.commit()
     monkeypatch.setattr(migrations,'create_warehouse_schedule_schema',lambda c: (_ for _ in ()).throw(RuntimeError('fail')))

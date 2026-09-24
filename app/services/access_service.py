@@ -39,6 +39,14 @@ class UserContext:
         }
 
     @property
+    def can_use_warehouse_attendance(self) -> bool:
+        return self.role in {Role.SUPER_ADMIN, Role.ADMIN, Role.BARTENDER}
+
+    @property
+    def can_manage_warehouse_attendance(self) -> bool:
+        return self.role in {Role.SUPER_ADMIN, Role.ADMIN}
+
+    @property
     def can_mutate_warehouse(self) -> bool:
         return self.role in {Role.SUPER_ADMIN, Role.ADMIN, Role.BARTENDER}
 
@@ -142,6 +150,9 @@ class AccessService:
     def can_mutate_warehouse(self, telegram_user_id: int) -> bool:
         return self.get_context(telegram_user_id).can_mutate_warehouse
 
+    def can_use_warehouse_attendance(self, telegram_user_id: int) -> bool:
+        return self.get_context(telegram_user_id).can_use_warehouse_attendance
+
     def can_manage_warehouse_required_rules(self, telegram_user_id: int) -> bool:
         return self.get_context(
             telegram_user_id
@@ -193,6 +204,18 @@ class AccessService:
         context = self.get_context(telegram_user_id)
         if not context.can_view_warehouse:
             raise AccessDeniedError("Недостаточно прав для просмотра склада")
+        return context
+
+    def require_warehouse_attendance(self, telegram_user_id: int) -> UserContext:
+        context = self.get_context(telegram_user_id)
+        if not context.can_use_warehouse_attendance:
+            raise AccessDeniedError("Недостаточно прав для рабочей смены")
+        return context
+
+    def require_warehouse_attendance_management(self, telegram_user_id: int) -> UserContext:
+        context = self.get_context(telegram_user_id)
+        if not context.can_manage_warehouse_attendance:
+            raise AccessDeniedError("Недостаточно прав для управления рабочими сменами")
         return context
 
     def require_warehouse_mutation(self, telegram_user_id: int) -> UserContext:

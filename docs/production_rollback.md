@@ -1,7 +1,7 @@
 # BarBot production rollback runbook
 
 Rollback after a migration restores the consistent pre-deploy backup. There is
-no manual schema downgrade and no attempt to combine a v11 database with code
+no manual schema downgrade and no attempt to combine a v12 database with code
 that expects an older schema.
 
 This runbook is usable only inside an explicitly authorized Phase 10B Stage.
