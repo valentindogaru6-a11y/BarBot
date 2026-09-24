@@ -51,7 +51,8 @@ SCHEMA = (
             ON UPDATE RESTRICT ON DELETE RESTRICT,
         FOREIGN KEY(closed_by_user_id) REFERENCES users(telegram_user_id)
             ON UPDATE RESTRICT ON DELETE RESTRICT,
-        CHECK((status='open' AND closed_at_utc IS NULL AND closed_by_user_id IS NULL)
+        CHECK((status='open' AND closed_at_utc IS NULL AND closed_by_user_id IS NULL
+               AND close_reason IS NULL)
            OR (status IN ('closed','force_closed') AND closed_at_utc IS NOT NULL
                AND closed_by_user_id IS NOT NULL)),
         CHECK(status!='force_closed' OR (close_reason IS NOT NULL AND trim(close_reason)<>''))
@@ -139,6 +140,7 @@ def validate_warehouse_attendance_schema(connection: sqlite3.Connection) -> None
         "datetime(created_at_utc)isnotnull",
         "datetime(updated_at_utc)isnotnull",
         "julianday(closed_at_utc)>=julianday(opened_at_utc)",
+        "status='open'andclosed_at_utcisnullandclosed_by_user_idisnullandclose_reasonisnull",
         "status!='closed'orclose_reasonisnull",
     ):
         if fragment not in table_sql:

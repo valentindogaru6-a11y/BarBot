@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import calendar
+import secrets
 import threading
-import time
 from collections import defaultdict
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -20,36 +20,84 @@ from app.storage.warehouse_attendance_database import WarehouseAttendanceDatabas
 
 
 class AttendanceReportCoordinator:
-    """Single-process claim for one requester/period/token report request."""
+    """Single-process one-shot token and active report coordination."""
 
     def __init__(self, completed_ttl_seconds: float = 120.0) -> None:
+        # Kept for API compatibility; expiry never makes a consumed token valid.
         self.completed_ttl_seconds = completed_ttl_seconds
         self._lock = threading.Lock()
-        self._claims: dict[tuple[int, str], tuple[int, str, float]] = {}
+        self._tokens: dict[tuple[int, int], tuple[str, str | None]] = {}
+        self._issued: dict[int, int] = {}
+        self._running: dict[tuple[int, str], int] = {}
+
+    def issue(self, user_id: int, *, token: int | None = None) -> int:
+        """Issue a new menu token and invalidate an older unused token."""
+
+        with self._lock:
+            previous = self._issued.pop(user_id, None)
+            if previous is not None:
+                self._tokens[(user_id, previous)] = ("cancelled", None)
+            if token is None:
+                token = secrets.randbits(63)
+                while token == 0 or (user_id, token) in self._tokens:
+                    token = secrets.randbits(63)
+            elif token <= 0 or (user_id, token) in self._tokens:
+                raise ValueError("Report token must be new and positive")
+            self._tokens[(user_id, token)] = ("issued", None)
+            self._issued[user_id] = token
+            return token
+
+    def is_issued(self, user_id: int, token: int) -> bool:
+        with self._lock:
+            return (
+                self._issued.get(user_id) == token
+                and self._tokens.get((user_id, token)) == ("issued", None)
+            )
 
     def claim(self, user_id: int, period: str, token: int) -> bool:
-        key = (user_id, period)
-        now = time.monotonic()
+        token_key = (user_id, token)
+        period_key = (user_id, period)
         with self._lock:
-            current = self._claims.get(key)
-            if current is not None:
-                old_token, status, changed = current
-                if status == "running" or (old_token == token and now - changed < self.completed_ttl_seconds):
-                    return False
-            self._claims[key] = (token, "running", now)
+            if self._issued.get(user_id) != token:
+                return False
+            if self._tokens.get(token_key) != ("issued", None):
+                return False
+            if period_key in self._running:
+                self._issued.pop(user_id, None)
+                self._tokens[token_key] = ("cancelled", period)
+                return False
+            self._issued.pop(user_id, None)
+            self._tokens[token_key] = ("running", period)
+            self._running[period_key] = token
             return True
 
     def finish(self, user_id: int, period: str, token: int) -> None:
-        key = (user_id, period)
+        token_key = (user_id, token)
+        period_key = (user_id, period)
         with self._lock:
-            if self._claims.get(key, (None,))[0] == token:
-                self._claims[key] = (token, "completed", time.monotonic())
+            if (
+                self._tokens.get(token_key) == ("running", period)
+                and self._running.get(period_key) == token
+            ):
+                self._running.pop(period_key, None)
+                self._tokens[token_key] = ("completed", period)
 
     def release(self, user_id: int, period: str, token: int) -> None:
-        key = (user_id, period)
+        self._terminate(user_id, period, token, "failed")
+
+    def cancel(self, user_id: int, period: str, token: int) -> None:
+        self._terminate(user_id, period, token, "cancelled")
+
+    def _terminate(self, user_id: int, period: str, token: int, status: str) -> None:
+        token_key = (user_id, token)
+        period_key = (user_id, period)
         with self._lock:
-            if self._claims.get(key, (None,))[0] == token:
-                self._claims.pop(key, None)
+            if (
+                self._tokens.get(token_key) == ("running", period)
+                and self._running.get(period_key) == token
+            ):
+                self._running.pop(period_key, None)
+                self._tokens[token_key] = (status, period)
 
 
 def parse_month(value: str) -> tuple[date, date]:

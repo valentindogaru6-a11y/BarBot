@@ -174,35 +174,64 @@ async def _send_report(callback: CallbackQuery, service: WarehouseAttendanceXlsx
     key = period.isoformat() if isinstance(period, date) else period
     if not coordinator.claim(callback.from_user.id, key, token):
         return False
-    try:
-        path = await asyncio.to_thread(
+    path = None
+    build_task = asyncio.create_task(asyncio.to_thread(
             service.build_day if isinstance(period, date) else service.build_month,
             callback.from_user.id, period,
-        )
+        ))
+    try:
+        try:
+            path = await asyncio.shield(build_task)
+        except asyncio.CancelledError:
+            # A thread cannot be cancelled safely. Wait until it stops writing,
+            # then remove its result before propagating cancellation.
+            try:
+                path = await asyncio.shield(build_task)
+            except Exception:
+                pass
+            raise
         if isinstance(callback.message, Message):
-            await callback.message.answer_document(FSInputFile(path), caption="📊 Табель рабочих смен")
+            send_task = asyncio.create_task(callback.message.answer_document(
+                FSInputFile(path), caption="📊 Табель рабочих смен"
+            ))
+            try:
+                await asyncio.shield(send_task)
+            except asyncio.CancelledError:
+                try:
+                    await asyncio.shield(send_task)
+                except Exception:
+                    pass
+                else:
+                    coordinator.finish(callback.from_user.id, key, token)
+                raise
         coordinator.finish(callback.from_user.id, key, token)
         return True
+    except asyncio.CancelledError:
+        coordinator.cancel(callback.from_user.id, key, token)
+        raise
     except Exception:
         coordinator.release(callback.from_user.id, key, token)
         raise
     finally:
-        if 'path' in locals(): path.unlink(missing_ok=True)
+        if path is not None: path.unlink(missing_ok=True)
 
 
 @router.callback_query(WarehouseCallback.filter(F.action == "tx"))
 async def timesheet_menu(callback: CallbackQuery, callback_data: WarehouseCallback,
                          auth_service: AuthService,
                          warehouse_attendance_xlsx_service: WarehouseAttendanceXlsxService | None = None,
+                         warehouse_attendance_report_coordinator: AttendanceReportCoordinator | None = None,
                          warehouse_enabled: bool = False) -> None:
     if not await answer_callback_safely(callback): return
-    if not warehouse_enabled or warehouse_attendance_xlsx_service is None:
+    if (not warehouse_enabled or warehouse_attendance_xlsx_service is None
+            or warehouse_attendance_report_coordinator is None):
         return
     context=await asyncio.to_thread(auth_service.get_context,callback.from_user.id)
     if not context.can_manage_warehouse_attendance:
         return
     if isinstance(callback.message,Message):
-        await edit_or_send_text(callback.message,"Выберите период табеля:",timesheet_period_keyboard(secrets.randbits(31)))
+        token = warehouse_attendance_report_coordinator.issue(callback.from_user.id)
+        await edit_or_send_text(callback.message,"Выберите период табеля:",timesheet_period_keyboard(token))
 
 
 @router.callback_query(WarehouseCallback.filter(F.action.in_({"td","tm","tp","ti"})))
@@ -222,8 +251,14 @@ async def timesheet_period(callback: CallbackQuery, callback_data: WarehouseCall
         return
     today=(await asyncio.to_thread(warehouse_attendance_service.current_period,callback.from_user.id)).business_date
     if callback_data.action=="ti":
+        if not warehouse_attendance_report_coordinator.is_issued(
+            callback.from_user.id, callback_data.aux
+        ):
+            if isinstance(callback.message, Message):
+                await callback.message.answer("Запрос устарел. Откройте выбор периода заново.")
+            return
         await state.set_state(AttendanceStates.report_month)
-        await state.update_data(report_token=callback_data.aux)
+        await state.set_data({"report_token": callback_data.aux})
         if isinstance(callback.message,Message): await callback.message.answer("Введите месяц в формате YYYY-MM")
         return
     if callback_data.action=="td": period: str|date=today
@@ -255,10 +290,37 @@ async def timesheet_manual(message: Message, state: FSMContext,
     if not warehouse_attendance_report_coordinator.claim(message.from_user.id,key,token):
         await state.clear(); await message.answer("Отчёт уже формируется или недавно был отправлен."); return
     path=None
+    build_task = asyncio.create_task(asyncio.to_thread(
+        warehouse_attendance_xlsx_service.build_month, message.from_user.id, value
+    ))
     try:
-        path=await asyncio.to_thread(warehouse_attendance_xlsx_service.build_month,message.from_user.id,value)
-        await message.answer_document(FSInputFile(path),caption="📊 Табель рабочих смен")
+        try:
+            path = await asyncio.shield(build_task)
+        except asyncio.CancelledError:
+            try:
+                path = await asyncio.shield(build_task)
+            except Exception:
+                pass
+            raise
+        send_task = asyncio.create_task(message.answer_document(
+            FSInputFile(path), caption="📊 Табель рабочих смен"
+        ))
+        try:
+            await asyncio.shield(send_task)
+        except asyncio.CancelledError:
+            try:
+                await asyncio.shield(send_task)
+            except Exception:
+                pass
+            else:
+                warehouse_attendance_report_coordinator.finish(
+                    message.from_user.id, key, token
+                )
+            raise
         warehouse_attendance_report_coordinator.finish(message.from_user.id,key,token)
+    except asyncio.CancelledError:
+        warehouse_attendance_report_coordinator.cancel(message.from_user.id,key,token)
+        raise
     except Exception:
         warehouse_attendance_report_coordinator.release(message.from_user.id,key,token)
         raise
@@ -296,8 +358,12 @@ async def force_reason_prompt(callback: CallbackQuery, callback_data: WarehouseC
     if target is None: return
     token=secrets.randbits(31)
     await state.set_state(AttendanceStates.force_reason)
-    await state.update_data(session_id=callback_data.object_id,revision=callback_data.aux,
-                            target_user_id=int(target["user_id"]),request_token=token)
+    await state.set_data({
+        "session_id": callback_data.object_id,
+        "revision": callback_data.aux,
+        "target_user_id": int(target["user_id"]),
+        "request_token": token,
+    })
     if isinstance(callback.message,Message):
         seconds=warehouse_attendance_service.duration_seconds(target,warehouse_attendance_service.clock.now())
         await callback.message.answer(
@@ -334,7 +400,8 @@ async def force_confirm(callback: CallbackQuery, callback_data: WarehouseCallbac
     if not warehouse_enabled or warehouse_attendance_service is None: return
     data=await state.get_data(); reason=str(data.get("reason") or "")
     if (int(data.get("session_id") or 0)!=callback_data.object_id
-            or int(data.get("request_token") or 0)!=callback_data.aux):
+            or int(data.get("request_token") or 0)!=callback_data.aux
+            or not reason):
         return
     try:
         await asyncio.to_thread(warehouse_attendance_service.force_close,callback_data.object_id,

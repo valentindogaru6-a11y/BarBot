@@ -177,14 +177,19 @@ def test_business_today_uses_cutoff(tmp_path: Path) -> None:
 
 def test_report_coordinator_is_token_and_period_idempotent() -> None:
     coordinator = AttendanceReportCoordinator()
+    coordinator.issue(1, token=11)
     assert coordinator.claim(1, "2026-09", 11)
     assert not coordinator.claim(1, "2026-09", 11)
     coordinator.finish(1, "2026-09", 11)
     assert not coordinator.claim(1, "2026-09", 11)
-    assert coordinator.claim(1, "2026-08", 11)
-    assert coordinator.claim(2, "2026-09", 11)
-    coordinator.release(1, "2026-08", 11)
+    coordinator.issue(1, token=12)
     assert coordinator.claim(1, "2026-08", 12)
+    coordinator.issue(2, token=11)
+    assert coordinator.claim(2, "2026-09", 11)
+    coordinator.release(1, "2026-08", 12)
+    assert not coordinator.claim(1, "2026-08", 12)
+    coordinator.issue(1, token=13)
+    assert coordinator.claim(1, "2026-08", 13)
 
 
 def _state() -> FSMContext:
