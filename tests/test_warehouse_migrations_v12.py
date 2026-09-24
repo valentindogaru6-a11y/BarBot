@@ -56,7 +56,8 @@ def test_only_one_open_session_per_user(tmp_path: Path) -> None:
         connection.execute("INSERT INTO users(telegram_user_id,username,first_name,last_name,role,is_active,first_seen_at,last_seen_at,created_by,updated_at,has_started) VALUES(1,NULL,'A',NULL,'bartender',1,'x','x',NULL,'x',1)")
         location=connection.execute("SELECT id FROM warehouse_locations LIMIT 1").fetchone()[0]
         shift=connection.execute("INSERT INTO warehouse_shifts(source_location_id,business_date,timezone_snapshot,cutoff_snapshot,status,started_at_utc,scheduled_close_at_utc,revision,created_at_utc,updated_at_utc) VALUES(?,'2026-09-24','Europe/Kyiv','23:00','open','x','y',1,'x','x')",(location,)).lastrowid
-        values=(shift,location,'2026-09-24',1,'x',1,'A','x','x')
+        stamp='2026-09-24T10:00:00Z'
+        values=(shift,location,'2026-09-24',1,stamp,1,'A',stamp,stamp)
         sql="INSERT INTO warehouse_shift_sessions(warehouse_shift_id,source_location_id,business_date,user_id,opened_at_utc,opened_by_user_id,status,display_name_snapshot,created_at_utc,updated_at_utc,revision) VALUES(?,?,?,?,?,?,'open',?,?,?,1)"
         connection.execute(sql,values)
         with pytest.raises(sqlite3.IntegrityError): connection.execute(sql,values)

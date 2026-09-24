@@ -140,6 +140,16 @@ class WarehouseReminderDatabase:
     def due(self, now: str, stale_before: str) -> list[dict[str, Any]]:
         with self._transaction() as connection:
             stale_rows = connection.execute("SELECT id, shift_id FROM warehouse_reminder_events WHERE status='sending' AND claimed_at_utc<?", (stale_before,)).fetchall()
+            stale_ids = [int(row["id"]) for row in stale_rows]
+            if stale_ids:
+                placeholders = ",".join("?" for _ in stale_ids)
+                connection.execute(
+                    f"""UPDATE warehouse_reminder_event_deliveries
+                        SET status='failed', last_error_code='stale_sending',
+                            updated_at_utc=?
+                        WHERE status='sending' AND event_id IN ({placeholders})""",
+                    (now, *stale_ids),
+                )
             connection.execute(
                 """UPDATE warehouse_reminder_events
                 SET status='failed', last_error_code='stale_sending',
@@ -176,7 +186,11 @@ class WarehouseReminderDatabase:
                     self._audit(connection, shift_id=int(row["shift_id"]), actor_user_id=None, event_type="warehouse_reminder_cancelled", entity_id=event_id, now=now)
                 return None
             participants = connection.execute(
-                "SELECT COUNT(*) FROM warehouse_shift_sessions WHERE warehouse_shift_id=? AND status='open'",
+                """SELECT COUNT(DISTINCT a.user_id)
+                   FROM warehouse_shift_sessions a
+                   JOIN warehouse_shifts s ON s.id=?
+                   WHERE a.source_location_id=s.source_location_id
+                     AND a.status='open'""",
                 (row["shift_id"],),
             ).fetchone()[0]
             if (not row["enabled"] or (row["target_chat_id"] is None and not participants)
@@ -198,11 +212,30 @@ class WarehouseReminderDatabase:
             return claimed
 
     def active_recipients(self, shift_id: int) -> list[int]:
+        """Return continuous open sessions at the shift's source location.
+
+        Attendance keeps its opening shift for history, while warehouse shifts
+        roll over at cutoff; location matching intentionally bridges that split.
+        """
         with self._connection() as connection:
             return [int(row[0]) for row in connection.execute(
-                "SELECT DISTINCT user_id FROM warehouse_shift_sessions WHERE warehouse_shift_id=? AND status='open' ORDER BY user_id",
+                """SELECT DISTINCT a.user_id
+                   FROM warehouse_shift_sessions a
+                   JOIN warehouse_shifts s ON s.id=?
+                   WHERE a.source_location_id=s.source_location_id
+                     AND a.status='open' ORDER BY a.user_id""",
                 (shift_id,),
             )]
+
+    def successful_delivery_message(self, event_id: int) -> int | None:
+        with self._connection() as connection:
+            row = connection.execute(
+                """SELECT telegram_message_id
+                   FROM warehouse_reminder_event_deliveries
+                   WHERE event_id=? AND status='sent' AND telegram_message_id IS NOT NULL
+                   ORDER BY user_id LIMIT 1""", (event_id,),
+            ).fetchone()
+            return int(row[0]) if row is not None else None
 
     def claim_delivery(self, event_id: int, user_id: int, now: str) -> bool:
         with self._transaction() as connection:

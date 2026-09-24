@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from datetime import UTC, date, datetime
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator
@@ -52,6 +53,28 @@ class WarehouseAttendanceDatabase:
     @staticmethod
     def _dict(row: sqlite3.Row) -> dict[str, Any]:
         return {key: row[key] for key in row.keys()}
+
+    @staticmethod
+    def _timestamp(value: str, field: str) -> datetime:
+        if not isinstance(value, str) or not value.endswith("Z"):
+            raise WarehouseAttendanceError(f"{field} must be UTC RFC3339 with Z")
+        try:
+            parsed = datetime.fromisoformat(value[:-1] + "+00:00")
+        except ValueError as exc:
+            raise WarehouseAttendanceError(f"{field} is not valid RFC3339") from exc
+        if parsed.tzinfo is None or parsed.utcoffset() != UTC.utcoffset(parsed):
+            raise WarehouseAttendanceError(f"{field} must be UTC")
+        return parsed
+
+    @staticmethod
+    def _business_date(value: str) -> date:
+        try:
+            parsed = date.fromisoformat(value)
+        except (TypeError, ValueError) as exc:
+            raise WarehouseAttendanceError("business_date is invalid") from exc
+        if parsed.isoformat() != value:
+            raise WarehouseAttendanceError("business_date must use YYYY-MM-DD")
+        return parsed
 
     @staticmethod
     def _audit(
@@ -106,6 +129,10 @@ class WarehouseAttendanceDatabase:
             )]
 
     def open_session(self, payload: dict[str, Any]) -> tuple[dict[str, Any], bool]:
+        self._business_date(payload["business_date"])
+        self._timestamp(payload["now"], "opened_at_utc")
+        self._timestamp(payload["started_at_utc"], "started_at_utc")
+        self._timestamp(payload["scheduled_close_at_utc"], "scheduled_close_at_utc")
         with self._transaction() as connection:
             existing = connection.execute(
                 "SELECT * FROM warehouse_shift_sessions WHERE user_id=? AND status='open'",
@@ -141,6 +168,7 @@ class WarehouseAttendanceDatabase:
             return result, True
 
     def close_own(self, user_id: int, now: str) -> tuple[dict[str, Any] | None, bool]:
+        closed = self._timestamp(now, "closed_at_utc")
         with self._transaction() as connection:
             row = connection.execute(
                 "SELECT * FROM warehouse_shift_sessions WHERE user_id=? AND status='open'",
@@ -153,6 +181,8 @@ class WarehouseAttendanceDatabase:
                 ).fetchone()
                 return (self._dict(latest) if latest else None), False
             before = self._dict(row)
+            if closed < self._timestamp(str(row["opened_at_utc"]), "opened_at_utc"):
+                raise WarehouseAttendanceError("closed_at_utc precedes opened_at_utc")
             cursor = connection.execute(
                 """UPDATE warehouse_shift_sessions SET status='closed',closed_at_utc=?,
                    closed_by_user_id=?,updated_at_utc=?,revision=revision+1
@@ -175,8 +205,9 @@ class WarehouseAttendanceDatabase:
     def force_close(self, session_id: int, actor_user_id: int, reason: str,
                     now: str, expected_revision: int) -> dict[str, Any]:
         reason = reason.strip()
-        if not reason:
-            raise ValueError("Причина обязательна")
+        if not reason or len(reason) > 500:
+            raise ValueError("Причина должна содержать от 1 до 500 символов")
+        closed = self._timestamp(now, "closed_at_utc")
         with self._transaction() as connection:
             row = connection.execute(
                 "SELECT * FROM warehouse_shift_sessions WHERE id=?", (session_id,)
@@ -186,6 +217,8 @@ class WarehouseAttendanceDatabase:
             if int(row["revision"]) != expected_revision:
                 raise WarehouseAttendanceConflict("Attendance revision conflict")
             before = self._dict(row)
+            if closed < self._timestamp(str(row["opened_at_utc"]), "opened_at_utc"):
+                raise WarehouseAttendanceError("closed_at_utc precedes opened_at_utc")
             cursor = connection.execute(
                 """UPDATE warehouse_shift_sessions SET status='force_closed',
                    closed_at_utc=?,closed_by_user_id=?,close_reason=?,updated_at_utc=?,
@@ -208,7 +241,10 @@ class WarehouseAttendanceDatabase:
     def open_sessions(self) -> list[dict[str, Any]]:
         with self._connection() as connection:
             return [self._dict(row) for row in connection.execute(
-                "SELECT * FROM warehouse_shift_sessions WHERE status='open' ORDER BY opened_at_utc,id"
+                """SELECT a.*,l.name source_location_name
+                   FROM warehouse_shift_sessions a
+                   JOIN warehouse_locations l ON l.id=a.source_location_id
+                   WHERE a.status='open' ORDER BY a.opened_at_utc,a.id"""
             )]
 
     def sessions_between(self, first_date: str, last_date: str) -> list[dict[str, Any]]:

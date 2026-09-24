@@ -47,6 +47,15 @@ class WarehouseAttendanceService:
             "now": utc_rfc3339(now),
         })
 
+    def current_period(self, user_id: int):
+        self.access.require_warehouse_attendance(user_id)
+        settings = self.repository.runtime_settings()
+        return BusinessDateService(
+            timezone=str(settings["timezone"]),
+            cutoff=str(settings["cutoff_local_time"]),
+            clock=self.clock,
+        ).current_period()
+
     def close(self, user_id: int) -> tuple[dict[str, Any] | None, bool]:
         self.access.require_warehouse_attendance(user_id)
         return self.repository.close_own(user_id, utc_rfc3339(self._now()))
@@ -70,4 +79,7 @@ class WarehouseAttendanceService:
         start = datetime.fromisoformat(str(session["opened_at_utc"]).replace("Z", "+00:00"))
         end_text = session.get("closed_at_utc")
         end = datetime.fromisoformat(str(end_text).replace("Z", "+00:00")) if end_text else (now or datetime.now(UTC))
-        return max(0, int((end - start).total_seconds()))
+        seconds = int((end - start).total_seconds())
+        if seconds < 0:
+            raise ValueError("Attendance close precedes open")
+        return seconds

@@ -47,7 +47,7 @@ from app.services.warehouse.reminder_service import WarehouseReminderService
 from app.services.warehouse.reminder_service import WarehouseReminderSettingsService
 from app.services.warehouse.schedule_service import WarehouseScheduleService
 from app.services.warehouse.attendance_service import WarehouseAttendanceService
-from app.services.warehouse.attendance_xlsx_service import WarehouseAttendanceXlsxService
+from app.services.warehouse.attendance_xlsx_service import AttendanceReportCoordinator, WarehouseAttendanceXlsxService
 from app.storage.json_storage import JsonCatalogStorage
 from app.storage.user_database import UserDatabase
 from app.storage.warehouse_operations_database import WarehouseOperationsDatabase
@@ -184,6 +184,7 @@ async def main() -> None:
     warehouse_schedule_service = None
     warehouse_attendance_service = None
     warehouse_attendance_xlsx_service = None
+    warehouse_attendance_report_coordinator = None
     if settings.warehouse_enabled:
         warehouse_attendance_repository = WarehouseAttendanceDatabase(settings.database_path)
         warehouse_attendance_service = WarehouseAttendanceService(
@@ -192,6 +193,7 @@ async def main() -> None:
         warehouse_attendance_xlsx_service = WarehouseAttendanceXlsxService(
             warehouse_attendance_repository, auth_service, settings.warehouse_reports_path
         )
+        warehouse_attendance_report_coordinator = AttendanceReportCoordinator()
         warehouse_service = WarehouseOperationsService(
             WarehouseOperationsDatabase(settings.database_path),
             auth_service,
@@ -279,6 +281,7 @@ async def main() -> None:
             warehouse_schedule_service=warehouse_schedule_service,
             warehouse_attendance_service=warehouse_attendance_service,
             warehouse_attendance_xlsx_service=warehouse_attendance_xlsx_service,
+            warehouse_attendance_report_coordinator=warehouse_attendance_report_coordinator,
             close_bot_session=False,
         )
     finally:

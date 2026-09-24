@@ -11,18 +11,35 @@ SCHEMA = (
         id INTEGER PRIMARY KEY,
         warehouse_shift_id INTEGER NOT NULL,
         source_location_id INTEGER NOT NULL,
-        business_date TEXT NOT NULL CHECK(length(business_date)=10),
+        business_date TEXT NOT NULL CHECK(
+            length(business_date)=10 AND date(business_date) IS NOT NULL
+            AND date(business_date)=business_date
+        ),
         user_id INTEGER NOT NULL,
-        opened_at_utc TEXT NOT NULL,
-        closed_at_utc TEXT NULL,
+        opened_at_utc TEXT NOT NULL CHECK(
+            opened_at_utc GLOB '????-??-??T??:??:??*Z'
+            AND datetime(opened_at_utc) IS NOT NULL
+        ),
+        closed_at_utc TEXT NULL CHECK(
+            closed_at_utc IS NULL OR (
+                closed_at_utc GLOB '????-??-??T??:??:??*Z'
+                AND datetime(closed_at_utc) IS NOT NULL
+            )
+        ),
         opened_by_user_id INTEGER NOT NULL,
         closed_by_user_id INTEGER NULL,
         close_reason TEXT NULL,
         status TEXT NOT NULL CHECK(status IN ('open','closed','force_closed')),
         display_name_snapshot TEXT NOT NULL CHECK(trim(display_name_snapshot)<>''),
         username_snapshot TEXT NULL,
-        created_at_utc TEXT NOT NULL,
-        updated_at_utc TEXT NOT NULL,
+        created_at_utc TEXT NOT NULL CHECK(
+            created_at_utc GLOB '????-??-??T??:??:??*Z'
+            AND datetime(created_at_utc) IS NOT NULL
+        ),
+        updated_at_utc TEXT NOT NULL CHECK(
+            updated_at_utc GLOB '????-??-??T??:??:??*Z'
+            AND datetime(updated_at_utc) IS NOT NULL
+        ),
         revision INTEGER NOT NULL DEFAULT 1 CHECK(revision>0),
         FOREIGN KEY(warehouse_shift_id) REFERENCES warehouse_shifts(id)
             ON UPDATE RESTRICT ON DELETE RESTRICT,
@@ -38,6 +55,8 @@ SCHEMA = (
            OR (status IN ('closed','force_closed') AND closed_at_utc IS NOT NULL
                AND closed_by_user_id IS NOT NULL)),
         CHECK(status!='force_closed' OR (close_reason IS NOT NULL AND trim(close_reason)<>''))
+        ,CHECK(status!='closed' OR close_reason IS NULL)
+        ,CHECK(closed_at_utc IS NULL OR julianday(closed_at_utc)>=julianday(opened_at_utc))
     )""",
     """CREATE UNIQUE INDEX ux_warehouse_shift_sessions_user_open
        ON warehouse_shift_sessions(user_id) WHERE status='open'""",
@@ -112,6 +131,15 @@ def validate_warehouse_attendance_schema(connection: sqlite3.Connection) -> None
         "statusin('open','closed','force_closed')",
         "revision>0",
         "status!='force_closed'",
+        "date(business_date)=business_date",
+        "opened_at_utcglob'????-??-??t??:??:??*z'",
+        "datetime(opened_at_utc)isnotnull",
+        "closed_at_utcglob'????-??-??t??:??:??*z'",
+        "datetime(closed_at_utc)isnotnull",
+        "datetime(created_at_utc)isnotnull",
+        "datetime(updated_at_utc)isnotnull",
+        "julianday(closed_at_utc)>=julianday(opened_at_utc)",
+        "status!='closed'orclose_reasonisnull",
     ):
         if fragment not in table_sql:
             raise WarehouseAttendanceSchemaError("Attendance CHECK constraints are incomplete")

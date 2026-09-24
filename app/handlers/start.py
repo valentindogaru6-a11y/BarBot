@@ -143,6 +143,7 @@ async def handle_help(
     state: FSMContext,
     auth_service: AuthService,
     warehouse_enabled: bool = False,
+    warehouse_attendance_service: WarehouseAttendanceService | None = None,
 ) -> None:
     """Show concise usage help and the role-aware main menu."""
 
@@ -162,7 +163,8 @@ async def handle_help(
         if warehouse_enabled:
             await message.answer(
                 ACCOUNTANT_WAREHOUSE_HELP_TEXT,
-                reply_markup=_main_menu_for(context, warehouse_enabled),
+                reply_markup=_main_menu_for(context, warehouse_enabled, await _attendance_open(
+                    warehouse_attendance_service, context, warehouse_enabled)),
             )
         else:
             await message.answer(ACCOUNTANT_HELP_TEXT)
@@ -176,7 +178,8 @@ async def handle_help(
     await message.answer(
         text,
         reply_markup=(
-            _main_menu_for(context, warehouse_enabled)
+            _main_menu_for(context, warehouse_enabled, await _attendance_open(
+                warehouse_attendance_service, context, warehouse_enabled))
             if context is not None
             else build_main_menu_keyboard()
         ),

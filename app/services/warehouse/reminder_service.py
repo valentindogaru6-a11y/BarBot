@@ -58,7 +58,9 @@ class WarehouseReminderService:
                 self.repository.active_recipients, int(claim["shift_id"])
             )
             failed = False
-            last_message_id: int | None = None
+            last_message_id = await asyncio.to_thread(
+                self.repository.successful_delivery_message, int(claim["id"])
+            )
             for recipient in recipients:
                 owned = await asyncio.to_thread(
                     self.repository.claim_delivery, int(claim["id"]), recipient, stamp
@@ -86,9 +88,9 @@ class WarehouseReminderService:
                 except Exception as exc:
                     failed = True
                     error_type = type(exc).__name__.casefold()
-            if failed:
+            if failed or last_message_id is None:
                 await asyncio.to_thread(self.repository.finish, int(claim["id"]), None,
-                    stamp, (error_type if 'error_type' in locals() else "delivery_failed",
+                    stamp, (error_type if 'error_type' in locals() else "no_successful_delivery",
                             "Telegram не принял напоминание"))
             else:
                 await asyncio.to_thread(self.repository.finish, int(claim["id"]),

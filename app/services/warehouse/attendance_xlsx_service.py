@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import calendar
+import threading
+import time
 from collections import defaultdict
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -15,6 +17,39 @@ import xlsxwriter
 from app.services.access_service import AccessService
 from app.services.warehouse.xlsx_report_service import _validate_xlsx, safe_excel_text
 from app.storage.warehouse_attendance_database import WarehouseAttendanceDatabase
+
+
+class AttendanceReportCoordinator:
+    """Single-process claim for one requester/period/token report request."""
+
+    def __init__(self, completed_ttl_seconds: float = 120.0) -> None:
+        self.completed_ttl_seconds = completed_ttl_seconds
+        self._lock = threading.Lock()
+        self._claims: dict[tuple[int, str], tuple[int, str, float]] = {}
+
+    def claim(self, user_id: int, period: str, token: int) -> bool:
+        key = (user_id, period)
+        now = time.monotonic()
+        with self._lock:
+            current = self._claims.get(key)
+            if current is not None:
+                old_token, status, changed = current
+                if status == "running" or (old_token == token and now - changed < self.completed_ttl_seconds):
+                    return False
+            self._claims[key] = (token, "running", now)
+            return True
+
+    def finish(self, user_id: int, period: str, token: int) -> None:
+        key = (user_id, period)
+        with self._lock:
+            if self._claims.get(key, (None,))[0] == token:
+                self._claims[key] = (token, "completed", time.monotonic())
+
+    def release(self, user_id: int, period: str, token: int) -> None:
+        key = (user_id, period)
+        with self._lock:
+            if self._claims.get(key, (None,))[0] == token:
+                self._claims.pop(key, None)
 
 
 def parse_month(value: str) -> tuple[date, date]:
@@ -31,13 +66,21 @@ def parse_month(value: str) -> tuple[date, date]:
 
 
 def _dt(value: str) -> datetime:
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if not isinstance(value, str) or not value.endswith("Z"):
+        raise ValueError("Attendance timestamp must be UTC RFC3339 with Z")
+    parsed = datetime.fromisoformat(value[:-1] + "+00:00")
+    if parsed.tzinfo is None or parsed.utcoffset() != UTC.utcoffset(parsed):
+        raise ValueError("Attendance timestamp must be UTC")
+    return parsed
 
 
 def _duration(row: dict[str, Any]) -> int | None:
     if not row.get("closed_at_utc"):
         return None
-    return max(0, int((_dt(row["closed_at_utc"]) - _dt(row["opened_at_utc"])).total_seconds()))
+    seconds = int((_dt(row["closed_at_utc"]) - _dt(row["opened_at_utc"])).total_seconds())
+    if seconds < 0:
+        raise ValueError("Attendance close precedes open")
+    return seconds
 
 
 def _hm(seconds: int | None) -> str:
@@ -114,9 +157,10 @@ class WarehouseAttendanceXlsxService:
             cal.write(r,0,safe_excel_text(name)); total_seconds=0
             for c, day in enumerate(days,1):
                 sessions=by_day_user.get((uid,day.isoformat()),[])
-                if any(x["status"]=="open" for x in sessions): value="ОТКРЫТА"
-                else:
-                    seconds=sum(_duration(x) or 0 for x in sessions); total_seconds+=seconds; value=_hm(seconds) if sessions else ""
+                seconds=sum(_duration(x) or 0 for x in sessions if x["status"] in {"closed","force_closed"})
+                total_seconds+=seconds
+                has_open=any(x["status"]=="open" for x in sessions)
+                value=(f"{_hm(seconds)} + ОТКРЫТА" if seconds and has_open else "ОТКРЫТА" if has_open else _hm(seconds) if sessions else "")
                 cal.write(r,c,value)
             cal.write(r,len(days)+1,_hm(total_seconds))
         workbook.close()
