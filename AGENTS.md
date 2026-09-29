@@ -107,3 +107,48 @@ production rollout, а разрешение пользователя на оди
 
 Каждый этап оформляется отдельным коммитом только по явной команде владельца.
 После изменений запускать pytest, compileall, import check и git diff --check.
+
+## KOS project-memory protocol
+
+BarBot uses the local knowledge entrypoint `memory/MEMORY_INDEX.md` and the
+shared, project-neutral methodology under `global-kos/`.  The production-safety
+rules above always take precedence over memory guidance.  Memory is never an
+authorization for production access or an alternative to a required live
+preflight.
+
+Classify each task before broad source reads:
+
+- **Lightweight**: direct questions, status checks, and small localized work.
+  Read `memory/MEMORY_INDEX.md` and only the smallest relevant memory slice.
+- **Standard**: normal implementation, multi-file documentation, feature work,
+  or non-trivial debugging.  Also check current context and working memory; use
+  a targeted source-localization pass before opening code broadly.
+- **Full**: architecture, high-risk or unclear work, stale/conflicting memory,
+  broad impact, or multi-turn work.  Apply Standard workflow plus trust,
+  freshness, lifecycle, and compression review for the relevant slice.
+
+For all modes:
+
+1. Read `memory/MEMORY_INDEX.md` first and follow only the route relevant to the
+   task; templates and archive are not default reading.
+2. Revalidate stale, owner-confirmed, and runtime-sensitive facts before any
+   consequential action.
+3. Read code/tests when exact control flow, permissions, data shape, or current
+   behavior matters; memory does not replace source evidence.
+4. Never start production work from memory alone.  The staged rollout policy
+   and explicit per-stage authorization remain mandatory.
+5. Update existing memory after material architecture or workflow changes when
+   it will make later work faster or safer.  Do not create notes without a
+   practical routing or reuse benefit.
+6. Standard/Full tasks participating in the active utility pilot record one
+   honest, redacted local event as described in
+   `memory/02-working/MEMORY_UTILITY_LOG.md`.  Unknown values stay `unknown`.
+   No network or Telegram delivery is part of the BarBot pilot.
+7. Use `rg`, import maps, and targeted tests as the localization fallback when
+   Graphify or PowerShell is unavailable; do not install them for routine work.
+8. Keep project facts in `memory/`; keep reusable templates and methodology in
+   `global-kos/`.  Use repo-relative paths in all memory documents.
+
+The pilot is reviewed after 10 eligible Standard/Full observations.  Track
+usefulness and overhead honestly; refine or stop the pilot if it becomes
+ceremonial or misleading.

@@ -1,0 +1,9 @@
+# Starter Notes
+
+Good first notes:
+
+- `SCENE_SUMMARY.md`
+- `RENDER_LOOP_SUMMARY.md`
+- `ASSET_PIPELINE_SUMMARY.md`
+- `INTERACTION_SUMMARY.md`
+- `PERFORMANCE_SUMMARY.md`
