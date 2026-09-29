@@ -91,6 +91,11 @@
                   "amount": 25,
                   "unit": "мл"
                 },
+                                {
+                  "name": "Monin сироп клубника (для розового цвета)",
+                  "amount": 20,
+                  "unit": "мл"
+                },
                 {
                   "name": "Мята/базилик",
                   "amount": 5,
@@ -144,7 +149,7 @@
                   "unit": "мл"
                 },
                 {
-                  "name": "Пюре манго-маракуйя п/ф",
+                  "name": "Пюре маракуйя монин",
                   "amount": 20,
                   "unit": "мл"
                 },
@@ -212,7 +217,7 @@
                   "unit": "мл"
                 },
                 {
-                  "name": "Пюре манго-маракуйя п/ф",
+                  "name": "Пюре маракуйя монин",
                   "amount": 20,
                   "unit": "мл"
                 },
@@ -621,7 +626,7 @@
                 }
               ],
               "fields": {
-                "garnish": "Требуется уточнение",
+                "garnish": "Бошка базилика",
                 "glassware": "Рокс",
                 "ice": "Ледяная глыба",
                 "method": "Shake",
@@ -633,7 +638,7 @@
               "tags": [
                 "авторский",
                 "джин",
-                "цитрусовый"
+                "Базиликовый"
               ],
               "voice_aliases": [],
               "sort_order": 110,
@@ -685,8 +690,7 @@
               "tags": [
                 "авторский",
                 "ром",
-                "ягодный",
-                "цитрусовый"
+                "ягодный"
               ],
               "voice_aliases": [],
               "sort_order": 120,
@@ -720,7 +724,7 @@
                   "unit": "мл"
                 },
                 {
-                  "name": "Соус молочный шоколад п/ф",
+                  "name": "Соус молочный шоколад п/ф (взять у фицов)",
                   "amount": 30,
                   "unit": "мл"
                 },
@@ -731,7 +735,7 @@
                 }
               ],
               "fields": {
-                "garnish": "Орех фундук — 6 г, шоколад — 3 г",
+                "garnish": "Орех фундук (сделать крошку) — 6 г, шоколад (тёртый) — 3 г",
                 "glassware": "Никанора (пони)",
                 "ice": "Без льда",
                 "method": "Dry Shake → Shake",
@@ -757,7 +761,7 @@
               "photo_file_id": "AgACAgIAAxkBAANZamu3gvjQLcSq7UxYLDrP7OMc-cQAAiAeaxtKP1hLEzG3wHGksSYBAAMCAAN5AAM9BA",
               "ingredients": [
                 {
-                  "name": "Big Moustache",
+                  "name": "Виски Bankhall",
                   "amount": 50,
                   "unit": "мл"
                 },
@@ -768,6 +772,11 @@
                 },
                 {
                   "name": "Ликёр De Kyper (трипл-сек)",
+                  "amount": 15,
+                  "unit": "мл"
+                },
+                {
+                  "name": "Сахарный сироп (на случай если кордиал для чая Бери Редианс не сильно сладкий)",
                   "amount": 15,
                   "unit": "мл"
                 },
@@ -19052,6 +19061,294 @@
           ],
           "voice_aliases": [],
           "sort_order": 20,
+          "is_active": true
+        }
+      ]
+    },
+    {
+      "id": "new_lemonades",
+      "name": "Новые лимонады",
+      "emoji": "🍋",
+      "description": "Лимонады из актуальных технологических карт.",
+      "sort_order": 20,
+      "is_active": true,
+      "subcategories": [],
+      "items": [
+        {
+          "id": "ays_ti",
+          "name": "Айс ти",
+          "short_description": "Позиция из актуальной технологической карты бара.",
+          "description": "Состав перенесён из технологической карты № 31967 от 13.08.2026. Расчётный выход: 1 порция.",
+          "photo_file_id": null,
+          "ingredients": [
+            {
+              "name": "Сироп в ассортименте (Белый чай)",
+              "amount": 20,
+              "unit": "мл"
+            },
+            {
+              "name": "База Клауди",
+              "amount": 20,
+              "unit": "мл"
+            },
+            {
+              "name": "Вода",
+              "amount": 260,
+              "unit": "мл"
+            },
+            {
+              "name": "Чипс апельсин",
+              "amount": 2,
+              "unit": "г"
+            },
+            {
+              "name": "Мята зачищ",
+              "amount": 2,
+              "unit": "г"
+            }
+          ],
+          "fields": {
+            "tech_card_number": "31967",
+            "tech_card_date": "13.08.2026",
+            "yield": "1 порция"
+          },
+          "steps": [],
+          "tags": [
+            "новые лимонады",
+            "безалкогольный напиток"
+          ],
+          "voice_aliases": [],
+          "sort_order": 10,
+          "is_active": true
+        },
+        {
+          "id": "klassicheskiy",
+          "name": "Классический лимонад",
+          "short_description": "Позиция из актуальной технологической карты бара.",
+          "description": "Состав перенесён из технологической карты № 31968 от 13.08.2026. Расчётный выход: 1 порция.",
+          "photo_file_id": "AgACAgIAAxkBAAIH2Gq8BsIYqMCNkrkZKt4lYYtTswLBAALjIGsbHyHgSTGX4cXre26kAQADAgADeQADPQQ",
+          "ingredients": [
+            {
+              "name": "База Клауди",
+              "amount": 30,
+              "unit": "мл"
+            },
+            {
+              "name": "Вода минеральная (бар)",
+              "amount": 260,
+              "unit": "мл"
+            },
+            {
+              "name": "Лимон",
+              "amount": 10,
+              "unit": "г"
+            },
+            {
+              "name": "Мята зачищ",
+              "amount": 2,
+              "unit": "г"
+            }
+          ],
+          "fields": {
+            "tech_card_number": "31968",
+            "tech_card_date": "13.08.2026",
+            "yield": "1 порция"
+          },
+          "steps": [],
+          "tags": [
+            "новые лимонады",
+            "безалкогольный напиток"
+          ],
+          "voice_aliases": [],
+          "sort_order": 20,
+          "is_active": true
+        },
+        {
+          "id": "krem_soda",
+          "name": "Крем Сода",
+          "short_description": "Позиция из актуальной технологической карты бара.",
+          "description": "Состав перенесён из технологической карты № 31963 от 13.08.2026. Расчётный выход: 1 порция.",
+          "photo_file_id": "AgACAgIAAxkBAAIH3Gq8BuVNn7PZ_CeV4TNMLcBxAY27AALnIGsbHyHgSaTct2OhbdIWAQADAgADeQADPQQ",
+          "ingredients": [
+            {
+              "name": "Сироп в ассортименте (Маршмеллоу)",
+              "amount": 20,
+              "unit": "мл"
+            },
+            {
+              "name": "База Клауди",
+              "amount": 20,
+              "unit": "мл"
+            },
+            {
+              "name": "Вода минеральная (бар)",
+              "amount": 260,
+              "unit": "мл"
+            },
+            {
+              "name": "Маршмеллоу (бар)",
+              "amount": 2,
+              "unit": "г"
+            },
+            {
+              "name": "Пена из малины",
+              "amount": 5,
+              "unit": "г"
+            }
+          ],
+          "fields": {
+            "tech_card_number": "31963",
+            "tech_card_date": "13.08.2026",
+            "yield": "1 порция"
+          },
+          "steps": [],
+          "tags": [
+            "новые лимонады",
+            "безалкогольный напиток"
+          ],
+          "voice_aliases": [],
+          "sort_order": 30,
+          "is_active": true
+        },
+        {
+          "id": "limonad_chereshnya",
+          "name": "Лимонад Черешня",
+          "short_description": "Позиция из актуальной технологической карты бара.",
+          "description": "Состав перенесён из технологической карты № 31958 от 10.08.2026. Расчётный выход: 1 порция.",
+          "photo_file_id": "AgACAgIAAxkBAAIH1Gq8BqTBwfuMdncNh64oWFJTzvEbAALiIGsbHyHgSUCbelcE_HrPAQADAgADeQADPQQ",
+          "ingredients": [
+            {
+              "name": "Сироп в ассортименте (Черешня)",
+              "amount": 20,
+              "unit": "мл"
+            },
+            {
+              "name": "База Клауди",
+              "amount": 20,
+              "unit": "мл"
+            },
+            {
+              "name": "Вода минеральная (бар)",
+              "amount": 260,
+              "unit": "мл"
+            },
+            {
+              "name": "Мята зачищ",
+              "amount": 2,
+              "unit": "г"
+            }
+          ],
+          "fields": {
+            "tech_card_number": "31958",
+            "tech_card_date": "10.08.2026",
+            "yield": "1 порция"
+          },
+          "steps": [],
+          "tags": [
+            "новые лимонады",
+            "безалкогольный напиток"
+          ],
+          "voice_aliases": [],
+          "sort_order": 40,
+          "is_active": true
+        },
+        {
+          "id": "marakuyya_ogurets",
+          "name": "Маракуйя - огурец",
+          "short_description": "Позиция из актуальной технологической карты бара.",
+          "description": "Состав перенесён из технологической карты № 31959 от 10.08.2026. Расчётный выход: 1 порция.",
+          "photo_file_id": "AgACAgIAAxkBAAIH4Gq8Bwmy2swne-bKTjEjFyomyMsKAALoIGsbHyHgSe_Fe6qF8z-KAQADAgADeQADPQQ",
+          "ingredients": [
+            {
+              "name": "Сироп в ассортименте (Кукумбер)",
+              "amount": 15,
+              "unit": "мл"
+            },
+            {
+              "name": "Ранчо Лимон",
+              "amount": 20,
+              "unit": "мл"
+            },
+            {
+              "name": "Вода минеральная (бар)",
+              "amount": 260,
+              "unit": "мл"
+            },
+            {
+              "name": "Мята зачищ",
+              "amount": 2,
+              "unit": "г"
+            },
+            {
+              "name": "Пюре маракуйя",
+              "amount": 20,
+              "unit": "г"
+            },
+            {
+              "name": "Огурец свежий",
+              "amount": 5,
+              "unit": "г"
+            }
+          ],
+          "fields": {
+            "tech_card_number": "31959",
+            "tech_card_date": "10.08.2026",
+            "yield": "1 порция"
+          },
+          "steps": [],
+          "tags": [
+            "новые лимонады",
+            "безалкогольный напиток"
+          ],
+          "voice_aliases": [],
+          "sort_order": 50,
+          "is_active": true
+        },
+        {
+          "id": "rubi_zemlyanika",
+          "name": "Руби-земляника",
+          "short_description": "Позиция из актуальной технологической карты бара.",
+          "description": "Состав перенесён из технологической карты № 31966 от 13.08.2026. Расчётный выход: 1 порция.",
+          "photo_file_id": "AgACAgIAAxkBAAIH5Gq8By7dSnC4CzcGHRIJCSsndczuAALqIGsbHyHgSb7ZOCCzXvtRAQADAgADeQADPQQ",
+          "ingredients": [
+            {
+              "name": "Сироп в ассортименте (Руби/Клубника)",
+              "amount": 20,
+              "unit": "мл"
+            },
+            {
+              "name": "База Клауди",
+              "amount": 20,
+              "unit": "мл"
+            },
+            {
+              "name": "Вода минеральная (бар)",
+              "amount": 260,
+              "unit": "мл"
+            },
+            {
+              "name": "Малина сублимированая",
+              "amount": 2,
+              "unit": "г"
+            },
+            {
+              "name": "Земляника",
+              "amount": 20,
+              "unit": "г"
+            }
+          ],
+          "fields": {
+            "tech_card_number": "31966",
+            "tech_card_date": "13.08.2026",
+            "yield": "1 порция"
+          },
+          "steps": [],
+          "tags": [
+            "новые лимонады",
+            "безалкогольный напиток"
+          ],
+          "voice_aliases": [],
+          "sort_order": 60,
           "is_active": true
         }
       ]

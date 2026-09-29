@@ -8,6 +8,10 @@ import pytest
 from app.keyboards.callbacks import ItemCallback
 from app.models.catalog import Catalog
 from app.storage.json_storage import JsonCatalogStorage
+from source.import_bar_xls import (
+    CatalogImporter,
+    OWNER_CURATED_LEMONADE_RECIPE_IDS,
+)
 
 
 LEGACY_STABLE_IDS = {
@@ -115,8 +119,8 @@ def _subcategory_counts(catalog: Catalog, category_id: str) -> dict[str, int]:
 
 
 def test_imported_catalog_counts(imported_catalog: Catalog) -> None:
-    assert len(imported_catalog.categories) == 9
-    assert len(list(_all_items(imported_catalog))) == 507
+    assert len(imported_catalog.categories) == 10
+    assert len(list(_all_items(imported_catalog))) == 513
     assert _subcategory_counts(imported_catalog, "cocktails") == {
         "signature": 15,
         "old_cocktails": 49,
@@ -136,6 +140,7 @@ def test_spreadsheet_categories_are_grouped_once(
     assert len(by_id) == len(imported_catalog.categories)
     assert set(by_id) == {
         "cocktails",
+        "new_lemonades",
         "signature_tea",
         "classic_tea",
         "coffee",
@@ -146,6 +151,35 @@ def test_spreadsheet_categories_are_grouped_once(
         "desserts",
     }
     assert len(by_id["signature_tea"].items) == 10
+    assert [item.name for item in by_id["new_lemonades"].items] == [
+        "Айс ти",
+        "Классический лимонад",
+        "Крем Сода",
+        "Лимонад Черешня",
+        "Маракуйя - огурец",
+        "Руби-земляника",
+    ]
+    assert [
+        item.fields["tech_card_number"]
+        for item in by_id["new_lemonades"].items
+    ] == ["31967", "31968", "31963", "31958", "31959", "31966"]
+    ordered_ids = [
+        category.id
+        for category in sorted(
+            imported_catalog.categories,
+            key=lambda category: (
+                category.sort_order,
+                category.name.casefold(),
+                category.id,
+            ),
+        )
+    ]
+    assert ordered_ids.index("cocktails") + 1 == ordered_ids.index(
+        "new_lemonades"
+    )
+    assert ordered_ids.index("new_lemonades") + 1 == ordered_ids.index(
+        "signature_tea"
+    )
     assert [item.id for item in by_id["classic_tea"].items] == [
         "chay_grechaniy",
         "chay_klasichniy",
@@ -188,6 +222,29 @@ def test_spreadsheet_categories_are_grouped_once(
         "infusions_mixes": 24,
         "dessert_bases": 7,
     }
+
+
+def test_owner_curated_lemonade_recipes_survive_reimport(
+    imported_catalog: Catalog,
+) -> None:
+    expected_syrups = {
+        "ays_ti": "Сироп в ассортименте (Белый чай)",
+        "krem_soda": "Сироп в ассортименте (Маршмеллоу)",
+        "limonad_chereshnya": "Сироп в ассортименте (Черешня)",
+        "marakuyya_ogurets": "Сироп в ассортименте (Кукумбер)",
+        "rubi_zemlyanika": "Сироп в ассортименте (Руби/Клубника)",
+    }
+    assert OWNER_CURATED_LEMONADE_RECIPE_IDS == set(expected_syrups)
+
+    reimported = CatalogImporter(
+        imported_catalog.model_copy(deep=True)
+    ).import_all()
+    by_id = {item.id: item for item in _all_items(reimported)}
+
+    assert {
+        item_id: by_id[item_id].ingredients[0].name
+        for item_id in expected_syrups
+    } == expected_syrups
 
 
 def test_import_preserves_every_preexisting_stable_id(
@@ -361,7 +418,7 @@ def test_xls_import_preserves_only_preexisting_manual_steps(
     ]
     items_with_steps = {item.id for item in source_items if item.steps}
 
-    assert len(source_items) == 505
+    assert len(source_items) == 511
     assert items_with_steps == {
         "b_52",
         "green_mexican",
@@ -374,7 +431,7 @@ def test_xls_import_preserves_only_preexisting_manual_steps(
 def test_every_catalog_card_has_ingredients(imported_catalog: Catalog) -> None:
     items = list(_all_items(imported_catalog))
 
-    assert sum(len(item.ingredients) for item in items) == 1447
+    assert sum(len(item.ingredients) for item in items) == 1478
     assert all(item.ingredients for item in items)
 
 
@@ -415,7 +472,7 @@ def test_xls_cards_have_source_metadata_and_clean_units(
         if "tech_card_number" in item.fields
     ]
 
-    assert len(source_items) == 505
+    assert len(source_items) == 511
     assert all(item.fields["tech_card_number"] for item in source_items)
     assert all(item.fields["tech_card_date"] for item in source_items)
     assert all(item.fields["yield"] for item in source_items)

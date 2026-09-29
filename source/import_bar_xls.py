@@ -1,7 +1,7 @@
 """Import the current bar spreadsheets into the universal JSON catalog.
 
 The utility is intentionally kept outside the runtime application.  It parses
-the two owner-provided XLS exports, skips known accounting duplicates, updates
+the owner-provided XLS exports, skips known accounting duplicates, updates
 existing cards by their stable technical-card number (or a curated alias), and
 uses the regular safe catalog storage only when ``--write`` is supplied.
 """
@@ -34,6 +34,7 @@ from app.storage.json_storage import JsonCatalogStorage
 
 PF_FILE = ROOT / "Технологическая_карта_полуфабрикати_бар.xls"
 BAR_FILE = ROOT / "Технологическая карта бар блюда.xls"
+LEMONADE_FILE = ROOT / "Технологическая карта лимонади.xls"
 CATALOG_FILE = ROOT / "data" / "catalog.json"
 
 ORIGINAL_SIGNATURE_IDS = {
@@ -73,6 +74,21 @@ TEXT_SOURCE_RECIPE_IDS = (
     ORIGINAL_SIGNATURE_IDS
     | ORIGINAL_CLASSIC_IDS
     | {"berry-bloom-na"}
+)
+
+# The owner refined the generic "Сироп в ассортименте" rows from the
+# lemonade export with the actual syrup variants used at the bar.  Keep those
+# recipes authoritative while still refreshing their XLS metadata.
+OWNER_CURATED_LEMONADE_RECIPE_IDS = {
+    "ays_ti",
+    "krem_soda",
+    "limonad_chereshnya",
+    "marakuyya_ogurets",
+    "rubi_zemlyanika",
+}
+
+AUTHORITATIVE_RECIPE_IDS = (
+    TEXT_SOURCE_RECIPE_IDS | OWNER_CURATED_LEMONADE_RECIPE_IDS
 )
 
 
@@ -544,6 +560,14 @@ class CatalogImporter:
             if subcategory.id != "methods"
         ]
 
+        self._ensure_category(
+            "new_lemonades",
+            "Новые лимонады",
+            "🍋",
+            20,
+            "Лимонады из актуальных технологических карт.",
+        )
+
         classic_tea = self._ensure_category(
             "classic_tea",
             "Классические чаи",
@@ -891,7 +915,7 @@ class CatalogImporter:
         self.selected_numbers.add(card.number)
         item = self._locate(card, kind)
         if item is not None:
-            if item.id not in TEXT_SOURCE_RECIPE_IDS:
+            if item.id not in AUTHORITATIVE_RECIPE_IDS:
                 item.ingredients = card.ingredients
             item.fields = {**item.fields, **self._source_fields(card)}
             if item.description and item.description.startswith(
@@ -966,6 +990,15 @@ class CatalogImporter:
                 ["п/ф", "полуфабрикат", "барная заготовка"],
             )
 
+        for card in parse_cards(LEMONADE_FILE):
+            self.apply(
+                card,
+                "bar",
+                "new_lemonades",
+                None,
+                ["новые лимонады", "безалкогольный напиток"],
+            )
+
         new_ids = {
             item.id
             for category in self.catalog.categories
@@ -981,13 +1014,21 @@ class CatalogImporter:
             raise RuntimeError("Импорт потерял существующий стабильный ID")
         return Catalog.model_validate(self.catalog.model_dump(mode="python"))
 
-    def print_summary(self, bar_total: int, pf_total: int) -> None:
+    def print_summary(
+        self,
+        bar_total: int,
+        pf_total: int,
+        lemonade_total: int,
+    ) -> None:
         total_items = sum(
             len(category.items)
             + sum(len(subcategory.items) for subcategory in category.subcategories)
             for category in self.catalog.categories
         )
-        print(f"Исходные карточки: бар={bar_total}, п/ф={pf_total}")
+        print(
+            f"Исходные карточки: бар={bar_total}, п/ф={pf_total}, "
+            f"новые лимонады={lemonade_total}"
+        )
         print(f"Использовано: {len(self.selected_numbers)}")
         print(f"Обновлено существующих: {len(self.matched)}")
         print(f"Создано новых: {len(self.created)}")
@@ -1041,6 +1082,7 @@ def main() -> None:
     importer.print_summary(
         bar_total=len(parse_cards(BAR_FILE)),
         pf_total=len(parse_cards(PF_FILE)),
+        lemonade_total=len(parse_cards(LEMONADE_FILE)),
     )
 
 

@@ -29,6 +29,7 @@ def test_loads_repository_catalog_successfully() -> None:
         "soft_drinks",
         "desserts",
         "classic_tea",
+        "new_lemonades",
     ]
     assert [
         subcategory.id
