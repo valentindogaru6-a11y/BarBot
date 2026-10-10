@@ -10,7 +10,14 @@ from app.services.warehouse.intake_parser import parse_intake_message
 
 
 class NeverGemini:
-    async def classify(self, text, *, candidates=(), normalized_entity=""):
+    async def classify(
+        self,
+        text,
+        *,
+        candidates=(),
+        normalized_entity="",
+        conversation=(),
+    ):
         raise AssertionError("Gemini must not be called for deterministic requests")
 
 
@@ -86,3 +93,13 @@ def test_unsupported_request_is_blocked_locally() -> None:
     intent = AssistantOrchestrator.local_intent("перезапусти бота")
     assert intent is not None
     assert intent.intent is AssistantIntentName.UNSUPPORTED
+
+
+def test_explicit_web_routes_to_search_but_action_keeps_priority() -> None:
+    web = AssistantOrchestrator.local_intent(
+        "найди в интернете свежую рецептуру настойки"
+    )
+    assert web is not None and web.intent is AssistantIntentName.WEB_SEARCH
+    assert AssistantOrchestrator.local_intent(
+        "перемести кокосовое молоко сейчас 1 л на кухню"
+    ) is None

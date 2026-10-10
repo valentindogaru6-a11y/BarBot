@@ -4,6 +4,7 @@ from app.services.assistant.coordinator import AssistantRequestCoordinator
 from app.services.assistant.context import (
     AssistantConversationContext,
     AssistantConversationMemory,
+    AssistantConversationTurn,
 )
 from app.services.assistant.orchestrator import (
     AssistantOrchestrator,
@@ -15,6 +16,10 @@ from app.services.assistant.providers import (
     AioHttpTransport,
     AssistantHttpTransport,
     GeminiIntentClient,
+    GeminiGroundedSearchClient,
+    GroundedSearchClient,
+    GroundedSearchResult,
+    GroundedSource,
     GroqSpeechToTextClient,
     IntentModelClient,
     ProviderError,
@@ -40,6 +45,7 @@ __all__ = [
     "AssistantRequestCoordinator",
     "AssistantConversationContext",
     "AssistantConversationMemory",
+    "AssistantConversationTurn",
     "AssistantCatalogRetriever",
     "AssistantToolAction",
     "AssistantToolRegistry",
@@ -47,6 +53,10 @@ __all__ = [
     "AioHttpTransport",
     "AssistantHttpTransport",
     "GeminiIntentClient",
+    "GeminiGroundedSearchClient",
+    "GroundedSearchClient",
+    "GroundedSearchResult",
+    "GroundedSource",
     "GroqSpeechToTextClient",
     "IntentModelClient",
     "ProviderError",

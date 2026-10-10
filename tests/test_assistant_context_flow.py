@@ -69,7 +69,14 @@ class QueueIntentClient:
         self.intents = list(intents)
         self.calls: list[tuple[str, tuple[str, ...], str]] = []
 
-    async def classify(self, text, *, candidates=(), normalized_entity=""):
+    async def classify(
+        self,
+        text,
+        *,
+        candidates=(),
+        normalized_entity="",
+        conversation=(),
+    ):
         self.calls.append((text, tuple(candidates), normalized_entity))
         return self.intents.pop(0)
 
@@ -113,7 +120,11 @@ def test_catalog_clarification_continues_with_same_user_and_clears_context(
         )
     )
     assert shown.await_args.args[3] == "mojito-zero"
-    assert memory.get(1) is None
+    assert memory.get(1).candidate_ids == ()
+    assert memory.provider_history(1)[-1] == (
+        "assistant",
+        "Открыта техкарта: Безалкогольный мохито",
+    )
 
 
 def test_writeoff_followup_combines_only_structured_product_context(
@@ -324,7 +335,14 @@ class RaisingIntentClient:
     def __init__(self, error: BaseException) -> None:
         self.error = error
 
-    async def classify(self, text, *, candidates=(), normalized_entity=""):
+    async def classify(
+        self,
+        text,
+        *,
+        candidates=(),
+        normalized_entity="",
+        conversation=(),
+    ):
         raise self.error
 
 

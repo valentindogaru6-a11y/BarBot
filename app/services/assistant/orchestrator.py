@@ -12,7 +12,11 @@ from app.models.assistant import (
     AssistantIntentName,
 )
 from app.models.catalog import Catalog
-from app.services.assistant.providers import IntentModelClient
+from app.services.assistant.providers import (
+    GroundedSearchClient,
+    GroundedSearchResult,
+    IntentModelClient,
+)
 from app.services.assistant.retrieval import (
     AssistantCatalogRetriever,
     display_catalog_entity,
@@ -21,8 +25,21 @@ from app.services.search_service import SearchResult
 
 MAX_ASSISTANT_TEXT_LENGTH = 2_000
 _UNSUPPORTED_RE = re.compile(
-    r"\b(?:интернет|перезапуст\w*|измени\s+прав|поменяй|редактир|"
+    r"\b(?:перезапуст\w*|измени\s+прав|поменяй|редактир|"
     r"добавь\s+(?:описание|продукт)|создай\s+продукт)\b",
+    re.IGNORECASE,
+)
+_WEB_REQUIRED_RE = re.compile(
+    r"\b(?:найди\s+в\s+интернете|проверь\s+актуальн\w*|сегодня|сейчас|"
+    r"последн\w*\s+новост\w*|актуальн\w*\s+(?:цен\w*|расписан\w*|график\w*))\b",
+    re.IGNORECASE,
+)
+_EXPLICIT_WEB_RE = re.compile(
+    r"\b(?:найди\s+в\s+интернете|проверь\s+актуальн\w*)\b",
+    re.IGNORECASE,
+)
+_WAREHOUSE_ACTION_PREFIX_RE = re.compile(
+    r"^\s*(?:спиши|списать|перемести|переместить)\b",
     re.IGNORECASE,
 )
 _TECH_PATTERNS = (
@@ -63,6 +80,8 @@ class AssistantToolAction:
         "clarify",
         "not_found",
         "unsupported",
+        "general_chat",
+        "web_search",
     ]
     message: str | None = None
     raw_intake: str | None = None
@@ -76,8 +95,18 @@ class AssistantToolAction:
 class AssistantOrchestrator:
     """Recognize deterministic commands before consulting Gemini."""
 
-    def __init__(self, intent_client: IntentModelClient | None) -> None:
+    def __init__(
+        self,
+        intent_client: IntentModelClient | None,
+        *,
+        search_client: GroundedSearchClient | None = None,
+        general_chat_enabled: bool = False,
+        web_search_enabled: bool = False,
+    ) -> None:
         self.intent_client = intent_client
+        self.search_client = search_client
+        self.general_chat_enabled = general_chat_enabled
+        self.web_search_enabled = web_search_enabled
 
     @staticmethod
     def local_intent(text: str) -> AssistantIntent | None:
@@ -86,6 +115,12 @@ class AssistantOrchestrator:
             return AssistantIntent(
                 intent=AssistantIntentName.CLARIFY,
                 clarification="Сформулируйте запрос короче и конкретнее.",
+            )
+        if _EXPLICIT_WEB_RE.search(cleaned):
+            return AssistantIntent(
+                intent=AssistantIntentName.WEB_SEARCH,
+                query=cleaned,
+                needs_web=True,
             )
         if _UNSUPPORTED_RE.search(cleaned):
             return AssistantIntent(intent=AssistantIntentName.UNSUPPORTED)
@@ -112,6 +147,15 @@ class AssistantOrchestrator:
                         confidence=10_000,
                         items=[AssistantIntentItem(product_text=product)],
                     )
+        if (
+            _WEB_REQUIRED_RE.search(cleaned)
+            and not _WAREHOUSE_ACTION_PREFIX_RE.search(cleaned)
+        ):
+            return AssistantIntent(
+                intent=AssistantIntentName.WEB_SEARCH,
+                query=cleaned,
+                needs_web=True,
+            )
         return None
 
     async def interpret(
@@ -120,6 +164,7 @@ class AssistantOrchestrator:
         *,
         candidates: Sequence[str] = (),
         normalized_entity: str = "",
+        conversation: Sequence[tuple[str, str]] = (),
     ) -> AssistantIntent:
         local = self.local_intent(text)
         if local is not None:
@@ -130,6 +175,7 @@ class AssistantOrchestrator:
             text,
             candidates=candidates,
             normalized_entity=normalized_entity,
+            conversation=conversation,
         )
 
     async def interpret_with_provider(
@@ -138,6 +184,7 @@ class AssistantOrchestrator:
         *,
         candidates: Sequence[str] = (),
         normalized_entity: str = "",
+        conversation: Sequence[tuple[str, str]] = (),
     ) -> AssistantIntent:
         """Consult the provider after local retrieval needs disambiguation."""
 
@@ -147,7 +194,18 @@ class AssistantOrchestrator:
             text,
             candidates=candidates,
             normalized_entity=normalized_entity,
+            conversation=conversation,
         )
+
+    async def search_web(
+        self,
+        query: str,
+        *,
+        conversation: Sequence[tuple[str, str]] = (),
+    ) -> GroundedSearchResult:
+        if not self.web_search_enabled or self.search_client is None:
+            raise AssistantUnavailableError("web search is disabled")
+        return await self.search_client.search(query, conversation=conversation)
 
 
 class AssistantToolRegistry:
@@ -168,6 +226,16 @@ class AssistantToolRegistry:
         )
 
     def execute(self, intent: AssistantIntent) -> AssistantToolAction:
+        if intent.intent is AssistantIntentName.GENERAL_CHAT:
+            return AssistantToolAction(
+                "general_chat",
+                message=intent.answer_text,
+            )
+        if intent.intent is AssistantIntentName.WEB_SEARCH:
+            return AssistantToolAction(
+                "web_search",
+                entity_query=intent.query,
+            )
         if intent.intent is AssistantIntentName.UNSUPPORTED:
             return AssistantToolAction(
                 "unsupported",

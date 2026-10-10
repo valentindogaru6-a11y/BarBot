@@ -45,14 +45,17 @@ to false. Text mode requires Gemini; voice mode requires Groq STT and Gemini
 intent classification. A master-only configuration is inert. Provider output
 is constrained by a Gemini-side JSON schema and authoritative local Pydantic
 validation. The AI layer has no direct SQLite, shell, systemd, deployment,
-catalog-editing, or internet-search tools. Production deployment is unverified.
+or catalog-editing tools. Optional Google Search grounding is a separate
+text-only provider path; its untrusted output cannot invoke local tools.
+Production deployment of this development phase is unverified.
 One process-local per-user claim coordinates text and voice so concurrent AI
 requests cannot duplicate provider work; every exit path releases the claim.
 Catalog lookup now resolves locally through normalized exact/token/searchable
 and bounded fuzzy stages before an honest absence result. Gemini receives a
 short versioned role and at most five local candidate labels. A separate
-bounded 15-minute process-local context stores only structured follow-up slots,
-never transcripts; it cannot bypass FSM, permissions, drafts, or confirmation.
+bounded 30-minute process-local context stores structured follow-up slots and
+at most six short dialog turns (6000 characters); it cannot bypass FSM,
+permissions, drafts, or confirmation and is never persisted or logged.
 Live Gemini structured output was owner-authorized and passed on 2026-10-10.
 Groq is still `NOT TESTED — AUDIO SAMPLE REQUIRED`; final verification is a
 controlled owner-only Telegram voice request, not a synthetic production file.

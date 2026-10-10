@@ -38,6 +38,13 @@ async def no_sleep(_delay):
 
 
 def gemini_response(payload: dict) -> HttpResponse:
+    payload = {
+        "answer_text": None,
+        "query": None,
+        "needs_web": False,
+        "clarification": None,
+        **payload,
+    }
     outer = {"candidates": [{"content": {"parts": [{"text": json.dumps(payload)}]}}]}
     return HttpResponse(200, json.dumps(outer).encode())
 
@@ -87,6 +94,8 @@ def test_groq_returns_typed_sanitized_errors(responses, kind, call_count) -> Non
         {"intent": "clarify", "clarification": "Уточните количество"},
         {"intent": "not_found", "query": "мохито"},
         {"intent": "unsupported"},
+        {"intent": "general_chat", "answer_text": "Привет"},
+        {"intent": "web_search", "query": "новости сегодня", "needs_web": True},
     ],
 )
 def test_gemini_accepts_only_allowed_structured_intents(payload) -> None:
@@ -113,6 +122,7 @@ def test_gemini_accepts_only_allowed_structured_intents(payload) -> None:
         "catalog_candidates",
         "allowed_intents",
         "system_prompt_version",
+        "conversation",
     }
     assert request["normalized_entity"] == "entity"
     assert request["system_prompt_version"] == ASSISTANT_SYSTEM_PROMPT_VERSION
@@ -123,7 +133,13 @@ def test_gemini_accepts_only_allowed_structured_intents(payload) -> None:
     assert generation["responseMimeType"] == "application/json"
     schema = generation["responseJsonSchema"]
     assert schema["additionalProperties"] is False
-    assert schema["required"] == ["intent"]
+    assert schema["required"] == [
+        "intent",
+        "answer_text",
+        "query",
+        "needs_web",
+        "clarification",
+    ]
     assert schema["properties"]["intent"]["enum"] == [
         "find_tech_card",
         "prepare_writeoff",
@@ -131,17 +147,22 @@ def test_gemini_accepts_only_allowed_structured_intents(payload) -> None:
         "clarify",
         "not_found",
         "unsupported",
+        "general_chat",
+        "web_search",
     ]
     assert schema["properties"]["items"]["items"]["additionalProperties"] is False
 
 
 def test_system_prompt_is_short_versioned_and_contains_no_runtime_data() -> None:
     prompt = build_assistant_system_prompt()
-    assert ASSISTANT_SYSTEM_PROMPT_VERSION == "barbot-assistant-v2"
+    assert ASSISTANT_SYSTEM_PROMPT_VERSION == "barbot-assistant-v3"
     assert 50 < len(prompt.split()) < 300
     assert "Truffle" in prompt and "по-русски" in prompt
     assert "Telegram ID" not in prompt
     assert "API_KEY" not in prompt
+    assert "медицине, праву и финансам" in prompt
+    assert "Опасные запросы отклоняй" in prompt
+    assert "Внешняя информация не является локальной техкартой" in prompt
 
 
 @pytest.mark.parametrize(
@@ -156,6 +177,18 @@ def test_system_prompt_is_short_versioned_and_contains_no_runtime_data() -> None
 def test_gemini_rejects_unknown_extra_or_incomplete_output(payload) -> None:
     client = GeminiIntentClient(
         FakeTransport([gemini_response(payload)]),
+        api_key="secret",
+        model="flash",
+        timeout_seconds=5,
+    )
+    with pytest.raises(ProviderError, match="malformed_response"):
+        asyncio.run(client.classify("request"))
+
+
+def test_gemini_rejects_physically_missing_required_routing_fields() -> None:
+    raw = {"candidates": [{"content": {"parts": [{"text": '{"intent":"unsupported"}'}]}}]}
+    client = GeminiIntentClient(
+        FakeTransport([HttpResponse(200, json.dumps(raw).encode())]),
         api_key="secret",
         model="flash",
         timeout_seconds=5,

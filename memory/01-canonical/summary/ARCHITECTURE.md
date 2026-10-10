@@ -35,6 +35,8 @@ Importance: Critical
   voice router. Provider adapters return strict intents to
   `AssistantOrchestrator`; `AssistantToolRegistry` can only search the catalog
   or translate input into the existing warehouse persistent-draft flow.
+  General chat returns escaped text only; the separate grounded-search adapter
+  returns text plus metadata-backed links and has no registry access.
 
 Exact control flow or data shape must be re-read from source; this summary is a
 router, not a substitute for code review.

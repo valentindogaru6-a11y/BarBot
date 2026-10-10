@@ -152,7 +152,8 @@ VOICE_DEBUG_TRANSCRIPTS=false
 Phase 1 adds an optional private-chat assistant for `super_admin`. Groq Whisper
 transcribes Telegram OGG/Opus voice messages and Gemini classifies free text
 into a strict allowlist: technology-card lookup, preparation of a warehouse
-writeoff or transfer, clarification, or unsupported. Catalog results use the
+writeoff or transfer, bounded general chat, optional grounded web search,
+clarification, or unsupported. Catalog results use the
 existing renderer; warehouse requests enter the existing persistent draft and
 still require explicit confirmation before any operation is created.
 
@@ -163,8 +164,10 @@ Groq STT followed by Gemini intent classification and therefore requires both
 inert mode with no registered AI fallback. Provider keys are never required
 while the master flag is disabled.
 Commands, active FSM flows, exact warehouse triggers, and callbacks keep
-priority. Phase 1 cannot edit cards or products, browse the internet, execute
-arbitrary tools, or control the service.
+priority. General chat and web search cannot edit cards or products, execute
+arbitrary tools, or control the service. Grounded search is a separate optional
+path: its answer is external information, and displayed links come only from
+Gemini `groundingMetadata`; web content cannot invoke a BarBot action.
 
 The polling process allows one in-flight AI request per user across text and
 voice. A concurrent request receives a short wait message; the claim is always
@@ -183,12 +186,15 @@ card whose searchable fields mention `мохито`.
 
 Gemini receives a short versioned BarBot/Truffle system role plus at most five
 local candidate labels, never the whole catalog, KOS, database or secrets. A
-bounded 15-minute process-local conversation context can retain only structured
-intent/entity/query/candidate/slot fields for a follow-up such as a missing
-quantity. It stores no transcript, is isolated per user, expires automatically
-and disappears on restart. KOS remains developer/Codex project memory; the
-runtime system prompt defines Gemini's role; conversation context is temporary
-dialog state; local retrieval remains the factual source for catalog results.
+bounded process-local conversation context retains at most six short
+user/assistant turns for 30 minutes, plus structured clarification fields. It
+is isolated per user, capped at 6000 characters, never persisted or logged,
+and disappears on restart. The phrases `забудь этот разговор`, `начнём заново`
+and `сбрось контекст` clear only this AI memory, not FSM or warehouse drafts.
+KOS remains developer/Codex project memory; the runtime system context defines
+the assistant role; conversation memory is temporary dialog state; local
+retrieval is the factual BarBot source; Google Search grounding is clearly
+separate external information.
 
 Runtime readiness: the live Gemini structured-output smoke passed on
 2026-10-10. Groq remains `NOT TESTED — AUDIO SAMPLE REQUIRED`; its final smoke
@@ -199,6 +205,8 @@ separately authorized rollout step.
 AI_ASSISTANT_ENABLED=false
 AI_TEXT_ENABLED=false
 AI_VOICE_ENABLED=false
+AI_GENERAL_CHAT_ENABLED=false
+AI_WEB_SEARCH_ENABLED=false
 GROQ_API_KEY=
 GROQ_STT_MODEL=whisper-large-v3-turbo
 GEMINI_API_KEY=
@@ -207,6 +215,10 @@ GEMINI_STRONG_MODEL=gemini-3.8-flash
 AI_VOICE_MAX_DURATION_SECONDS=180
 AI_VOICE_MAX_FILE_BYTES=20971520
 AI_REQUEST_TIMEOUT_SECONDS=30
+AI_CONVERSATION_TTL_SECONDS=1800
+AI_CONVERSATION_MAX_TURNS=6
+AI_CONVERSATION_MAX_CHARS=6000
+AI_WEB_SEARCH_MAX_QUERIES_PER_REQUEST=2
 ```
 
 Для неоднозначных названий можно вручную добавить необязательное поле, не

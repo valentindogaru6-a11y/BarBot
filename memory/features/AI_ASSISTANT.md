@@ -1,6 +1,6 @@
 # AI Assistant Pilot
 
-Scope: bounded owner-only intent, retrieval, and draft preparation
+Scope: bounded owner-only intent, conversation, retrieval, search, and drafts
 Trust: Confirmed from code and tests
 Lifecycle: Fresh
 Last verified: 2026-10-10
@@ -17,15 +17,24 @@ Importance: High
 - Gemini receives the request, normalized entity and at most five local
   candidate labels. Its output remains strict schema/Pydantic data and cannot
   supply database IDs, callbacks, SQL, or service methods.
-- `AssistantConversationMemory` keeps only structured intent/entity/query,
-  local candidate keys, pending slots, and timestamps. It is per-user,
-  process-local, bounded to 100 entries, expires after 15 minutes, and clears
-  after completion, cancellation, timeout, or provider failure.
+- `AssistantConversationMemory` combines structured clarification fields with
+  at most six normalized user/assistant turns, 6000 characters and a 30-minute
+  TTL. It is process-local, isolated for at most 100 users, never logged or
+  persisted, and its reset phrases do not clear FSM or warehouse drafts.
 - Candidate callbacks contain stable local catalog IDs and are revalidated
   against both current context and the current catalog. Active FSM, commands,
   exact warehouse triggers, permissions, single-flight, persistent drafts, and
   explicit warehouse confirmation remain authoritative.
+- Four routing modes are represented by strict intents: local `bar_knowledge`,
+  allowlisted `bar_action`, text-only `general_chat`, and optional
+  `web_search`. The first two retain existing local retrieval/draft boundaries.
+- `GeminiGroundedSearchClient` uses only the official `google_search` tool,
+  accepts at most two reported queries and builds source links solely from
+  `groundingMetadata`. Search text is untrusted and cannot call the registry.
 - KOS is developer/Codex memory; it is never copied into the runtime prompt or
-  dialog context. Runtime context is not persisted to SQLite.
+  dialog context. The system context is the runtime role, conversation memory
+  is ephemeral, local retrieval owns BarBot facts, and grounding is external.
+- General chat and web search default off. The production pilot access remains
+  private-chat `super_admin`; no broader role is enabled by this phase.
 - The committed catalog has no searchable `мохито` card. The safe response is
   an honest absence message; no recipe is synthesized.

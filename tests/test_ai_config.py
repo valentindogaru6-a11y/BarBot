@@ -16,11 +16,43 @@ def test_ai_defaults_are_disabled_and_do_not_require_keys() -> None:
     assert settings.ai_assistant_enabled is False
     assert settings.ai_text_enabled is False
     assert settings.ai_voice_enabled is False
+    assert settings.ai_general_chat_enabled is False
+    assert settings.ai_web_search_enabled is False
     assert settings.groq_api_key is None
     assert settings.gemini_api_key is None
     assert settings.ai_voice_max_duration_seconds == 180
     assert settings.ai_voice_max_file_bytes == 20 * 1024 * 1024
     assert settings.ai_request_timeout_seconds == 30
+    assert settings.ai_conversation_ttl_seconds == 1800
+    assert settings.ai_conversation_max_turns == 6
+    assert settings.ai_conversation_max_chars == 6000
+    assert settings.ai_web_search_max_queries_per_request == 2
+
+
+def test_web_search_cannot_bypass_master_switch() -> None:
+    with pytest.raises(ValidationError, match="AI_ASSISTANT_ENABLED"):
+        Settings(
+            _env_file=None,
+            bot_token="test",
+            ai_web_search_enabled=True,
+            gemini_api_key="gemini",
+        )
+
+
+def test_enabled_general_chat_and_search_require_only_gemini() -> None:
+    settings = Settings(
+        _env_file=None,
+        bot_token="test",
+        ai_assistant_enabled=True,
+        ai_general_chat_enabled=True,
+        ai_web_search_enabled=True,
+        gemini_api_key="gemini",
+    )
+    orchestrator, speech = build_assistant_clients(settings)
+    assert orchestrator.general_chat_enabled is True
+    assert orchestrator.web_search_enabled is True
+    assert orchestrator.search_client is not None
+    assert speech is None
 
 
 @pytest.mark.parametrize(
@@ -83,7 +115,13 @@ def test_enabled_ai_matrix_accepts_exact_required_keys(text, voice, groq, gemini
 
 class VoiceOnlyTransport:
     async def post_json(self, _url, **_kwargs):
-        intent = {"intent": "unsupported"}
+        intent = {
+            "intent": "unsupported",
+            "answer_text": None,
+            "query": None,
+            "needs_web": False,
+            "clarification": None,
+        }
         body = {"candidates": [{"content": {"parts": [{"text": json.dumps(intent)}]}}]}
         return HttpResponse(200, json.dumps(body).encode())
 

@@ -85,6 +85,8 @@ class Settings(BaseSettings):
     ai_assistant_enabled: bool = False
     ai_text_enabled: bool = False
     ai_voice_enabled: bool = False
+    ai_general_chat_enabled: bool = False
+    ai_web_search_enabled: bool = False
     groq_api_key: SecretStr | None = None
     groq_stt_model: str = Field(
         default="whisper-large-v3-turbo",
@@ -109,6 +111,10 @@ class Settings(BaseSettings):
         le=50 * 1024 * 1024,
     )
     ai_request_timeout_seconds: int = Field(default=30, gt=0, le=120)
+    ai_conversation_ttl_seconds: int = Field(default=1800, gt=0, le=86_400)
+    ai_conversation_max_turns: int = Field(default=6, gt=0, le=20)
+    ai_conversation_max_chars: int = Field(default=6000, gt=0, le=20_000)
+    ai_web_search_max_queries_per_request: int = Field(default=2, gt=0, le=2)
 
     @field_validator("super_admin_ids", mode="before")
     @classmethod
@@ -192,6 +198,10 @@ class Settings(BaseSettings):
     def validate_ai_provider_keys(self) -> "Settings":
         """Require provider secrets only for explicitly enabled pilot paths."""
 
+        if self.ai_web_search_enabled and not self.ai_assistant_enabled:
+            raise ValueError(
+                "AI_WEB_SEARCH_ENABLED требует AI_ASSISTANT_ENABLED"
+            )
         if not self.ai_assistant_enabled:
             return self
         if self.ai_voice_enabled and (
@@ -201,7 +211,12 @@ class Settings(BaseSettings):
             raise ValueError(
                 "GROQ_API_KEY обязателен при включённом AI voice pilot"
             )
-        if (self.ai_text_enabled or self.ai_voice_enabled) and (
+        if (
+            self.ai_text_enabled
+            or self.ai_voice_enabled
+            or self.ai_general_chat_enabled
+            or self.ai_web_search_enabled
+        ) and (
             self.gemini_api_key is None
             or not self.gemini_api_key.get_secret_value().strip()
         ):

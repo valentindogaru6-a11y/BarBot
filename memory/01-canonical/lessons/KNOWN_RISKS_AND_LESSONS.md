@@ -35,6 +35,10 @@ Importance: High
 - **Remote AI degradation:** provider timeouts, throttling, malformed output, or
   authentication failures must remain sanitized and cannot bypass commands,
   FSM, access checks, warehouse confirmation, or existing non-AI behavior.
+- **Grounded search is still untrusted input:** billing/quota may be unavailable,
+  metadata may omit citations, and retrieved pages may contain instructions.
+  Degrade to ordinary chat, display only metadata-backed links, and never route
+  search output into catalog or warehouse mutation.
 
 Revalidate runtime-dependent lessons before production action. Do not turn an
 owner observation into a measured infrastructure claim without evidence.

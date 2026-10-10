@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from dataclasses import replace
 from html import escape
 from pathlib import Path
@@ -50,6 +51,51 @@ AI_REQUEST_BUSY_TEXT = (
     "⏳ Я ещё обрабатываю предыдущий запрос. Дождитесь результата."
 )
 AI_CONTEXT_CANCELLED_TEXT = "Текущий AI-запрос отменён."
+AI_CONTEXT_RESET_TEXT = "Контекст разговора очищен. Начнём заново."
+WEB_SEARCH_UNAVAILABLE_TEXT = (
+    "Актуальный поиск в интернете пока недоступен. Могу ответить по общим "
+    "знаниям или помочь с данными BarBot."
+)
+_CONVERSATION_RESET_PHRASES = {
+    "забудь этот разговор",
+    "начнем заново",
+    "начнём заново",
+    "сбрось контекст",
+}
+_MARKDOWN_LINK_RE = re.compile(r"\[([^\]]+)\]\(https?://[^)\s]+\)", re.IGNORECASE)
+_BARE_URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
+
+
+def _without_model_links(text: str) -> str:
+    """Keep links out of model prose; citations come from grounding metadata."""
+
+    without_markdown = _MARKDOWN_LINK_RE.sub(r"\1", text)
+    return " ".join(_BARE_URL_RE.sub("", without_markdown).split())
+
+
+async def _answer_safe_text(
+    message: Message,
+    text: str,
+    *,
+    limit: int = 3500,
+) -> None:
+    """Send escaped text in bounded Telegram-safe chunks."""
+
+    cleaned = text.strip()
+    while cleaned:
+        candidate = cleaned[:limit]
+        while len(escape(candidate)) > limit and len(candidate) > 1:
+            candidate = candidate[: max(1, int(len(candidate) * 0.8))]
+        if len(candidate) == len(cleaned):
+            chunk, cleaned = candidate, ""
+        else:
+            split_at = candidate.rfind("\n")
+            if split_at < limit // 2:
+                split_at = candidate.rfind(" ")
+            if split_at < limit // 2:
+                split_at = len(candidate)
+            chunk, cleaned = cleaned[:split_at], cleaned[split_at:].lstrip()
+        await message.answer(escape(chunk))
 
 
 def _latency_bucket(elapsed: float) -> str:
@@ -136,6 +182,11 @@ async def _run_assistant(
     registry = AssistantToolRegistry(catalog)
     user_id = message.from_user.id if message.from_user is not None else None
     normalized_command = " ".join(text.casefold().split())
+    if normalized_command in _CONVERSATION_RESET_PHRASES:
+        if conversation_memory is not None and user_id is not None:
+            conversation_memory.clear(user_id)
+        await message.answer(AI_CONTEXT_RESET_TEXT)
+        return
     if normalized_command in {"отмена", "отмени", "cancel"}:
         if conversation_memory is not None and user_id is not None:
             conversation_memory.clear(user_id)
@@ -147,6 +198,11 @@ async def _run_assistant(
         else None
     )
     request_text = text
+    provider_history = (
+        conversation_memory.provider_history(user_id)
+        if conversation_memory is not None and user_id is not None
+        else ()
+    )
     if context is not None:
         if context.last_entity_type == "tech_card":
             request_text = f"покажи техкарту {context.last_query} {text}"
@@ -183,6 +239,7 @@ async def _run_assistant(
                 request_text,
                 candidates=provider_candidates,
                 normalized_entity=retrieval.normalized_query,
+                conversation=provider_history,
             )
             if local_intent is None:
                 provider_latency_bucket = _latency_bucket(monotonic() - started)
@@ -237,6 +294,7 @@ async def _run_assistant(
                 text,
                 candidates=provider_candidates,
                 normalized_entity=action.entity_query or retrieval.normalized_query,
+                conversation=provider_history,
             )
             provider_latency_bucket = _latency_bucket(monotonic() - started)
             refined_action = registry.execute(refined)
@@ -288,11 +346,96 @@ async def _run_assistant(
         provider_latency_bucket,
     )
 
+    if action.kind == "general_chat":
+        if not orchestrator.general_chat_enabled:
+            await message.answer(
+                "Общий разговор пока отключён. Я могу помочь с данными BarBot."
+            )
+            return
+        answer = (action.message or AI_UNAVAILABLE_TEXT).strip()[:1000]
+        if conversation_memory is not None and user_id is not None:
+            conversation_memory.append_turn(
+                user_id,
+                role="user",
+                text=text,
+                last_intent="general_chat",
+                topic=intent.query or "general_chat",
+            )
+            conversation_memory.append_turn(
+                user_id,
+                role="assistant",
+                text=answer,
+                last_intent="general_chat",
+            )
+        await _answer_safe_text(message, answer)
+        return
+    if action.kind == "web_search":
+        if not orchestrator.web_search_enabled:
+            await message.answer(WEB_SEARCH_UNAVAILABLE_TEXT)
+            return
+        try:
+            result = await orchestrator.search_web(
+                action.entity_query or text,
+                conversation=provider_history,
+            )
+        except (AssistantUnavailableError, ProviderError) as exc:
+            if isinstance(exc, ProviderError):
+                logger.warning(
+                    "Assistant web provider failed: provider=%s kind=%s",
+                    exc.provider,
+                    exc.kind.value,
+                )
+            await message.answer(WEB_SEARCH_UNAVAILABLE_TEXT)
+            return
+        answer = _without_model_links(result.answer_text).strip()[:3000]
+        if not answer:
+            answer = "Поиск завершён, но текст ответа недоступен."
+        if conversation_memory is not None and user_id is not None:
+            conversation_memory.append_turn(
+                user_id,
+                role="user",
+                text=text,
+                last_intent="web_search",
+                topic=action.entity_query or "web_search",
+            )
+            conversation_memory.append_turn(
+                user_id,
+                role="assistant",
+                text=answer,
+                last_intent="web_search",
+            )
+        await _answer_safe_text(message, answer)
+        if result.sources:
+            links = ["<b>Источники:</b>"]
+            for source in result.sources:
+                links.append(
+                    f'• <a href="{escape(source.uri, quote=True)}">'
+                    f"{escape(source.title)}</a>"
+                )
+            await message.answer("\n".join(links))
+        return
+
     if action.kind == "find_tech_card":
         if action.catalog_exact and len(action.search_results) == 1:
             result = action.search_results[0]
             if conversation_memory is not None and user_id is not None:
-                conversation_memory.clear(user_id)
+                conversation_memory.clear_structured(
+                    user_id,
+                    last_intent="find_tech_card",
+                    topic=result.item.name,
+                )
+                conversation_memory.append_turn(
+                    user_id,
+                    role="user",
+                    text=text,
+                    last_intent="find_tech_card",
+                )
+                conversation_memory.append_turn(
+                    user_id,
+                    role="assistant",
+                    text=f"Открыта техкарта: {result.item.name}",
+                    last_intent="find_tech_card",
+                )
             await _show_item(
                 message,
                 catalog_path,
@@ -306,6 +449,13 @@ async def _run_assistant(
             )
         else:
             if conversation_memory is not None and user_id is not None:
+                conversation_memory.append_turn(
+                    user_id,
+                    role="user",
+                    text=text,
+                    last_intent="find_tech_card",
+                    topic=action.entity_query or "tech_card",
+                )
                 conversation_memory.remember(
                     user_id,
                     last_intent="find_tech_card",
@@ -406,7 +556,23 @@ async def handle_assistant_candidate(
         return
     if not await answer_callback_safely(callback):
         return
-    assistant_conversation_memory.clear(callback.from_user.id)
+    assistant_conversation_memory.clear_structured(
+        callback.from_user.id,
+        last_intent="find_tech_card",
+        topic=result.item.name,
+    )
+    assistant_conversation_memory.append_turn(
+        callback.from_user.id,
+        role="user",
+        text=result.item.name,
+        last_intent="find_tech_card",
+    )
+    assistant_conversation_memory.append_turn(
+        callback.from_user.id,
+        role="assistant",
+        text=f"Открыта техкарта: {result.item.name}",
+        last_intent="find_tech_card",
+    )
     await _show_item(
         callback.message,
         catalog_path,

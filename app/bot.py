@@ -33,6 +33,7 @@ from app.services.assistant import (
     AssistantConversationMemory,
     AssistantRequestCoordinator,
     GeminiIntentClient,
+    GeminiGroundedSearchClient,
     GroqSpeechToTextClient,
 )
 from app.services.audio_service import AudioService
@@ -135,8 +136,12 @@ def build_assistant_clients(
 
     speech_client = None
     intent_client = None
+    search_client = None
     if settings.ai_assistant_enabled and (
-        settings.ai_voice_enabled or settings.ai_text_enabled
+        settings.ai_voice_enabled
+        or settings.ai_text_enabled
+        or settings.ai_general_chat_enabled
+        or settings.ai_web_search_enabled
     ):
         provider_transport = transport or AioHttpTransport()
         if settings.ai_voice_enabled:
@@ -154,7 +159,20 @@ def build_assistant_clients(
             model=settings.gemini_fast_model,
             timeout_seconds=settings.ai_request_timeout_seconds,
         )
-    return AssistantOrchestrator(intent_client), speech_client
+        if settings.ai_web_search_enabled:
+            search_client = GeminiGroundedSearchClient(
+                provider_transport,
+                api_key=settings.gemini_api_key.get_secret_value(),
+                model=settings.gemini_strong_model,
+                timeout_seconds=settings.ai_request_timeout_seconds,
+                max_queries=settings.ai_web_search_max_queries_per_request,
+            )
+    return AssistantOrchestrator(
+        intent_client,
+        search_client=search_client,
+        general_chat_enabled=settings.ai_general_chat_enabled,
+        web_search_enabled=settings.ai_web_search_enabled,
+    ), speech_client
 
 
 def start_reminder_worker(
@@ -216,7 +234,11 @@ async def main() -> None:
         settings
     )
     assistant_request_coordinator = AssistantRequestCoordinator()
-    assistant_conversation_memory = AssistantConversationMemory()
+    assistant_conversation_memory = AssistantConversationMemory(
+        ttl_seconds=settings.ai_conversation_ttl_seconds,
+        max_turns=settings.ai_conversation_max_turns,
+        max_chars=settings.ai_conversation_max_chars,
+    )
     bot = Bot(
         token=settings.bot_token.get_secret_value(),
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),

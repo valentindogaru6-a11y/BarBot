@@ -70,7 +70,7 @@ behavior. Visible buttons are not authorization.
 
 The 414-product seed is not the whole production nomenclature. Reconcile seed
 records without deleting or overwriting deliberate owner additions; current
-owner-confirmed production baseline is 416 active products.
+owner-confirmed production baseline is 417 active products.
 
 ## D12 — Bounded AI service boundary
 
@@ -79,6 +79,9 @@ catalog lookup or existing warehouse draft preparation. Strict local intent
 models and a tool allowlist own that boundary; provider output cannot choose
 database IDs or callbacks. The pilot is private-`super_admin` only and disabled
 by default. It has no direct SQL, filesystem shell, systemd, polling, migration,
-deployment, internet-search, catalog-editing, or unrestricted mutation access.
+deployment, catalog-editing, or unrestricted mutation access. Optional general
+chat and Google Search grounding are separate text-only outputs behind disabled
+flags; web content cannot select or invoke a local tool, and source links come
+only from provider grounding metadata.
 Warehouse mutations retain preview, authorization recheck, idempotency, and
 explicit confirmation.

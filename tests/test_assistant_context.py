@@ -69,3 +69,22 @@ def test_memory_truncates_untrusted_structured_fields() -> None:
     assert len(context.last_query) == 200
     assert len(context.candidate_ids) == 5
     assert len(context.pending_slots) == 8
+
+
+def test_completing_structured_context_revokes_callbacks_but_keeps_turns() -> None:
+    memory = AssistantConversationMemory()
+    memory.append_turn(1, role="user", text="покажи карту")
+    memory.remember(
+        1,
+        last_intent="find_tech_card",
+        last_entity_type="tech_card",
+        last_query="мохито",
+        candidate_ids=("a/_/one",),
+        pending_slots=("candidate",),
+    )
+    memory.clear_structured(1, last_intent="find_tech_card")
+    context = memory.get(1)
+    assert context is not None
+    assert context.candidate_ids == ()
+    assert context.pending_slots == ()
+    assert memory.provider_history(1) == (("user", "покажи карту"),)
