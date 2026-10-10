@@ -12,6 +12,7 @@ class AssistantIntentName(StrEnum):
     PREPARE_WRITEOFF = "prepare_writeoff"
     PREPARE_TRANSFER = "prepare_transfer"
     CLARIFY = "clarify"
+    NOT_FOUND = "not_found"
     UNSUPPORTED = "unsupported"
 
 
@@ -40,8 +41,11 @@ class AssistantIntent(BaseModel):
 
     @model_validator(mode="after")
     def validate_shape(self) -> "AssistantIntent":
-        if self.intent is AssistantIntentName.FIND_TECH_CARD and not self.query:
-            raise ValueError("find_tech_card requires query")
+        if self.intent in {
+            AssistantIntentName.FIND_TECH_CARD,
+            AssistantIntentName.NOT_FOUND,
+        } and not self.query:
+            raise ValueError(f"{self.intent.value} requires query")
         if self.intent in {
             AssistantIntentName.PREPARE_WRITEOFF,
             AssistantIntentName.PREPARE_TRANSFER,

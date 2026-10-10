@@ -42,6 +42,6 @@ interval and are distinct from the shared warehouse shift. They reference the
 warehouse shift but have independent lifecycle, forced-close reason, reminder
 recipient selection, and attendance XLSX export.
 
-Owner-confirmed runtime baseline: 416 active products, including 2 manual
-production additions that seed reconciliation must preserve. Revalidate live
-before any production mutation.
+Owner-confirmed runtime baseline: 417 active products, including 3 manual
+production additions that seed reconciliation must preserve; the third is
+`Лимонный фреш`. Revalidate live before any production mutation.

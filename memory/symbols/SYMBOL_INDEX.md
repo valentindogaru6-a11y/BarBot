@@ -24,6 +24,9 @@ Importance: High
 - `source.import_bar_xls.CatalogImporter`: spreadsheet-to-catalog reconciliation preserving stable/manual data.
 - `AssistantOrchestrator.interpret`: local-first intent selection with optional Gemini fallback.
 - `AssistantToolRegistry.execute`: narrow catalog-search/warehouse-draft tool allowlist.
+- `AssistantCatalogRetriever.retrieve`: exact/token/searchable/fuzzy catalog ranking with bounded candidates.
+- `AssistantConversationMemory`: per-user bounded TTL context without transcripts or persistence.
+- `build_assistant_system_prompt`: versioned Gemini role shared by text and voice.
 - `GroqSpeechToTextClient` / `GeminiIntentClient`: bounded asynchronous provider adapters.
 
 Names are routing aids, not API guarantees. Confirm definitions before edits.

@@ -11,6 +11,10 @@ from app.services.assistant.providers import (
     ProviderError,
     ProviderErrorKind,
 )
+from app.services.assistant.system_prompt import (
+    ASSISTANT_SYSTEM_PROMPT_VERSION,
+    build_assistant_system_prompt,
+)
 
 
 class FakeTransport:
@@ -81,6 +85,7 @@ def test_groq_returns_typed_sanitized_errors(responses, kind, call_count) -> Non
         {"intent": "prepare_writeoff", "confidence": 9000, "items": [{"product_text": "морковь", "quantity_text": "0.5", "unit_text": "кг"}]},
         {"intent": "prepare_transfer", "confidence": 9000, "items": [{"product_text": "молоко", "quantity_text": "1", "unit_text": "л", "destination_text": "кухня"}]},
         {"intent": "clarify", "clarification": "Уточните количество"},
+        {"intent": "not_found", "query": "мохито"},
         {"intent": "unsupported"},
     ],
 )
@@ -89,14 +94,31 @@ def test_gemini_accepts_only_allowed_structured_intents(payload) -> None:
     client = GeminiIntentClient(
         transport, api_key="secret", model="flash", timeout_seconds=5
     )
-    result = asyncio.run(client.classify("request", candidates=["one"] * 20))
+    result = asyncio.run(
+        client.classify(
+            "request",
+            candidates=["one"] * 20,
+            normalized_entity="entity",
+        )
+    )
     assert result.intent is AssistantIntentName(payload["intent"])
     url, call = transport.calls[0]
     assert "secret" not in url
     assert call["headers"] == {"x-goog-api-key": "secret"}
     request = json.loads(call["payload"]["contents"][0]["parts"][0]["text"])
-    assert len(request["catalog_candidates"]) == 8
-    assert set(request) == {"request", "catalog_candidates", "allowed_intents"}
+    assert len(request["catalog_candidates"]) == 5
+    assert set(request) == {
+        "request",
+        "normalized_entity",
+        "catalog_candidates",
+        "allowed_intents",
+        "system_prompt_version",
+    }
+    assert request["normalized_entity"] == "entity"
+    assert request["system_prompt_version"] == ASSISTANT_SYSTEM_PROMPT_VERSION
+    assert call["payload"]["system_instruction"]["parts"][0]["text"] == (
+        build_assistant_system_prompt()
+    )
     generation = call["payload"]["generationConfig"]
     assert generation["responseMimeType"] == "application/json"
     schema = generation["responseJsonSchema"]
@@ -107,9 +129,19 @@ def test_gemini_accepts_only_allowed_structured_intents(payload) -> None:
         "prepare_writeoff",
         "prepare_transfer",
         "clarify",
+        "not_found",
         "unsupported",
     ]
     assert schema["properties"]["items"]["items"]["additionalProperties"] is False
+
+
+def test_system_prompt_is_short_versioned_and_contains_no_runtime_data() -> None:
+    prompt = build_assistant_system_prompt()
+    assert ASSISTANT_SYSTEM_PROMPT_VERSION == "barbot-assistant-v2"
+    assert 50 < len(prompt.split()) < 300
+    assert "Truffle" in prompt and "по-русски" in prompt
+    assert "Telegram ID" not in prompt
+    assert "API_KEY" not in prompt
 
 
 @pytest.mark.parametrize(
@@ -118,6 +150,7 @@ def test_gemini_accepts_only_allowed_structured_intents(payload) -> None:
         {"intent": "run_shell"},
         {"intent": "unsupported", "tool": "delete_database"},
         {"intent": "find_tech_card"},
+        {"intent": "not_found"},
     ],
 )
 def test_gemini_rejects_unknown_extra_or_incomplete_output(payload) -> None:

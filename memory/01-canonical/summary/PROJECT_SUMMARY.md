@@ -30,7 +30,8 @@ Code-confirmed state:
 Owner-confirmed production state — last verified 2026-09-24; requires live
 revalidation before production actions:
 
-- schema v12; 416 total/active products (414 seed plus 2 deliberately added);
+- schema v12; 417 total/active products (414 seed plus 3 deliberately added,
+  including owner-confirmed `Лимонный фреш`);
 - aliases 8; required rules 2; `WAREHOUSE_ENABLED=true`;
 - service active with one polling owner;
 - verified backup recorded at the approved production backup root;
@@ -47,6 +48,11 @@ validation. The AI layer has no direct SQLite, shell, systemd, deployment,
 catalog-editing, or internet-search tools. Production deployment is unverified.
 One process-local per-user claim coordinates text and voice so concurrent AI
 requests cannot duplicate provider work; every exit path releases the claim.
+Catalog lookup now resolves locally through normalized exact/token/searchable
+and bounded fuzzy stages before an honest absence result. Gemini receives a
+short versioned role and at most five local candidate labels. A separate
+bounded 15-minute process-local context stores only structured follow-up slots,
+never transcripts; it cannot bypass FSM, permissions, drafts, or confirmation.
 Live Gemini structured output was owner-authorized and passed on 2026-10-10.
 Groq is still `NOT TESTED — AUDIO SAMPLE REQUIRED`; final verification is a
 controlled owner-only Telegram voice request, not a synthetic production file.

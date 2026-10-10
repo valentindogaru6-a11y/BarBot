@@ -45,3 +45,11 @@ class SearchCallback(CallbackData, prefix="s"):
     """Control the search conversation."""
 
     action: Literal["cancel", "retry", "voice_retry"]
+
+
+class AssistantCandidateCallback(CallbackData, prefix="ai"):
+    """Select one locally resolved AI catalog candidate by stable IDs."""
+
+    category_id: str
+    item_id: str
+    subcategory_id: str = "_"

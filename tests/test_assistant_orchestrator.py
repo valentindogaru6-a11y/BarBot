@@ -10,7 +10,7 @@ from app.services.warehouse.intake_parser import parse_intake_message
 
 
 class NeverGemini:
-    async def classify(self, text, *, candidates=()):
+    async def classify(self, text, *, candidates=(), normalized_entity=""):
         raise AssertionError("Gemini must not be called for deterministic requests")
 
 
@@ -54,6 +54,32 @@ def test_missing_quantity_clarifies_without_guessing() -> None:
     )
     assert action.kind == "clarify"
     assert action.raw_intake is None
+    assert action.entity_query == "морковь"
+    assert action.pending_slots == ("quantity",)
+
+
+def test_partial_warehouse_commands_preserve_product_for_followup() -> None:
+    writeoff = AssistantOrchestrator.local_intent("спиши морковь")
+    transfer = AssistantOrchestrator.local_intent("перемести кокосовое молоко")
+    assert writeoff is not None and writeoff.items[0].product_text == "морковь"
+    assert transfer is not None
+    assert transfer.items[0].product_text == "кокосовое молоко"
+
+
+def test_real_missing_mojito_card_returns_honest_normalized_message() -> None:
+    catalog = load_catalog(Path("data/catalog.json"))
+    action = AssistantToolRegistry(catalog).execute(
+        AssistantIntent(
+            intent="find_tech_card",
+            query="безалкогольного мохито",
+        )
+    )
+    assert action.kind == "not_found"
+    assert action.search_results == ()
+    assert action.message == (
+        "Точной техкарты «Безалкогольный мохито» нет.\n\n"
+        "Попробуйте другое название или часть названия."
+    )
 
 
 def test_unsupported_request_is_blocked_locally() -> None:

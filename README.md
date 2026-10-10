@@ -172,6 +172,24 @@ released after success, failure, timeout, or cancellation. Different users do
 not block one another. This is intentionally process-local and does not replace
 warehouse idempotency or confirmation.
 
+Catalog lookup is local-first. BarBot removes command words, normalizes
+Unicode, punctuation, case, `ё/е`, common Russian endings and token order, then
+checks exact titles, token matches, existing aliases/searchable fields and only
+then bounded fuzzy candidates. Ambiguous candidates are shown as inline
+buttons containing stable local catalog IDs; no model-generated ID is trusted.
+If no real card or relevant candidate exists, the assistant says so without
+inventing a recipe. In particular, the committed catalog currently contains no
+card whose searchable fields mention `мохито`.
+
+Gemini receives a short versioned BarBot/Truffle system role plus at most five
+local candidate labels, never the whole catalog, KOS, database or secrets. A
+bounded 15-minute process-local conversation context can retain only structured
+intent/entity/query/candidate/slot fields for a follow-up such as a missing
+quantity. It stores no transcript, is isolated per user, expires automatically
+and disappears on restart. KOS remains developer/Codex project memory; the
+runtime system prompt defines Gemini's role; conversation context is temporary
+dialog state; local retrieval remains the factual source for catalog results.
+
 Runtime readiness: the live Gemini structured-output smoke passed on
 2026-10-10. Groq remains `NOT TESTED — AUDIO SAMPLE REQUIRED`; its final smoke
 must use a controlled Telegram voice request sent only by the owner during a

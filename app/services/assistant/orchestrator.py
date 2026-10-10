@@ -13,8 +13,11 @@ from app.models.assistant import (
 )
 from app.models.catalog import Catalog
 from app.services.assistant.providers import IntentModelClient
-from app.services.search_service import SearchResult, SearchService
-from app.utils.text import normalize_search_text
+from app.services.assistant.retrieval import (
+    AssistantCatalogRetriever,
+    display_catalog_entity,
+)
+from app.services.search_service import SearchResult
 
 MAX_ASSISTANT_TEXT_LENGTH = 2_000
 _UNSUPPORTED_RE = re.compile(
@@ -34,6 +37,17 @@ _TECH_PATTERNS = (
         re.IGNORECASE,
     ),
 )
+_WRITEOFF_PARTIAL_RE = re.compile(
+    r"^\s*(?:спиши|списать)\s+(?P<product>.+?)\s*$", re.IGNORECASE
+)
+_TRANSFER_PARTIAL_RE = re.compile(
+    r"^\s*(?:перемести|переместить)\s+(?P<product>.+?)\s*$", re.IGNORECASE
+)
+_QUANTITY_HINT_RE = re.compile(
+    r"(?:\d|полкил|килограмм|грамм|\bкг\b|литр|миллилитр|\bмл\b|"
+    r"\bл\b|штук)",
+    re.IGNORECASE,
+)
 
 
 class AssistantUnavailableError(RuntimeError):
@@ -47,12 +61,16 @@ class AssistantToolAction:
         "prepare_writeoff",
         "prepare_transfer",
         "clarify",
-        "unsupported",
         "not_found",
+        "unsupported",
     ]
     message: str | None = None
     raw_intake: str | None = None
     search_results: tuple[SearchResult, ...] = ()
+    candidate_ids: tuple[str, ...] = ()
+    pending_slots: tuple[str, ...] = ()
+    entity_query: str | None = None
+    catalog_exact: bool = False
 
 
 class AssistantOrchestrator:
@@ -81,6 +99,19 @@ class AssistantOrchestrator:
                         confidence=10_000,
                         query=query,
                     )
+        for pattern, intent_name in (
+            (_WRITEOFF_PARTIAL_RE, AssistantIntentName.PREPARE_WRITEOFF),
+            (_TRANSFER_PARTIAL_RE, AssistantIntentName.PREPARE_TRANSFER),
+        ):
+            match = pattern.fullmatch(cleaned)
+            if match is not None and not _QUANTITY_HINT_RE.search(cleaned):
+                product = match.group("product").strip(" «»\"'.")
+                if product:
+                    return AssistantIntent(
+                        intent=intent_name,
+                        confidence=10_000,
+                        items=[AssistantIntentItem(product_text=product)],
+                    )
         return None
 
     async def interpret(
@@ -88,28 +119,53 @@ class AssistantOrchestrator:
         text: str,
         *,
         candidates: Sequence[str] = (),
+        normalized_entity: str = "",
     ) -> AssistantIntent:
         local = self.local_intent(text)
         if local is not None:
             return local
         if self.intent_client is None:
             raise AssistantUnavailableError("intent provider is disabled")
-        return await self.intent_client.classify(text, candidates=candidates)
+        return await self.intent_client.classify(
+            text,
+            candidates=candidates,
+            normalized_entity=normalized_entity,
+        )
+
+    async def interpret_with_provider(
+        self,
+        text: str,
+        *,
+        candidates: Sequence[str] = (),
+        normalized_entity: str = "",
+    ) -> AssistantIntent:
+        """Consult the provider after local retrieval needs disambiguation."""
+
+        if self.intent_client is None:
+            raise AssistantUnavailableError("intent provider is disabled")
+        return await self.intent_client.classify(
+            text,
+            candidates=candidates,
+            normalized_entity=normalized_entity,
+        )
 
 
 class AssistantToolRegistry:
     """Execute only catalog lookup or canonical intake preparation."""
 
     def __init__(self, catalog: Catalog) -> None:
-        self.search = SearchService(catalog)
+        self.retriever = AssistantCatalogRetriever(catalog)
 
     def relevant_candidate_names(
         self,
         text: str,
         *,
-        limit: int = 8,
+        limit: int = 5,
     ) -> tuple[str, ...]:
-        return tuple(result.item.name for result in self.search.search(text)[:limit])
+        retrieval = self.retriever.retrieve(text, limit=limit)
+        return tuple(
+            candidate.provider_label for candidate in retrieval.candidates
+        )
 
     def execute(self, intent: AssistantIntent) -> AssistantToolAction:
         if intent.intent is AssistantIntentName.UNSUPPORTED:
@@ -123,14 +179,52 @@ class AssistantToolRegistry:
                 message=intent.clarification
                 or "Уточните, пожалуйста, что нужно сделать.",
             )
+        if intent.intent is AssistantIntentName.NOT_FOUND:
+            entity = display_catalog_entity(intent.query or "позиция")
+            return AssistantToolAction(
+                "not_found",
+                message=(
+                    f"Точной техкарты «{entity}» нет.\n\n"
+                    "Попробуйте другое название или часть названия."
+                ),
+                entity_query=intent.query,
+            )
         if intent.intent is AssistantIntentName.FIND_TECH_CARD:
-            results = tuple(self.search.search(intent.query or "")[:20])
-            if not results:
+            retrieval = self.retriever.retrieve(intent.query or "")
+            if retrieval.exact:
                 return AssistantToolAction(
-                    "not_found",
-                    message=f"Техкарта «{intent.query or ''}» не найдена.",
+                    "find_tech_card",
+                    search_results=retrieval.exact,
+                    candidate_ids=tuple(
+                        self._candidate_key(result) for result in retrieval.exact
+                    ),
+                    entity_query=retrieval.normalized_query,
+                    catalog_exact=True,
                 )
-            return AssistantToolAction("find_tech_card", search_results=results)
+            if retrieval.candidates:
+                return AssistantToolAction(
+                    "find_tech_card",
+                    message="Возможно, вы имели в виду:",
+                    search_results=tuple(
+                        candidate.result for candidate in retrieval.candidates
+                    ),
+                    candidate_ids=tuple(
+                        candidate.key for candidate in retrieval.candidates
+                    ),
+                    entity_query=retrieval.normalized_query,
+                    catalog_exact=False,
+                )
+            entity = display_catalog_entity(intent.query or "позиция")
+            if not entity:
+                entity = "Позиция"
+            return AssistantToolAction(
+                "not_found",
+                message=(
+                    f"Точной техкарты «{entity}» нет.\n\n"
+                    "Попробуйте другое название или часть названия."
+                ),
+                entity_query=retrieval.normalized_query,
+            )
         if intent.confidence < 5_000:
             return AssistantToolAction(
                 "clarify",
@@ -155,10 +249,35 @@ class AssistantToolRegistry:
             unit = self._safe_field(item.unit_text)
             destination = self._safe_field(item.destination_text)
             comment = self._safe_field(item.comment_text)
-            if not product or not quantity:
+            pending: list[str] = []
+            if not product:
+                pending.append("product")
+            if not quantity:
+                pending.append("quantity")
+            if (
+                intent.intent is AssistantIntentName.PREPARE_TRANSFER
+                and not destination
+            ):
+                pending.append("destination")
+            if pending:
+                if pending == ["quantity"]:
+                    prompt = "Укажите количество."
+                elif pending == ["destination"]:
+                    prompt = "Укажите направление перемещения."
+                else:
+                    labels = {
+                        "product": "продукт",
+                        "quantity": "количество",
+                        "destination": "направление",
+                    }
+                    prompt = "Укажите " + " и ".join(
+                        labels[value] for value in pending
+                    ) + "."
                 return AssistantToolAction(
                     "clarify",
-                    message="Укажите продукт и количество.",
+                    message=prompt,
+                    pending_slots=tuple(pending),
+                    entity_query=product,
                 )
             line = f"{product} {quantity}"
             if unit:
@@ -183,3 +302,8 @@ class AssistantToolRegistry:
             "unsupported",
             message="Эта команда пока недоступна в AI-помощнике.",
         )
+
+    @staticmethod
+    def _candidate_key(result: SearchResult) -> str:
+        subcategory_id = result.subcategory.id if result.subcategory else "_"
+        return f"{result.category.id}/{subcategory_id}/{result.item.id}"
