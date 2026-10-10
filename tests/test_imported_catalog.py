@@ -9,6 +9,7 @@ from app.keyboards.callbacks import ItemCallback
 from app.models.catalog import Catalog
 from app.storage.json_storage import JsonCatalogStorage
 from source.import_bar_xls import (
+    AUTHORITATIVE_RECIPE_IDS,
     CatalogImporter,
     OWNER_CURATED_LEMONADE_RECIPE_IDS,
 )
@@ -521,12 +522,17 @@ def test_existing_cards_receive_latest_source_data(
 def test_text_source_preserves_precise_cocktail_ingredients(
     imported_catalog: Catalog,
 ) -> None:
-    by_id = {item.id: item for item in _all_items(imported_catalog)}
+    assert "kiss-me" in AUTHORITATIVE_RECIPE_IDS
+
+    reimported = CatalogImporter(
+        imported_catalog.model_copy(deep=True)
+    ).import_all()
+    by_id = {item.id: item for item in _all_items(reimported)}
 
     assert [
         ingredient.name for ingredient in by_id["kiss-me"].ingredients
     ] == [
-        "Виски Pouges",
+        "Виски Банкхолл",
         "Ликёр De Kyper (амаретто)",
         "Фреш лимона",
         "Сахарный сироп",

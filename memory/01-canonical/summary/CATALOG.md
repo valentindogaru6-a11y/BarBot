@@ -3,7 +3,7 @@
 Scope: JSON catalog and spreadsheet import state
 Trust: Confirmed
 Lifecycle: Fresh
-Last verified: 2026-09-29
+Last verified: 2026-10-10
 Evidence: `data/catalog.json`, `source/import_bar_xls.py`, catalog tests, commit `a57cc389c4aafcf5e840b67b0481a168c032fe3b`
 Depends on: catalog schema and owner spreadsheet sources
 Importance: High
@@ -16,6 +16,9 @@ Importance: High
   refinements and must remain intact.
 - Five lemonade recipes contain owner-curated syrup variants. The importer
   treats those recipes as authoritative while refreshing spreadsheet metadata.
+- The owner-confirmed `Kiss Me` recipe uses `Виски Банкхолл`. Its precise
+  ingredient list is backed by `source/tech_cards.txt` and protected by the
+  importer's authoritative recipe allowlist.
 - Lemonade dry-run import is idempotent; existing stable IDs and photographs
   are preserved. Commit `a57cc389c4aafcf5e840b67b0481a168c032fe3b`
   completed the work with a confirmed full test result of `797 passed`.
