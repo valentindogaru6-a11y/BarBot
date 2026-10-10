@@ -157,7 +157,11 @@ existing renderer; warehouse requests enter the existing persistent draft and
 still require explicit confirmation before any operation is created.
 
 The pilot is off unless `AI_ASSISTANT_ENABLED` and the corresponding text or
-voice flag are enabled. Provider keys are required only for an enabled path.
+voice flag are enabled. Text mode requires `GEMINI_API_KEY`; voice mode uses
+Groq STT followed by Gemini intent classification and therefore requires both
+`GROQ_API_KEY` and `GEMINI_API_KEY`. Enabling only the master flag is a valid
+inert mode with no registered AI fallback. Provider keys are never required
+while the master flag is disabled.
 Commands, active FSM flows, exact warehouse triggers, and callbacks keep
 priority. Phase 1 cannot edit cards or products, browse the internet, execute
 arbitrary tools, or control the service.

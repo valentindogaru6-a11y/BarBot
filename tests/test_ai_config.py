@@ -1,7 +1,14 @@
+import asyncio
+import json
+
 from pydantic import ValidationError
 import pytest
 
+from app.bot import build_assistant_clients
 from app.config import Settings
+from app.models.assistant import AssistantIntentName
+from app.services.assistant import GeminiIntentClient, GroqSpeechToTextClient
+from app.services.assistant.providers import HttpResponse
 
 
 def test_ai_defaults_are_disabled_and_do_not_require_keys() -> None:
@@ -21,6 +28,7 @@ def test_ai_defaults_are_disabled_and_do_not_require_keys() -> None:
     [
         ({"ai_assistant_enabled": True, "ai_voice_enabled": True}, "GROQ_API_KEY"),
         ({"ai_assistant_enabled": True, "ai_voice_enabled": True, "groq_api_key": ""}, "GROQ_API_KEY"),
+        ({"ai_assistant_enabled": True, "ai_voice_enabled": True, "groq_api_key": "g"}, "GEMINI_API_KEY"),
         ({"ai_assistant_enabled": True, "ai_text_enabled": True}, "GEMINI_API_KEY"),
         ({"ai_assistant_enabled": True, "ai_text_enabled": True, "gemini_api_key": " "}, "GEMINI_API_KEY"),
     ],
@@ -38,6 +46,67 @@ def test_disabled_master_switch_does_not_require_provider_keys() -> None:
         ai_text_enabled=True,
         ai_voice_enabled=True,
     )
+
+
+def test_enabled_master_with_no_paths_is_documented_inert_mode() -> None:
+    settings = Settings(
+        _env_file=None,
+        bot_token="test",
+        ai_assistant_enabled=True,
+        ai_text_enabled=False,
+        ai_voice_enabled=False,
+    )
+    orchestrator, speech = build_assistant_clients(settings)
+    assert orchestrator.intent_client is None
+    assert speech is None
+
+
+@pytest.mark.parametrize(
+    ("text", "voice", "groq", "gemini"),
+    [
+        (True, False, None, "gemini"),
+        (False, True, "groq", "gemini"),
+        (True, True, "groq", "gemini"),
+    ],
+)
+def test_enabled_ai_matrix_accepts_exact_required_keys(text, voice, groq, gemini) -> None:
+    Settings(
+        _env_file=None,
+        bot_token="test",
+        ai_assistant_enabled=True,
+        ai_text_enabled=text,
+        ai_voice_enabled=voice,
+        groq_api_key=groq,
+        gemini_api_key=gemini,
+    )
+
+
+class VoiceOnlyTransport:
+    async def post_json(self, _url, **_kwargs):
+        intent = {"intent": "unsupported"}
+        body = {"candidates": [{"content": {"parts": [{"text": json.dumps(intent)}]}}]}
+        return HttpResponse(200, json.dumps(body).encode())
+
+    async def post_multipart(self, _url, **_kwargs):
+        raise AssertionError("STT network is not needed for this composition test")
+
+
+def test_voice_only_builds_both_adapters_and_transcript_reaches_gemini() -> None:
+    settings = Settings(
+        _env_file=None,
+        bot_token="test",
+        ai_assistant_enabled=True,
+        ai_voice_enabled=True,
+        groq_api_key="groq",
+        gemini_api_key="gemini",
+    )
+    orchestrator, speech = build_assistant_clients(
+        settings, transport=VoiceOnlyTransport()
+    )
+    assert isinstance(speech, GroqSpeechToTextClient)
+    assert isinstance(orchestrator.intent_client, GeminiIntentClient)
+    result = asyncio.run(orchestrator.interpret("спиши 500 грамм моркови"))
+    assert result.intent is AssistantIntentName.UNSUPPORTED
 
 
 def test_provider_keys_are_secret_values() -> None:

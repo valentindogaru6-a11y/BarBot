@@ -97,6 +97,19 @@ def test_gemini_accepts_only_allowed_structured_intents(payload) -> None:
     request = json.loads(call["payload"]["contents"][0]["parts"][0]["text"])
     assert len(request["catalog_candidates"]) == 8
     assert set(request) == {"request", "catalog_candidates", "allowed_intents"}
+    generation = call["payload"]["generationConfig"]
+    assert generation["responseMimeType"] == "application/json"
+    schema = generation["responseJsonSchema"]
+    assert schema["additionalProperties"] is False
+    assert schema["required"] == ["intent"]
+    assert schema["properties"]["intent"]["enum"] == [
+        "find_tech_card",
+        "prepare_writeoff",
+        "prepare_transfer",
+        "clarify",
+        "unsupported",
+    ]
+    assert schema["properties"]["items"]["items"]["additionalProperties"] is False
 
 
 @pytest.mark.parametrize(
@@ -116,3 +129,39 @@ def test_gemini_rejects_unknown_extra_or_incomplete_output(payload) -> None:
     )
     with pytest.raises(ProviderError, match="malformed_response"):
         asyncio.run(client.classify("request"))
+
+
+@pytest.mark.parametrize(
+    ("responses", "kind", "call_count"),
+    [
+        ([HttpResponse(401, b"private raw auth body")], ProviderErrorKind.AUTH, 1),
+        ([HttpResponse(429, b"private raw rate body"), HttpResponse(429, b"still private")], ProviderErrorKind.RATE_LIMIT, 2),
+        ([asyncio.TimeoutError()], ProviderErrorKind.TIMEOUT, 1),
+        ([HttpResponse(500, b"temporary"), gemini_response({"intent": "unsupported"})], None, 2),
+        ([HttpResponse(503, b"private raw server body"), HttpResponse(503, b"still private")], ProviderErrorKind.SERVER, 2),
+        ([HttpResponse(200, b"not-json-private-body")], ProviderErrorKind.MALFORMED_RESPONSE, 1),
+    ],
+)
+def test_gemini_errors_and_retry_are_bounded_and_sanitized(
+    responses, kind, call_count, caplog
+) -> None:
+    transport = FakeTransport(responses)
+    client = GeminiIntentClient(
+        transport,
+        api_key="gemini-never-log-me",
+        model="flash",
+        timeout_seconds=1,
+        sleep=no_sleep,
+    )
+    if kind is None:
+        result = asyncio.run(client.classify("request"))
+        assert result.intent is AssistantIntentName.UNSUPPORTED
+    else:
+        with pytest.raises(ProviderError) as caught:
+            asyncio.run(client.classify("request"))
+        assert caught.value.kind is kind
+        rendered = str(caught.value) + caplog.text
+        assert "gemini-never-log-me" not in rendered
+        assert "private raw" not in rendered
+        assert "not-json-private-body" not in rendered
+    assert len(transport.calls) == call_count

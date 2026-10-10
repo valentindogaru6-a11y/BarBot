@@ -201,11 +201,11 @@ class Settings(BaseSettings):
             raise ValueError(
                 "GROQ_API_KEY обязателен при включённом AI voice pilot"
             )
-        if self.ai_text_enabled and (
+        if (self.ai_text_enabled or self.ai_voice_enabled) and (
             self.gemini_api_key is None
             or not self.gemini_api_key.get_secret_value().strip()
         ):
             raise ValueError(
-                "GEMINI_API_KEY обязателен при включённом AI text pilot"
+                "GEMINI_API_KEY обязателен при включённом AI text/voice pilot"
             )
         return self

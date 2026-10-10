@@ -7,6 +7,7 @@ import pytest
 
 from app.config import Settings
 from app.handlers import assistant
+from app.services.assistant import ProviderError, ProviderErrorKind
 from app.services.auth_service import AuthService
 
 
@@ -17,6 +18,7 @@ def settings(**updates) -> Settings:
         "ai_assistant_enabled": True,
         "ai_voice_enabled": True,
         "groq_api_key": "secret",
+        "gemini_api_key": "gemini-secret",
     }
     values.update(updates)
     return Settings(**values)
@@ -114,6 +116,40 @@ def test_voice_cancellation_propagates_after_tempfile_cleanup(tmp_path) -> None:
             )
         )
     assert observed_paths and all(not path.exists() for path in observed_paths)
+
+
+def test_voice_provider_error_is_safe_cleans_file_and_stops_pipeline(
+    tmp_path, monkeypatch, caplog
+) -> None:
+    observed_paths = []
+    msg = message()
+    run = AsyncMock()
+    monkeypatch.setattr(assistant, "_run_assistant", run)
+    client = SimpleNamespace(
+        transcribe=AsyncMock(
+            side_effect=ProviderError("groq", ProviderErrorKind.SERVER)
+        )
+    )
+
+    asyncio.run(
+        assistant.handle_assistant_voice(
+            msg,
+            SimpleNamespace(),
+            bot(observed_paths),
+            tmp_path / "catalog.json",
+            AuthService(frozenset({1})),
+            settings(),
+            SimpleNamespace(),
+            client,
+        )
+    )
+
+    run.assert_not_awaited()
+    assert msg.answer.await_args.args[0] == assistant.VOICE_UNAVAILABLE_TEXT
+    assert observed_paths and all(not path.exists() for path in observed_paths)
+    rendered = msg.answer.await_args.args[0] + caplog.text
+    assert "secret" not in rendered
+    assert "provider response" not in rendered
 
 
 def test_transcript_is_html_escaped_before_display(tmp_path, monkeypatch) -> None:

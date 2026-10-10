@@ -40,5 +40,8 @@ Current development state: an opt-in Phase 1 AI pilot uses Groq Whisper for
 voice and Gemini for strict intent classification, only for `super_admin` in a
 private chat. It delegates catalog lookup and warehouse draft preparation to
 existing services; mutations retain preview/confirmation. All AI flags default
-to false, and the AI layer has no direct SQLite, shell, systemd, deployment,
+to false. Text mode requires Gemini; voice mode requires Groq STT and Gemini
+intent classification. A master-only configuration is inert. Provider output
+is constrained by a Gemini-side JSON schema and authoritative local Pydantic
+validation. The AI layer has no direct SQLite, shell, systemd, deployment,
 catalog-editing, or internet-search tools. Production deployment is unverified.

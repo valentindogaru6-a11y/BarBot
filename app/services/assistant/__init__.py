@@ -8,6 +8,7 @@ from app.services.assistant.orchestrator import (
 )
 from app.services.assistant.providers import (
     AioHttpTransport,
+    AssistantHttpTransport,
     GeminiIntentClient,
     GroqSpeechToTextClient,
     IntentModelClient,
@@ -22,6 +23,7 @@ __all__ = [
     "AssistantToolRegistry",
     "AssistantUnavailableError",
     "AioHttpTransport",
+    "AssistantHttpTransport",
     "GeminiIntentClient",
     "GroqSpeechToTextClient",
     "IntentModelClient",

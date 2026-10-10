@@ -28,6 +28,7 @@ from app.middlewares.user_context import UserSyncMiddleware
 from app.services.admin_service import AdminService
 from app.services.assistant import (
     AioHttpTransport,
+    AssistantHttpTransport,
     AssistantOrchestrator,
     GeminiIntentClient,
     GroqSpeechToTextClient,
@@ -123,6 +124,37 @@ def build_dispatcher(
     return dispatcher
 
 
+def build_assistant_clients(
+    settings: Settings,
+    *,
+    transport: AssistantHttpTransport | None = None,
+) -> tuple[AssistantOrchestrator, GroqSpeechToTextClient | None]:
+    """Build only the provider adapters enabled by the validated AI matrix."""
+
+    speech_client = None
+    intent_client = None
+    if settings.ai_assistant_enabled and (
+        settings.ai_voice_enabled or settings.ai_text_enabled
+    ):
+        provider_transport = transport or AioHttpTransport()
+        if settings.ai_voice_enabled:
+            assert settings.groq_api_key is not None
+            speech_client = GroqSpeechToTextClient(
+                provider_transport,
+                api_key=settings.groq_api_key.get_secret_value(),
+                model=settings.groq_stt_model,
+                timeout_seconds=settings.ai_request_timeout_seconds,
+            )
+        assert settings.gemini_api_key is not None
+        intent_client = GeminiIntentClient(
+            provider_transport,
+            api_key=settings.gemini_api_key.get_secret_value(),
+            model=settings.gemini_fast_model,
+            timeout_seconds=settings.ai_request_timeout_seconds,
+        )
+    return AssistantOrchestrator(intent_client), speech_client
+
+
 def start_reminder_worker(
     service: WarehouseReminderService | None,
 ) -> asyncio.Task[None] | None:
@@ -178,27 +210,9 @@ async def main() -> None:
         ),
         max_concurrent=settings.voice_max_concurrent,
     )
-    assistant_speech_client = None
-    assistant_intent_client = None
-    if settings.ai_assistant_enabled and (
-        settings.ai_voice_enabled or settings.ai_text_enabled
-    ):
-        assistant_transport = AioHttpTransport()
-        if settings.ai_voice_enabled and settings.groq_api_key is not None:
-            assistant_speech_client = GroqSpeechToTextClient(
-                assistant_transport,
-                api_key=settings.groq_api_key.get_secret_value(),
-                model=settings.groq_stt_model,
-                timeout_seconds=settings.ai_request_timeout_seconds,
-            )
-        if settings.ai_text_enabled and settings.gemini_api_key is not None:
-            assistant_intent_client = GeminiIntentClient(
-                assistant_transport,
-                api_key=settings.gemini_api_key.get_secret_value(),
-                model=settings.gemini_fast_model,
-                timeout_seconds=settings.ai_request_timeout_seconds,
-            )
-    assistant_orchestrator = AssistantOrchestrator(assistant_intent_client)
+    assistant_orchestrator, assistant_speech_client = build_assistant_clients(
+        settings
+    )
     bot = Bot(
         token=settings.bot_token.get_secret_value(),
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),

@@ -19,6 +19,41 @@ GROQ_TRANSCRIPTION_URL = (
     "https://api.groq.com/openai/v1/audio/transcriptions"
 )
 GEMINI_API_ROOT = "https://generativelanguage.googleapis.com/v1beta/models"
+GEMINI_INTENT_SCHEMA: Mapping[str, object] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "intent": {
+            "type": "string",
+            "enum": [
+                "find_tech_card",
+                "prepare_writeoff",
+                "prepare_transfer",
+                "clarify",
+                "unsupported",
+            ],
+        },
+        "confidence": {"type": "integer", "minimum": 0, "maximum": 10_000},
+        "items": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "product_text": {"type": ["string", "null"]},
+                    "quantity_text": {"type": ["string", "null"]},
+                    "unit_text": {"type": ["string", "null"]},
+                    "destination_text": {"type": ["string", "null"]},
+                    "comment_text": {"type": ["string", "null"]},
+                },
+            },
+        },
+        "query": {"type": ["string", "null"]},
+        "clarification": {"type": ["string", "null"]},
+    },
+    "required": ["intent"],
+}
 
 
 class ProviderErrorKind(StrEnum):
@@ -326,6 +361,7 @@ class GeminiIntentClient(_RetryingProvider):
             "generationConfig": {
                 "temperature": 0,
                 "responseMimeType": "application/json",
+                "responseJsonSchema": GEMINI_INTENT_SCHEMA,
                 "maxOutputTokens": 1024,
             },
         }
