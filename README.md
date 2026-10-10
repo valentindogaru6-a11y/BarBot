@@ -147,6 +147,35 @@ VOICE_DEBUG_TRANSCRIPTS=false
 активных названий и алиасов каталога, не поддерживается конкретной моделью,
 сервис автоматически использует ту же модель без grammar.
 
+### AI assistant pilot (disabled by default)
+
+Phase 1 adds an optional private-chat assistant for `super_admin`. Groq Whisper
+transcribes Telegram OGG/Opus voice messages and Gemini classifies free text
+into a strict allowlist: technology-card lookup, preparation of a warehouse
+writeoff or transfer, clarification, or unsupported. Catalog results use the
+existing renderer; warehouse requests enter the existing persistent draft and
+still require explicit confirmation before any operation is created.
+
+The pilot is off unless `AI_ASSISTANT_ENABLED` and the corresponding text or
+voice flag are enabled. Provider keys are required only for an enabled path.
+Commands, active FSM flows, exact warehouse triggers, and callbacks keep
+priority. Phase 1 cannot edit cards or products, browse the internet, execute
+arbitrary tools, or control the service.
+
+```dotenv
+AI_ASSISTANT_ENABLED=false
+AI_TEXT_ENABLED=false
+AI_VOICE_ENABLED=false
+GROQ_API_KEY=
+GROQ_STT_MODEL=whisper-large-v3-turbo
+GEMINI_API_KEY=
+GEMINI_FAST_MODEL=gemini-3.5-flash-lite
+GEMINI_STRONG_MODEL=gemini-3.8-flash
+AI_VOICE_MAX_DURATION_SECONDS=180
+AI_VOICE_MAX_FILE_BYTES=20971520
+AI_REQUEST_TIMEOUT_SECONDS=30
+```
+
 Для неоднозначных названий можно вручную добавить необязательное поле, не
 меняя стабильный `id`:
 

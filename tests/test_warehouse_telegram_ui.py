@@ -38,11 +38,13 @@ def test_router_order_only_contains_warehouse_when_enabled() -> None:
     assert router_names(warehouse_enabled=False) == (
         "app.handlers.start",
         "app.handlers.catalog",
+        "app.handlers.assistant_voice",
         "app.handlers.voice",
         "app.handlers.search",
         "app.handlers.admin",
+        "app.handlers.assistant_text",
     )
-    assert router_names(warehouse_enabled=True)[-8:] == (
+    assert router_names(warehouse_enabled=True)[-9:] == (
         "app.handlers.warehouse",
         "app.handlers.warehouse_recipients",
         "app.handlers.warehouse_reminders",
@@ -51,6 +53,7 @@ def test_router_order_only_contains_warehouse_when_enabled() -> None:
         "app.handlers.warehouse_reports",
         "app.handlers.warehouse_corrections",
         "app.handlers.admin",
+        "app.handlers.assistant_text",
     )
 
 

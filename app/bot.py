@@ -9,6 +9,7 @@ from aiogram.enums import ParseMode
 
 from app.config import PROJECT_ROOT, Settings
 from app.handlers import (
+    assistant,
     catalog,
     search,
     start,
@@ -25,6 +26,12 @@ from app.handlers import (
 from app.handlers.admin import router as admin_router
 from app.middlewares.user_context import UserSyncMiddleware
 from app.services.admin_service import AdminService
+from app.services.assistant import (
+    AioHttpTransport,
+    AssistantOrchestrator,
+    GeminiIntentClient,
+    GroqSpeechToTextClient,
+)
 from app.services.audio_service import AudioService
 from app.services.audit_service import AuditService
 from app.services.auth_service import AuthService
@@ -66,6 +73,7 @@ def router_names(*, warehouse_enabled: bool) -> tuple[str, ...]:
     names = [
         "app.handlers.start",
         "app.handlers.catalog",
+        "app.handlers.assistant_voice",
         "app.handlers.voice",
         "app.handlers.search",
     ]
@@ -79,6 +87,7 @@ def router_names(*, warehouse_enabled: bool) -> tuple[str, ...]:
         names.append("app.handlers.warehouse_reports")
         names.append("app.handlers.warehouse_corrections")
     names.append("app.handlers.admin")
+    names.append("app.handlers.assistant_text")
     return tuple(names)
 
 
@@ -93,6 +102,7 @@ def build_dispatcher(
     dispatcher.update.outer_middleware(UserSyncMiddleware(user_service))
     dispatcher.include_router(start.router)
     dispatcher.include_router(catalog.router)
+    dispatcher.include_router(assistant.voice_router)
     dispatcher.include_router(voice.router)
     dispatcher.include_router(search.router)
     if warehouse_enabled:
@@ -105,6 +115,7 @@ def build_dispatcher(
         dispatcher.include_router(warehouse_reports.router)
         dispatcher.include_router(warehouse_corrections.router)
     dispatcher.include_router(admin_router)
+    dispatcher.include_router(assistant.text_router)
     dispatcher.errors.register(start.handle_unexpected_error)
     assert tuple(router.name for router in dispatcher.sub_routers) == router_names(
         warehouse_enabled=warehouse_enabled
@@ -167,6 +178,27 @@ async def main() -> None:
         ),
         max_concurrent=settings.voice_max_concurrent,
     )
+    assistant_speech_client = None
+    assistant_intent_client = None
+    if settings.ai_assistant_enabled and (
+        settings.ai_voice_enabled or settings.ai_text_enabled
+    ):
+        assistant_transport = AioHttpTransport()
+        if settings.ai_voice_enabled and settings.groq_api_key is not None:
+            assistant_speech_client = GroqSpeechToTextClient(
+                assistant_transport,
+                api_key=settings.groq_api_key.get_secret_value(),
+                model=settings.groq_stt_model,
+                timeout_seconds=settings.ai_request_timeout_seconds,
+            )
+        if settings.ai_text_enabled and settings.gemini_api_key is not None:
+            assistant_intent_client = GeminiIntentClient(
+                assistant_transport,
+                api_key=settings.gemini_api_key.get_secret_value(),
+                model=settings.gemini_fast_model,
+                timeout_seconds=settings.ai_request_timeout_seconds,
+            )
+    assistant_orchestrator = AssistantOrchestrator(assistant_intent_client)
     bot = Bot(
         token=settings.bot_token.get_secret_value(),
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
@@ -282,6 +314,8 @@ async def main() -> None:
             warehouse_attendance_service=warehouse_attendance_service,
             warehouse_attendance_xlsx_service=warehouse_attendance_xlsx_service,
             warehouse_attendance_report_coordinator=warehouse_attendance_report_coordinator,
+            assistant_orchestrator=assistant_orchestrator,
+            assistant_speech_client=assistant_speech_client,
             close_bot_session=False,
         )
     finally:

@@ -630,6 +630,17 @@ async def _prepare(
     await _show_batch(message, state, service, batch, message.from_user.id)
 
 
+async def prepare_intake_message(
+    message: Message,
+    state: FSMContext,
+    service: WarehouseOperationsService,
+    raw_text: str,
+) -> None:
+    """Reuse the complete warehouse draft/resolution UI from trusted adapters."""
+
+    await _prepare(message, state, service, raw_text)
+
+
 @router.message(Command("warehouse"))
 async def warehouse_command(
     message: Message,

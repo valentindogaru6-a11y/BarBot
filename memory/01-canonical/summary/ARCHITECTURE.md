@@ -31,6 +31,10 @@ Importance: Critical
 - Release inspection uses a separate logical read-only SQLite connection and
   does not call initialization, migrations, checkpoint, journal mutation, or
   chmod. SQLite may still touch WAL/SHM runtime sidecars.
+- `app.handlers.assistant` is an opt-in last-resort text router plus a gated
+  voice router. Provider adapters return strict intents to
+  `AssistantOrchestrator`; `AssistantToolRegistry` can only search the catalog
+  or translate input into the existing warehouse persistent-draft flow.
 
 Exact control flow or data shape must be re-read from source; this summary is a
 router, not a substitute for code review.

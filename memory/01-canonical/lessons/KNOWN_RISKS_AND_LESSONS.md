@@ -32,6 +32,9 @@ Importance: High
 - **Limited VPS resources:** Owner-confirmed direction plus README voice-memory
   guidance. Avoid large local AI models; prefer bounded remote inference or
   small controlled local components after explicit design review.
+- **Remote AI degradation:** provider timeouts, throttling, malformed output, or
+  authentication failures must remain sanitized and cannot bypass commands,
+  FSM, access checks, warehouse confirmation, or existing non-AI behavior.
 
 Revalidate runtime-dependent lessons before production action. Do not turn an
 owner observation into a measured infrastructure claim without evidence.

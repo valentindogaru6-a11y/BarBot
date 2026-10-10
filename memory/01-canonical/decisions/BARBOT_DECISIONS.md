@@ -72,10 +72,13 @@ The 414-product seed is not the whole production nomenclature. Reconcile seed
 records without deleting or overwriting deliberate owner additions; current
 owner-confirmed production baseline is 416 active products.
 
-## D12 — Future AI service boundary
+## D12 — Bounded AI service boundary
 
-Proposed Groq Whisper/Gemini functionality may interpret input and request
-existing service operations. It must not receive direct SQL, filesystem shell,
-systemd, polling, migration, deployment, or unrestricted mutation access.
-Mutations require preview and explicit confirmation. This layer is not yet
-implemented.
+The Phase 1 Groq Whisper/Gemini pilot may interpret input and request only
+catalog lookup or existing warehouse draft preparation. Strict local intent
+models and a tool allowlist own that boundary; provider output cannot choose
+database IDs or callbacks. The pilot is private-`super_admin` only and disabled
+by default. It has no direct SQL, filesystem shell, systemd, polling, migration,
+deployment, internet-search, catalog-editing, or unrestricted mutation access.
+Warehouse mutations retain preview, authorization recheck, idempotency, and
+explicit confirmation.

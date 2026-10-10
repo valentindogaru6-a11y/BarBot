@@ -36,7 +36,9 @@ revalidation before production actions:
 - verified backup recorded at the approved production backup root;
 - GitHub remote configured and the v12 rollout completed.
 
-Current proposed direction, not implemented: Groq Whisper for voice and Gemini
-for intent/tool calling, only through existing BarBot services. Mutations must
-use preview/confirmation; AI receives no direct SQLite, shell, systemd, or
-deployment access.
+Current development state: an opt-in Phase 1 AI pilot uses Groq Whisper for
+voice and Gemini for strict intent classification, only for `super_admin` in a
+private chat. It delegates catalog lookup and warehouse draft preparation to
+existing services; mutations retain preview/confirmation. All AI flags default
+to false, and the AI layer has no direct SQLite, shell, systemd, deployment,
+catalog-editing, or internet-search tools. Production deployment is unverified.

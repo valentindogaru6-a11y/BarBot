@@ -4,7 +4,7 @@ import json
 import logging
 from pathlib import Path
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -82,6 +82,33 @@ class Settings(BaseSettings):
         default=Path("reports/warehouse"),
         validate_default=True,
     )
+    ai_assistant_enabled: bool = False
+    ai_text_enabled: bool = False
+    ai_voice_enabled: bool = False
+    groq_api_key: SecretStr | None = None
+    groq_stt_model: str = Field(
+        default="whisper-large-v3-turbo",
+        min_length=1,
+        max_length=100,
+    )
+    gemini_api_key: SecretStr | None = None
+    gemini_fast_model: str = Field(
+        default="gemini-3.5-flash-lite",
+        min_length=1,
+        max_length=100,
+    )
+    gemini_strong_model: str = Field(
+        default="gemini-3.8-flash",
+        min_length=1,
+        max_length=100,
+    )
+    ai_voice_max_duration_seconds: int = Field(default=180, gt=0, le=600)
+    ai_voice_max_file_bytes: int = Field(
+        default=20 * 1024 * 1024,
+        gt=0,
+        le=50 * 1024 * 1024,
+    )
+    ai_request_timeout_seconds: int = Field(default=30, gt=0, le=120)
 
     @field_validator("super_admin_ids", mode="before")
     @classmethod
@@ -160,3 +187,25 @@ class Settings(BaseSettings):
                 "ADMIN_IDS bootstrap is deprecated; configure SUPER_ADMIN_IDS"
             )
         return self.admin_ids
+
+    @model_validator(mode="after")
+    def validate_ai_provider_keys(self) -> "Settings":
+        """Require provider secrets only for explicitly enabled pilot paths."""
+
+        if not self.ai_assistant_enabled:
+            return self
+        if self.ai_voice_enabled and (
+            self.groq_api_key is None
+            or not self.groq_api_key.get_secret_value().strip()
+        ):
+            raise ValueError(
+                "GROQ_API_KEY обязателен при включённом AI voice pilot"
+            )
+        if self.ai_text_enabled and (
+            self.gemini_api_key is None
+            or not self.gemini_api_key.get_secret_value().strip()
+        ):
+            raise ValueError(
+                "GEMINI_API_KEY обязателен при включённом AI text pilot"
+            )
+        return self

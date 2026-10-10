@@ -22,5 +22,8 @@ Importance: High
 - `WarehouseAttendanceService`: personal attendance lifecycle and authorization.
 - `AttendanceReportCoordinator`: one-shot XLSX generation token lifecycle.
 - `source.import_bar_xls.CatalogImporter`: spreadsheet-to-catalog reconciliation preserving stable/manual data.
+- `AssistantOrchestrator.interpret`: local-first intent selection with optional Gemini fallback.
+- `AssistantToolRegistry.execute`: narrow catalog-search/warehouse-draft tool allowlist.
+- `GroqSpeechToTextClient` / `GeminiIntentClient`: bounded asynchronous provider adapters.
 
 Names are routing aids, not API guarantees. Confirm definitions before edits.

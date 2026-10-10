@@ -245,7 +245,13 @@ def test_admin_and_warehouse_router_order_is_unchanged() -> None:
     disabled = router_names(warehouse_enabled=False)
     enabled = router_names(warehouse_enabled=True)
 
-    assert disabled[-1] == "app.handlers.admin"
-    assert enabled[-1] == "app.handlers.admin"
+    assert disabled[-2:] == (
+        "app.handlers.admin",
+        "app.handlers.assistant_text",
+    )
+    assert enabled[-2:] == (
+        "app.handlers.admin",
+        "app.handlers.assistant_text",
+    )
     assert "app.handlers.warehouse" not in disabled
     assert "app.handlers.warehouse" in enabled
