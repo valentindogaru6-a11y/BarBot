@@ -7,7 +7,11 @@ import pytest
 
 from app.config import Settings
 from app.handlers import assistant
-from app.services.assistant import ProviderError, ProviderErrorKind
+from app.services.assistant import (
+    AssistantRequestCoordinator,
+    ProviderError,
+    ProviderErrorKind,
+)
 from app.services.auth_service import AuthService
 
 
@@ -63,6 +67,7 @@ def test_voice_transcript_uses_shared_orchestrator_and_cleans_file(tmp_path, mon
             settings(),
             orchestrator,
             client,
+            AssistantRequestCoordinator(),
         )
     )
 
@@ -93,6 +98,7 @@ def test_voice_limits_reject_before_download(updates, voice_values) -> None:
             settings(**updates),
             SimpleNamespace(),
             client,
+            AssistantRequestCoordinator(),
         )
     )
     telegram.download.assert_not_awaited()
@@ -113,6 +119,7 @@ def test_voice_cancellation_propagates_after_tempfile_cleanup(tmp_path) -> None:
                 settings(),
                 SimpleNamespace(),
                 client,
+                AssistantRequestCoordinator(),
             )
         )
     assert observed_paths and all(not path.exists() for path in observed_paths)
@@ -141,6 +148,7 @@ def test_voice_provider_error_is_safe_cleans_file_and_stops_pipeline(
             settings(),
             SimpleNamespace(),
             client,
+            AssistantRequestCoordinator(),
         )
     )
 
@@ -166,6 +174,7 @@ def test_transcript_is_html_escaped_before_display(tmp_path, monkeypatch) -> Non
             settings(),
             SimpleNamespace(),
             client,
+            AssistantRequestCoordinator(),
         )
     )
     rendered = msg.answer.await_args_list[0].args[0]

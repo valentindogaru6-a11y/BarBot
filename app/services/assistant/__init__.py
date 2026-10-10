@@ -1,5 +1,6 @@
 """Bounded AI assistant services."""
 
+from app.services.assistant.coordinator import AssistantRequestCoordinator
 from app.services.assistant.orchestrator import (
     AssistantOrchestrator,
     AssistantToolAction,
@@ -19,6 +20,7 @@ from app.services.assistant.providers import (
 
 __all__ = [
     "AssistantOrchestrator",
+    "AssistantRequestCoordinator",
     "AssistantToolAction",
     "AssistantToolRegistry",
     "AssistantUnavailableError",

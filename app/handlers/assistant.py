@@ -21,6 +21,7 @@ from app.keyboards.catalog import build_search_results_keyboard
 from app.models.user import Role
 from app.services.assistant import (
     AssistantOrchestrator,
+    AssistantRequestCoordinator,
     AssistantToolRegistry,
     AssistantUnavailableError,
     ProviderError,
@@ -38,6 +39,9 @@ logger = logging.getLogger(__name__)
 
 AI_UNAVAILABLE_TEXT = "AI-помощник временно недоступен. Попробуйте позже."
 VOICE_UNAVAILABLE_TEXT = "Не удалось распознать голосовое. Попробуйте ещё раз или отправьте текст."
+AI_REQUEST_BUSY_TEXT = (
+    "⏳ Я ещё обрабатываю предыдущий запрос. Дождитесь результата."
+)
 
 
 def _private_super_admin(
@@ -173,11 +177,49 @@ async def handle_assistant_voice(
     settings: Settings,
     assistant_orchestrator: AssistantOrchestrator | None,
     assistant_speech_client: SpeechToTextClient | None,
+    assistant_request_coordinator: AssistantRequestCoordinator,
     warehouse_service: WarehouseOperationsService | None = None,
 ) -> None:
     voice = message.voice
     if voice is None or assistant_speech_client is None or assistant_orchestrator is None:
         await message.answer(VOICE_UNAVAILABLE_TEXT)
+        return
+    if message.from_user is None:
+        return
+    async with assistant_request_coordinator.claim(
+        message.from_user.id
+    ) as acquired:
+        if not acquired:
+            await message.answer(AI_REQUEST_BUSY_TEXT)
+            return
+        await _handle_assistant_voice_claimed(
+            message,
+            state,
+            bot,
+            catalog_path,
+            auth_service,
+            settings,
+            assistant_orchestrator,
+            assistant_speech_client,
+            warehouse_service,
+        )
+
+
+async def _handle_assistant_voice_claimed(
+    message: Message,
+    state: FSMContext,
+    bot: Bot,
+    catalog_path: Path,
+    auth_service: AuthService,
+    settings: Settings,
+    assistant_orchestrator: AssistantOrchestrator,
+    assistant_speech_client: SpeechToTextClient,
+    warehouse_service: WarehouseOperationsService | None,
+) -> None:
+    """Run the voice pipeline while the caller owns the per-user claim."""
+
+    voice = message.voice
+    if voice is None:
         return
     if voice.duration > settings.ai_voice_max_duration_seconds:
         await message.answer(
@@ -240,16 +282,23 @@ async def handle_assistant_text(
     catalog_path: Path,
     auth_service: AuthService,
     assistant_orchestrator: AssistantOrchestrator | None,
+    assistant_request_coordinator: AssistantRequestCoordinator,
     warehouse_service: WarehouseOperationsService | None = None,
 ) -> None:
-    if assistant_orchestrator is None:
+    if assistant_orchestrator is None or message.from_user is None:
         return
-    await _run_assistant(
-        message,
-        state,
-        text=message.text or "",
-        catalog_path=catalog_path,
-        auth_service=auth_service,
-        orchestrator=assistant_orchestrator,
-        warehouse_service=warehouse_service,
-    )
+    async with assistant_request_coordinator.claim(
+        message.from_user.id
+    ) as acquired:
+        if not acquired:
+            await message.answer(AI_REQUEST_BUSY_TEXT)
+            return
+        await _run_assistant(
+            message,
+            state,
+            text=message.text or "",
+            catalog_path=catalog_path,
+            auth_service=auth_service,
+            orchestrator=assistant_orchestrator,
+            warehouse_service=warehouse_service,
+        )

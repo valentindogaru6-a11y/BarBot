@@ -45,3 +45,8 @@ intent classification. A master-only configuration is inert. Provider output
 is constrained by a Gemini-side JSON schema and authoritative local Pydantic
 validation. The AI layer has no direct SQLite, shell, systemd, deployment,
 catalog-editing, or internet-search tools. Production deployment is unverified.
+One process-local per-user claim coordinates text and voice so concurrent AI
+requests cannot duplicate provider work; every exit path releases the claim.
+Live Gemini structured output was owner-authorized and passed on 2026-10-10.
+Groq is still `NOT TESTED — AUDIO SAMPLE REQUIRED`; final verification is a
+controlled owner-only Telegram voice request, not a synthetic production file.

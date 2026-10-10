@@ -166,6 +166,17 @@ Commands, active FSM flows, exact warehouse triggers, and callbacks keep
 priority. Phase 1 cannot edit cards or products, browse the internet, execute
 arbitrary tools, or control the service.
 
+The polling process allows one in-flight AI request per user across text and
+voice. A concurrent request receives a short wait message; the claim is always
+released after success, failure, timeout, or cancellation. Different users do
+not block one another. This is intentionally process-local and does not replace
+warehouse idempotency or confirmation.
+
+Runtime readiness: the live Gemini structured-output smoke passed on
+2026-10-10. Groq remains `NOT TESTED — AUDIO SAMPLE REQUIRED`; its final smoke
+must use a controlled Telegram voice request sent only by the owner during a
+separately authorized rollout step.
+
 ```dotenv
 AI_ASSISTANT_ENABLED=false
 AI_TEXT_ENABLED=false

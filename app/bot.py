@@ -30,6 +30,7 @@ from app.services.assistant import (
     AioHttpTransport,
     AssistantHttpTransport,
     AssistantOrchestrator,
+    AssistantRequestCoordinator,
     GeminiIntentClient,
     GroqSpeechToTextClient,
 )
@@ -213,6 +214,7 @@ async def main() -> None:
     assistant_orchestrator, assistant_speech_client = build_assistant_clients(
         settings
     )
+    assistant_request_coordinator = AssistantRequestCoordinator()
     bot = Bot(
         token=settings.bot_token.get_secret_value(),
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
@@ -330,6 +332,7 @@ async def main() -> None:
             warehouse_attendance_report_coordinator=warehouse_attendance_report_coordinator,
             assistant_orchestrator=assistant_orchestrator,
             assistant_speech_client=assistant_speech_client,
+            assistant_request_coordinator=assistant_request_coordinator,
             close_bot_session=False,
         )
     finally:
