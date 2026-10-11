@@ -103,11 +103,17 @@ def test_gemini_accepts_only_allowed_structured_intents(payload) -> None:
     client = GeminiIntentClient(
         transport, api_key="secret", model="flash", timeout_seconds=5
     )
+    action = (
+        (AssistantIntentName(payload["intent"]),)
+        if payload["intent"] in {"prepare_writeoff", "prepare_transfer"}
+        else ()
+    )
     result = asyncio.run(
         client.classify(
             "request",
             candidates=["one"] * 20,
             normalized_entity="entity",
+            allowed_action_intents=action,
         )
     )
     assert result.intent is AssistantIntentName(payload["intent"])
@@ -140,17 +146,51 @@ def test_gemini_accepts_only_allowed_structured_intents(payload) -> None:
         "needs_web",
         "clarification",
     ]
-    assert schema["properties"]["intent"]["enum"] == [
+    expected_intents = [
         "find_tech_card",
-        "prepare_writeoff",
-        "prepare_transfer",
         "clarify",
         "not_found",
         "unsupported",
         "general_chat",
         "web_search",
     ]
+    expected_intents.extend(value.value for value in action)
+    assert schema["properties"]["intent"]["enum"] == expected_intents
     assert schema["properties"]["items"]["items"]["additionalProperties"] is False
+
+
+def test_provider_schema_excludes_actions_without_local_evidence() -> None:
+    transport = FakeTransport([gemini_response({"intent": "unsupported"})])
+    client = GeminiIntentClient(
+        transport, api_key="secret", model="flash", timeout_seconds=5
+    )
+    asyncio.run(client.classify("расскажи про молоко"))
+    _, call = transport.calls[0]
+    request = json.loads(call["payload"]["contents"][0]["parts"][0]["text"])
+    schema = call["payload"]["generationConfig"]["responseJsonSchema"]
+    for blocked in ("prepare_writeoff", "prepare_transfer"):
+        assert blocked not in request["allowed_intents"]
+        assert blocked not in schema["properties"]["intent"]["enum"]
+
+
+def test_provider_rejects_action_outside_dynamic_schema() -> None:
+    client = GeminiIntentClient(
+        FakeTransport([gemini_response({
+            "intent": "prepare_transfer",
+            "confidence": 10_000,
+            "items": [{
+                "product_text": "молоко",
+                "quantity_text": "1",
+                "unit_text": "л",
+                "destination_text": "кухня",
+            }],
+        })]),
+        api_key="secret",
+        model="flash",
+        timeout_seconds=5,
+    )
+    with pytest.raises(ProviderError, match="malformed_response"):
+        asyncio.run(client.classify("расскажи про молоко"))
 
 
 def test_system_prompt_is_short_versioned_and_contains_no_runtime_data() -> None:

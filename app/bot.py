@@ -165,7 +165,9 @@ def build_assistant_clients(
                 api_key=settings.gemini_api_key.get_secret_value(),
                 model=settings.gemini_strong_model,
                 timeout_seconds=settings.ai_request_timeout_seconds,
-                max_queries=settings.ai_web_search_max_queries_per_request,
+                max_provider_calls_per_update=(
+                    settings.ai_web_search_max_provider_calls_per_update
+                ),
             )
     return AssistantOrchestrator(
         intent_client,

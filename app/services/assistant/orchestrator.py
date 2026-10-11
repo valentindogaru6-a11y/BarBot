@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import logging
 import re
+import unicodedata
 from dataclasses import dataclass
 from typing import Literal, Sequence
 
@@ -24,6 +26,13 @@ from app.services.assistant.retrieval import (
 from app.services.search_service import SearchResult
 
 MAX_ASSISTANT_TEXT_LENGTH = 2_000
+logger = logging.getLogger(__name__)
+_WAREHOUSE_ACTION_INTENTS = frozenset(
+    {
+        AssistantIntentName.PREPARE_WRITEOFF,
+        AssistantIntentName.PREPARE_TRANSFER,
+    }
+)
 _UNSUPPORTED_RE = re.compile(
     r"\b(?:перезапуст\w*|измени\s+прав|поменяй|редактир|"
     r"добавь\s+(?:описание|продукт)|создай\s+продукт)\b",
@@ -64,6 +73,16 @@ _QUANTITY_HINT_RE = re.compile(
     r"(?:\d|полкил|килограмм|грамм|\bкг\b|литр|миллилитр|\bмл\b|"
     r"\bл\b|штук)",
     re.IGNORECASE,
+)
+_WRITEOFF_EVIDENCE_RE = re.compile(
+    r"^(?:(?:спиши(?:те)?|списать)\b|"
+    r"(?:сделай|оформи)\s+списани(?:е|я)\b|"
+    r"добавь\s+в\s+списани(?:е|я)\b|списание\s*:)",
+)
+_TRANSFER_EVIDENCE_RE = re.compile(
+    r"^(?:(?:перемести(?:те)?|переместить|перенеси(?:те)?|перенести)\b|"
+    r"(?:сделай|оформи)\s+перемещени(?:е|я)\b|перемещение\s*:|"
+    r"отправь(?:те)?\b.+\bна\s+кухн(?:ю|е)\b)",
 )
 
 
@@ -107,6 +126,42 @@ class AssistantOrchestrator:
         self.search_client = search_client
         self.general_chat_enabled = general_chat_enabled
         self.web_search_enabled = web_search_enabled
+
+    @staticmethod
+    def local_action_evidence(text: str) -> AssistantIntentName | None:
+        """Return an action only for an explicit, deterministic command form."""
+
+        normalized = (
+            unicodedata.normalize("NFKC", text).casefold().replace("ё", "е")
+        )
+        normalized = re.sub(r"[^\w\s:]+", " ", normalized)
+        normalized = " ".join(normalized.split())
+        if _WRITEOFF_EVIDENCE_RE.search(normalized):
+            return AssistantIntentName.PREPARE_WRITEOFF
+        if _TRANSFER_EVIDENCE_RE.search(normalized):
+            return AssistantIntentName.PREPARE_TRANSFER
+        return None
+
+    @staticmethod
+    def _guard_provider_intent(
+        intent: AssistantIntent,
+        allowed_action: AssistantIntentName | None,
+    ) -> AssistantIntent:
+        if intent.intent not in _WAREHOUSE_ACTION_INTENTS:
+            return intent
+        if intent.intent is allowed_action:
+            return intent
+        logger.warning(
+            "blocked_action_escalation intent=%s",
+            intent.intent.value,
+        )
+        return AssistantIntent(
+            intent=AssistantIntentName.CLARIFY,
+            clarification=(
+                "Если нужно изменить складские остатки, сформулируйте явную "
+                "команду списания или перемещения."
+            ),
+        )
 
     @staticmethod
     def local_intent(text: str) -> AssistantIntent | None:
@@ -165,18 +220,21 @@ class AssistantOrchestrator:
         candidates: Sequence[str] = (),
         normalized_entity: str = "",
         conversation: Sequence[tuple[str, str]] = (),
+        allowed_action: AssistantIntentName | None = None,
     ) -> AssistantIntent:
         local = self.local_intent(text)
         if local is not None:
             return local
         if self.intent_client is None:
             raise AssistantUnavailableError("intent provider is disabled")
-        return await self.intent_client.classify(
+        intent = await self.intent_client.classify(
             text,
             candidates=candidates,
             normalized_entity=normalized_entity,
             conversation=conversation,
+            allowed_action_intents=(allowed_action,) if allowed_action else (),
         )
+        return self._guard_provider_intent(intent, allowed_action)
 
     async def interpret_with_provider(
         self,
@@ -185,17 +243,20 @@ class AssistantOrchestrator:
         candidates: Sequence[str] = (),
         normalized_entity: str = "",
         conversation: Sequence[tuple[str, str]] = (),
+        allowed_action: AssistantIntentName | None = None,
     ) -> AssistantIntent:
         """Consult the provider after local retrieval needs disambiguation."""
 
         if self.intent_client is None:
             raise AssistantUnavailableError("intent provider is disabled")
-        return await self.intent_client.classify(
+        intent = await self.intent_client.classify(
             text,
             candidates=candidates,
             normalized_entity=normalized_entity,
             conversation=conversation,
+            allowed_action_intents=(allowed_action,) if allowed_action else (),
         )
+        return self._guard_provider_intent(intent, allowed_action)
 
     async def search_web(
         self,

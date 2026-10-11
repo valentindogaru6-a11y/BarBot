@@ -37,8 +37,15 @@ Importance: High
   FSM, access checks, warehouse confirmation, or existing non-AI behavior.
 - **Grounded search is still untrusted input:** billing/quota may be unavailable,
   metadata may omit citations, and retrieved pages may contain instructions.
-  Degrade to ordinary chat, display only metadata-backed links, and never route
-  search output into catalog or warehouse mutation.
+  Reject answers without usable grounding metadata/support, display only
+  credential-free metadata-backed links, never route search output into local
+  mutation, and never automatically retry an ambiguously completed billable
+  search call. The prompt's two-query request is soft, not an enforceable API
+  limit.
+- **Provider intent is not mutation authority:** writeoff/transfer drafts require
+  explicit local command evidence or a live pending context created from that
+  evidence. Keep both the dynamic provider enum and local post-validation;
+  prompt instructions alone are not a security boundary.
 
 Revalidate runtime-dependent lessons before production action. Do not turn an
 owner observation into a measured infrastructure claim without evidence.

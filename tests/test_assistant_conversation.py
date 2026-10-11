@@ -25,6 +25,7 @@ class QueueClient:
         candidates=(),
         normalized_entity="",
         conversation=(),
+        allowed_action_intents=(),
     ):
         self.calls.append((text, tuple(conversation)))
         return self.responses.pop(0)

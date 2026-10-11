@@ -36,6 +36,7 @@ def test_context_expires_and_is_not_reused() -> None:
         last_entity_type="warehouse_product",
         last_query="морковь",
         pending_slots=("quantity",),
+        authorized_action="prepare_writeoff",
     )
     clock.value = 110.0
     assert memory.get(1) is None
@@ -81,10 +82,12 @@ def test_completing_structured_context_revokes_callbacks_but_keeps_turns() -> No
         last_query="мохито",
         candidate_ids=("a/_/one",),
         pending_slots=("candidate",),
+        authorized_action="prepare_transfer",
     )
     memory.clear_structured(1, last_intent="find_tech_card")
     context = memory.get(1)
     assert context is not None
     assert context.candidate_ids == ()
     assert context.pending_slots == ()
+    assert context.authorized_action == ""
     assert memory.provider_history(1) == (("user", "покажи карту"),)

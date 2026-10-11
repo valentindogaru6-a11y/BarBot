@@ -23,6 +23,7 @@ from app.handlers.common import answer_callback_safely, load_catalog
 from app.handlers.warehouse import prepare_intake_message
 from app.keyboards.assistant import build_assistant_candidates_keyboard
 from app.keyboards.callbacks import AssistantCandidateCallback
+from app.models.assistant import AssistantIntentName
 from app.models.user import Role
 from app.services.assistant import (
     AssistantOrchestrator,
@@ -197,6 +198,17 @@ async def _run_assistant(
         if conversation_memory is not None and user_id is not None
         else None
     )
+    allowed_action = orchestrator.local_action_evidence(text)
+    if (
+        allowed_action is None
+        and context is not None
+        and context.authorized_action
+        in {
+            AssistantIntentName.PREPARE_WRITEOFF.value,
+            AssistantIntentName.PREPARE_TRANSFER.value,
+        }
+    ):
+        allowed_action = AssistantIntentName(context.authorized_action)
     request_text = text
     provider_history = (
         conversation_memory.provider_history(user_id)
@@ -206,7 +218,10 @@ async def _run_assistant(
     if context is not None:
         if context.last_entity_type == "tech_card":
             request_text = f"покажи техкарту {context.last_query} {text}"
-        elif context.last_entity_type == "warehouse_product":
+        elif (
+            context.last_entity_type == "warehouse_product"
+            and allowed_action is not None
+        ):
             verb = (
                 "спиши"
                 if context.last_intent == "prepare_writeoff"
@@ -240,6 +255,7 @@ async def _run_assistant(
                 candidates=provider_candidates,
                 normalized_entity=retrieval.normalized_query,
                 conversation=provider_history,
+                allowed_action=allowed_action,
             )
             if local_intent is None:
                 provider_latency_bucket = _latency_bucket(monotonic() - started)
@@ -295,6 +311,7 @@ async def _run_assistant(
                 candidates=provider_candidates,
                 normalized_entity=action.entity_query or retrieval.normalized_query,
                 conversation=provider_history,
+                allowed_action=allowed_action,
             )
             provider_latency_bucket = _latency_bucket(monotonic() - started)
             refined_action = registry.execute(refined)
@@ -387,6 +404,11 @@ async def _run_assistant(
                 )
             await message.answer(WEB_SEARCH_UNAVAILABLE_TEXT)
             return
+        logger.info(
+            "Assistant grounded search completed query_count=%d source_count=%d",
+            result.query_count,
+            len(result.sources),
+        )
         answer = _without_model_links(result.answer_text).strip()[:3000]
         if not answer:
             answer = "Поиск завершён, но текст ответа недоступен."
@@ -493,6 +515,7 @@ async def _run_assistant(
         and action.entity_query
         and conversation_memory is not None
         and user_id is not None
+        and allowed_action is intent.intent
     ):
         conversation_memory.remember(
             user_id,
@@ -500,6 +523,7 @@ async def _run_assistant(
             last_entity_type="warehouse_product",
             last_query=action.entity_query,
             pending_slots=action.pending_slots,
+            authorized_action=intent.intent.value,
         )
     elif action.kind == "clarify" and context is not None:
         if conversation_memory is not None and user_id is not None:

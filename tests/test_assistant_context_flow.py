@@ -76,6 +76,7 @@ class QueueIntentClient:
         candidates=(),
         normalized_entity="",
         conversation=(),
+        allowed_action_intents=(),
     ):
         self.calls.append((text, tuple(candidates), normalized_entity))
         return self.intents.pop(0)
@@ -342,6 +343,7 @@ class RaisingIntentClient:
         candidates=(),
         normalized_entity="",
         conversation=(),
+        allowed_action_intents=(),
     ):
         raise self.error
 
@@ -425,3 +427,83 @@ def test_safe_observability_has_no_query_or_user_id(
     assert "local_exact_hit=True" in caplog.text
     assert "Каманинская" not in caplog.text
     assert "987654" not in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("text", "hostile_intent"),
+    [
+        ("расскажи про кокосовое молоко", "prepare_transfer"),
+        ("что такое списание", "prepare_writeoff"),
+        ("как оформлять перемещение", "prepare_transfer"),
+    ],
+)
+def test_hostile_action_escalation_never_reaches_warehouse(
+    tmp_path, monkeypatch, caplog, text, hostile_intent
+) -> None:
+    item = {
+        "product_text": "кокосовое молоко",
+        "quantity_text": "1",
+        "unit_text": "л",
+    }
+    if hostile_intent == "prepare_transfer":
+        item["destination_text"] = "кухня"
+    client = QueueIntentClient(AssistantIntent(
+        intent=hostile_intent,
+        confidence=10_000,
+        items=[item],
+    ))
+    prepare = AsyncMock()
+    monkeypatch.setattr(assistant, "prepare_intake_message", prepare)
+    message = _message(123456, text)
+    with caplog.at_level(logging.WARNING):
+        asyncio.run(assistant._run_assistant(
+            message,
+            SimpleNamespace(),
+            text=text,
+            catalog_path=_catalog_path(tmp_path),
+            auth_service=AuthService(frozenset({123456})),
+            orchestrator=AssistantOrchestrator(client),
+            warehouse_service=SimpleNamespace(),
+            conversation_memory=AssistantConversationMemory(),
+        ))
+    prepare.assert_not_awaited()
+    assert "blocked_action_escalation" in caplog.text
+    assert text not in caplog.text
+    assert "123456" not in caplog.text
+    assert client.calls[0][0] == text
+
+
+def test_unconfirmed_pending_context_cannot_authorize_action(
+    tmp_path, monkeypatch
+) -> None:
+    memory = AssistantConversationMemory()
+    memory.remember(
+        1,
+        last_intent="prepare_writeoff",
+        last_entity_type="warehouse_product",
+        last_query="морковь",
+        pending_slots=("quantity",),
+    )
+    client = QueueIntentClient(AssistantIntent(
+        intent="prepare_writeoff",
+        confidence=10_000,
+        items=[{
+            "product_text": "морковь",
+            "quantity_text": "500",
+            "unit_text": "г",
+        }],
+    ))
+    prepare = AsyncMock()
+    monkeypatch.setattr(assistant, "prepare_intake_message", prepare)
+    asyncio.run(assistant._run_assistant(
+        _message(1, "500 г"),
+        SimpleNamespace(),
+        text="500 г",
+        catalog_path=_catalog_path(tmp_path),
+        auth_service=AuthService(frozenset({1})),
+        orchestrator=AssistantOrchestrator(client),
+        warehouse_service=SimpleNamespace(),
+        conversation_memory=memory,
+    ))
+    assert client.calls[0][0] == "500 г"
+    prepare.assert_not_awaited()

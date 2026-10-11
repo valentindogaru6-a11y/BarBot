@@ -17,6 +17,10 @@ Importance: High
 - Gemini receives the request, normalized entity and at most five local
   candidate labels. Its output remains strict schema/Pydantic data and cannot
   supply database IDs, callbacks, SQL, or service methods.
+- Warehouse intent classification is not authority. A normalized local action
+  gate must find an explicit writeoff/transfer command, or a previously gated
+  pending action must still be live. The provider enum is narrowed per request,
+  and local post-validation blocks escalation before persistent-draft creation.
 - `AssistantConversationMemory` combines structured clarification fields with
   at most six normalized user/assistant turns, 6000 characters and a 30-minute
   TTL. It is process-local, isolated for at most 100 users, never logged or
@@ -28,9 +32,15 @@ Importance: High
 - Four routing modes are represented by strict intents: local `bar_knowledge`,
   allowlisted `bar_action`, text-only `general_chat`, and optional
   `web_search`. The first two retain existing local retrieval/draft boundaries.
-- `GeminiGroundedSearchClient` uses only the official `google_search` tool,
-  accepts at most two reported queries and builds source links solely from
-  `groundingMetadata`. Search text is untrusted and cannot call the registry.
+- `GeminiGroundedSearchClient` uses only the official `google_search` tool and
+  builds links solely from metadata-backed, credential-free HTTP(S) sources.
+  It requires grounding metadata, a valid source and support linkage. One user
+  update makes one provider call with no automatic retry; the request suggests
+  at most two internal queries, but this is not a technical Google-query cap.
+  Only the numeric reported query count is logged.
+- General chat or web search requires the master flag, at least one enabled
+  input channel, and Gemini. Web composition remains separate and creates no
+  search client while its flag is disabled.
 - KOS is developer/Codex memory; it is never copied into the runtime prompt or
   dialog context. The system context is the runtime role, conversation memory
   is ephemeral, local retrieval owns BarBot facts, and grounding is external.

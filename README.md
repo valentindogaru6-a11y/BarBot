@@ -156,6 +156,10 @@ writeoff or transfer, bounded general chat, optional grounded web search,
 clarification, or unsupported. Catalog results use the
 existing renderer; warehouse requests enter the existing persistent draft and
 still require explicit confirmation before any operation is created.
+Warehouse action intents additionally require a deterministic local command
+gate. Gemini classification alone cannot start a writeoff or transfer draft;
+an explicit command such as `спиши ...` or `перемести ...` (or an already
+authorized pending clarification) must be present.
 
 The pilot is off unless `AI_ASSISTANT_ENABLED` and the corresponding text or
 voice flag are enabled. Text mode requires `GEMINI_API_KEY`; voice mode uses
@@ -167,7 +171,12 @@ Commands, active FSM flows, exact warehouse triggers, and callbacks keep
 priority. General chat and web search cannot edit cards or products, execute
 arbitrary tools, or control the service. Grounded search is a separate optional
 path: its answer is external information, and displayed links come only from
-Gemini `groundingMetadata`; web content cannot invoke a BarBot action.
+Gemini `groundingMetadata`; web content cannot invoke a BarBot action. A valid
+grounded answer requires metadata, a usable source and a support link to that
+source. BarBot makes exactly one grounded provider call per user update and
+does not retry 429, server, timeout or ambiguous transport failures. The prompt
+asks Gemini to keep internal Google queries to two where possible, but the API
+does not provide a hard internal-query limit; the reported count is diagnostic.
 
 The polling process allows one in-flight AI request per user across text and
 voice. A concurrent request receives a short wait message; the claim is always
@@ -218,7 +227,7 @@ AI_REQUEST_TIMEOUT_SECONDS=30
 AI_CONVERSATION_TTL_SECONDS=1800
 AI_CONVERSATION_MAX_TURNS=6
 AI_CONVERSATION_MAX_CHARS=6000
-AI_WEB_SEARCH_MAX_QUERIES_PER_REQUEST=2
+AI_WEB_SEARCH_MAX_PROVIDER_CALLS_PER_UPDATE=1
 ```
 
 Для неоднозначных названий можно вручную добавить необязательное поле, не

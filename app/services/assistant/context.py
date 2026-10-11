@@ -30,6 +30,7 @@ class AssistantConversationContext:
     turns: tuple[AssistantConversationTurn, ...]
     created_at: float
     expires_at: float
+    authorized_action: str = ""
 
 
 class AssistantConversationMemory:
@@ -70,6 +71,7 @@ class AssistantConversationMemory:
         candidate_ids: tuple[str, ...] = (),
         pending_slots: tuple[str, ...] = (),
         topic: str | None = None,
+        authorized_action: str = "",
     ) -> AssistantConversationContext:
         now = self._clock()
         previous = self.get(user_id)
@@ -83,6 +85,7 @@ class AssistantConversationMemory:
             turns=previous.turns if previous else (),
             created_at=previous.created_at if previous else now,
             expires_at=now + self.ttl_seconds,
+            authorized_action=authorized_action[:100],
         )
         return self._store(user_id, context)
 
@@ -117,6 +120,7 @@ class AssistantConversationMemory:
             turns=tuple(turns),
             created_at=previous.created_at if previous else now,
             expires_at=now + self.ttl_seconds,
+            authorized_action=previous.authorized_action if previous else "",
         )
         return self._store(user_id, context)
 
@@ -165,6 +169,7 @@ class AssistantConversationMemory:
                 turns=previous.turns,
                 created_at=previous.created_at,
                 expires_at=now + self.ttl_seconds,
+                authorized_action="",
             ),
         )
 

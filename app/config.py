@@ -114,7 +114,11 @@ class Settings(BaseSettings):
     ai_conversation_ttl_seconds: int = Field(default=1800, gt=0, le=86_400)
     ai_conversation_max_turns: int = Field(default=6, gt=0, le=20)
     ai_conversation_max_chars: int = Field(default=6000, gt=0, le=20_000)
-    ai_web_search_max_queries_per_request: int = Field(default=2, gt=0, le=2)
+    ai_web_search_max_provider_calls_per_update: int = Field(
+        default=1,
+        ge=1,
+        le=1,
+    )
 
     @field_validator("super_admin_ids", mode="before")
     @classmethod
@@ -198,12 +202,21 @@ class Settings(BaseSettings):
     def validate_ai_provider_keys(self) -> "Settings":
         """Require provider secrets only for explicitly enabled pilot paths."""
 
-        if self.ai_web_search_enabled and not self.ai_assistant_enabled:
+        if (
+            self.ai_general_chat_enabled or self.ai_web_search_enabled
+        ) and not self.ai_assistant_enabled:
             raise ValueError(
-                "AI_WEB_SEARCH_ENABLED требует AI_ASSISTANT_ENABLED"
+                "AI_GENERAL_CHAT_ENABLED/AI_WEB_SEARCH_ENABLED требуют "
+                "AI_ASSISTANT_ENABLED"
             )
         if not self.ai_assistant_enabled:
             return self
+        if (
+            self.ai_general_chat_enabled or self.ai_web_search_enabled
+        ) and not (self.ai_text_enabled or self.ai_voice_enabled):
+            raise ValueError(
+                "AI general/web требуют AI_TEXT_ENABLED или AI_VOICE_ENABLED"
+            )
         if self.ai_voice_enabled and (
             self.groq_api_key is None
             or not self.groq_api_key.get_secret_value().strip()

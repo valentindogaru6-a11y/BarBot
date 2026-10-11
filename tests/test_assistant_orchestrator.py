@@ -17,8 +17,45 @@ class NeverGemini:
         candidates=(),
         normalized_entity="",
         conversation=(),
+        allowed_action_intents=(),
     ):
         raise AssertionError("Gemini must not be called for deterministic requests")
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("спиши морковь", AssistantIntentName.PREPARE_WRITEOFF),
+        ("СПИСАТЬ морковь", AssistantIntentName.PREPARE_WRITEOFF),
+        ("сделай списание моркови", AssistantIntentName.PREPARE_WRITEOFF),
+        ("добавь в списание морковь", AssistantIntentName.PREPARE_WRITEOFF),
+        ("оформи списание: морковь", AssistantIntentName.PREPARE_WRITEOFF),
+        ("списание: морковь", AssistantIntentName.PREPARE_WRITEOFF),
+        ("перемести молоко", AssistantIntentName.PREPARE_TRANSFER),
+        ("перенеси молоко", AssistantIntentName.PREPARE_TRANSFER),
+        ("отправь молоко на кухню", AssistantIntentName.PREPARE_TRANSFER),
+        ("сделай перемещение молока", AssistantIntentName.PREPARE_TRANSFER),
+        ("оформи перемещение молока", AssistantIntentName.PREPARE_TRANSFER),
+        ("перемещение: молоко", AssistantIntentName.PREPARE_TRANSFER),
+    ],
+)
+def test_local_action_gate_accepts_only_explicit_commands(text, expected) -> None:
+    assert AssistantOrchestrator.local_action_evidence(text) is expected
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "расскажи про кокосовое молоко",
+        "что такое списание",
+        "как правильно оформлять перемещение",
+        "можно ли перемещать молоко",
+        "почему списывают морковь",
+        "покажи операции перемещения",
+    ],
+)
+def test_local_action_gate_rejects_informational_phrases(text) -> None:
+    assert AssistantOrchestrator.local_action_evidence(text) is None
 
 
 def test_local_tech_card_command_does_not_call_gemini() -> None:

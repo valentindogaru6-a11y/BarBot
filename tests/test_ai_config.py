@@ -26,7 +26,7 @@ def test_ai_defaults_are_disabled_and_do_not_require_keys() -> None:
     assert settings.ai_conversation_ttl_seconds == 1800
     assert settings.ai_conversation_max_turns == 6
     assert settings.ai_conversation_max_chars == 6000
-    assert settings.ai_web_search_max_queries_per_request == 2
+    assert settings.ai_web_search_max_provider_calls_per_update == 1
 
 
 def test_web_search_cannot_bypass_master_switch() -> None:
@@ -44,6 +44,7 @@ def test_enabled_general_chat_and_search_require_only_gemini() -> None:
         _env_file=None,
         bot_token="test",
         ai_assistant_enabled=True,
+        ai_text_enabled=True,
         ai_general_chat_enabled=True,
         ai_web_search_enabled=True,
         gemini_api_key="gemini",
@@ -53,6 +54,55 @@ def test_enabled_general_chat_and_search_require_only_gemini() -> None:
     assert orchestrator.web_search_enabled is True
     assert orchestrator.search_client is not None
     assert speech is None
+
+
+@pytest.mark.parametrize(
+    "feature", ["ai_general_chat_enabled", "ai_web_search_enabled"]
+)
+def test_general_and_web_require_master_and_input_channel(feature) -> None:
+    with pytest.raises(ValidationError, match="AI_ASSISTANT_ENABLED"):
+        Settings(_env_file=None, bot_token="test", **{feature: True})
+    with pytest.raises(
+        ValidationError, match="AI_TEXT_ENABLED или AI_VOICE_ENABLED"
+    ):
+        Settings(
+            _env_file=None,
+            bot_token="test",
+            ai_assistant_enabled=True,
+            gemini_api_key="gemini",
+            **{feature: True},
+        )
+
+
+@pytest.mark.parametrize("channel", ["ai_text_enabled", "ai_voice_enabled"])
+@pytest.mark.parametrize(
+    "feature", ["ai_general_chat_enabled", "ai_web_search_enabled"]
+)
+def test_general_and_web_accept_each_enabled_input_channel(channel, feature) -> None:
+    values = {
+        "ai_assistant_enabled": True,
+        channel: True,
+        feature: True,
+        "gemini_api_key": "gemini",
+    }
+    if channel == "ai_voice_enabled":
+        values["groq_api_key"] = "groq"
+    settings = Settings(_env_file=None, bot_token="test", **values)
+    orchestrator, _ = build_assistant_clients(settings)
+    assert orchestrator.intent_client is not None
+    assert (orchestrator.search_client is not None) is (
+        feature == "ai_web_search_enabled"
+    )
+
+
+@pytest.mark.parametrize("value", [0, 2, -1])
+def test_web_provider_call_limit_is_exactly_one(value) -> None:
+    with pytest.raises(ValidationError):
+        Settings(
+            _env_file=None,
+            bot_token="test",
+            ai_web_search_max_provider_calls_per_update=value,
+        )
 
 
 @pytest.mark.parametrize(
