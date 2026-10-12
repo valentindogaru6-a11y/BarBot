@@ -193,7 +193,7 @@ def test_wrong_schema_version_is_rejected(tmp_path: Path) -> None:
 
     with pytest.raises(
         WarehouseSeedImportError,
-        match="v3 through v13 required",
+        match="v3 through v14 required",
     ):
         WarehouseSeedDatabase(database_path).import_seed(seed)
 

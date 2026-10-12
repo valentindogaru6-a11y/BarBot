@@ -1,6 +1,6 @@
 # AI Assistant Pilot
 
-Scope: bounded owner-only intent, conversation, retrieval, search, and drafts
+Scope: bounded role-aware intent, conversation, retrieval, capabilities and proposals
 Trust: Confirmed from code and tests
 Lifecycle: Fresh
 Last verified: 2026-10-12
@@ -28,14 +28,21 @@ Importance: High
 - Schema-v13 conversation DDL is a sequence of individual statements with no
   transaction control of its own. The migration coordinator owns the enclosing
   transaction, so DDL, `user_version=13` and validation roll back together.
+- Phase 3 adds an immutable `CapabilityRegistry` and schema-v14 persistent
+  action proposals. Capability discovery is filtered by the current role,
+  private-chat policy and feature flags; prompt text is never authority.
+  Mutations use opaque ten-minute tokens, one active proposal per actor,
+  explicit confirmation and service-owned revision/authorization checks.
+- Schema-v14 proposal DDL also contains no transaction control. Migration owns
+  creation, `user_version=14`, validation and rollback as one atomic step.
 - Structured state keeps the current topic, last catalog query/entity,
   candidates, requested action, tool and one pending clarification. High-
   confidence follow-ups are resolved locally; ambiguous references ask one
   question rather than guessing.
-- `AssistantReadOnlyTools` exposes only typed catalog lookup, open attendance
-  sessions and current-shift summary. Every call rechecks private pilot
-  authority server-side and delegates to existing read services; there is no
-  arbitrary SQL or mutation surface.
+- `AssistantReadOnlyTools` exposes only typed, bounded catalog, employee,
+  attendance, shift, report, recipient, reminder, schedule and capability
+  views. Every call rechecks centralized authority server-side and delegates
+  to existing services; there is no arbitrary SQL or mutation surface.
 - Candidate callbacks contain stable local catalog IDs and are revalidated
   against both current context and the current catalog. Active FSM, commands,
   exact warehouse triggers, permissions, single-flight, persistent drafts, and
@@ -55,7 +62,8 @@ Importance: High
 - KOS is developer/Codex memory; it is never copied into the runtime prompt or
   dialog context. The system context is the runtime role, conversation memory
   is ephemeral, local retrieval owns BarBot facts, and grounding is external.
-- General chat and web search default off. The production pilot access remains
-  private-chat `super_admin`; no broader role is enabled by this phase.
+- General chat and web search default off. Phase 3 may route private-chat
+  requests for active roles, but each capability has an explicit role set and
+  every underlying service remains authoritative.
 - The committed catalog has no searchable `мохито` card. The safe response is
   an honest absence message; no recipe is synthesized.

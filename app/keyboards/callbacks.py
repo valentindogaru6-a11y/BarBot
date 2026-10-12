@@ -53,3 +53,8 @@ class AssistantCandidateCallback(CallbackData, prefix="ai"):
     category_id: str
     item_id: str
     subcategory_id: str = "_"
+
+
+class AssistantProposalCallback(CallbackData, prefix="ap"):
+    action: Literal["c", "x"]
+    token: str

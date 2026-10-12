@@ -201,9 +201,14 @@ candidate, tool and clarification state. It is isolated by user and private
 chat, survives process restart, is never logged, and is evicted oldest-first.
 The phrases `забудь этот разговор`, `начать новый разговор`, `начнём заново`
 and `сбрось контекст` clear only this AI memory, not FSM or warehouse drafts.
-Schema v13 adds only these bounded conversation tables. Read-only assistant
-tools expose allowlisted catalog, open-attendance and current-shift reads to
-the private-chat super-admin pilot; Gemini cannot select SQL, tables or IDs.
+Schema v13 adds only these bounded conversation tables. Schema v14 adds a
+restart-safe action-proposal table with opaque ten-minute confirmation tokens.
+The Phase 3 capability registry is filtered by the current server-side role,
+private-chat policy and feature flags. Read-only tools execute immediately;
+business mutations create a preview and can run only from a server-generated
+confirm callback. Roles are checked again at proposal creation and execution,
+and target revisions are checked by the existing application service. Gemini
+cannot select SQL, tables, database IDs, callbacks or service methods.
 KOS remains developer/Codex project memory; the runtime system context defines
 the assistant role; conversation memory is temporary dialog state; local
 retrieval is the factual BarBot source; Google Search grounding is clearly

@@ -26,7 +26,7 @@ def _v10(path: Path) -> None:
 def test_v11_fresh_repeat_and_full_chain(tmp_path: Path) -> None:
     fresh = tmp_path / "fresh.db"
     UserDatabase(fresh).initialize(); UserDatabase(fresh).initialize()
-    assert _version(fresh) == 13
+    assert _version(fresh) == 14
     with sqlite3.connect(fresh) as connection:
         validate_warehouse_correction_schema(connection)
 
@@ -36,7 +36,7 @@ def test_v11_fresh_repeat_and_full_chain(tmp_path: Path) -> None:
         connection.execute("PRAGMA user_version=2")
         connection.commit()
     UserDatabase(chain).initialize()
-    assert _version(chain) == 13
+    assert _version(chain) == 14
 
 
 def test_v10_to_v11_preserves_existing_ready_report(tmp_path: Path) -> None:
@@ -50,7 +50,7 @@ def test_v10_to_v11_preserves_existing_ready_report(tmp_path: Path) -> None:
     with sqlite3.connect(path) as connection:
         row = connection.execute("SELECT status,file_sha256,correction_session_id FROM warehouse_reports WHERE id=?",(report,)).fetchone()
         assert row == ('ready','a'*64,None)
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 13
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 14
 
 
 def test_v11_schema_constraints_and_validation(tmp_path: Path) -> None:
@@ -80,5 +80,5 @@ def test_v11_migration_failure_rolls_back(tmp_path: Path, monkeypatch: pytest.Mo
 def test_v11_rejects_future_schema_version(tmp_path: Path) -> None:
     path=tmp_path/'future.db'
     with sqlite3.connect(path) as connection:
-        connection.execute('PRAGMA user_version=14')
+        connection.execute('PRAGMA user_version=15')
     with pytest.raises(UnsupportedSchemaVersionError):UserDatabase(path).initialize()

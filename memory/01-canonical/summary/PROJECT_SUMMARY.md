@@ -48,7 +48,8 @@ validation. The AI layer has no direct SQLite, shell, systemd, deployment,
 or catalog-editing tools. Optional Google Search grounding is a separate
 text-only provider path; its untrusted output cannot invoke local tools.
 Production deployment of this development phase is unverified. Code now
-targets schema v13, adding only bounded assistant conversation tables; the
+uses schema v13 for bounded assistant conversation tables and schema v14 for
+restart-safe action proposals; the
 owner-confirmed production runtime above remains v12 until a separate rollout.
 One process-local per-user claim coordinates text and voice so concurrent AI
 requests cannot duplicate provider work; every exit path releases the claim.

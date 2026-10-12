@@ -40,6 +40,16 @@ from app.services.assistant.system_prompt import (
     ASSISTANT_SYSTEM_PROMPT_VERSION,
     build_assistant_system_prompt,
 )
+from app.services.assistant.capabilities import (
+    CapabilityDefinition,
+    CapabilityRegistry,
+    UI_CAPABILITY_COVERAGE,
+)
+from app.services.assistant.proposals import AssistantActionProposalService
+from app.services.assistant.capability_controller import (
+    AssistantCapabilityController,
+    CapabilityDispatch,
+)
 
 __all__ = [
     "AssistantOrchestrator",
@@ -72,4 +82,10 @@ __all__ = [
     "normalize_assistant_text",
     "ASSISTANT_SYSTEM_PROMPT_VERSION",
     "build_assistant_system_prompt",
+    "CapabilityDefinition",
+    "CapabilityRegistry",
+    "UI_CAPABILITY_COVERAGE",
+    "AssistantActionProposalService",
+    "AssistantCapabilityController",
+    "CapabilityDispatch",
 ]

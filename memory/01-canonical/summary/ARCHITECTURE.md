@@ -24,7 +24,7 @@ Importance: Critical
   handlers load the current JSON so data updates do not require architectural
   hardcoding.
 - `UserDatabase.initialize()` runs sequential transactional migrations and
-  validates schema v13. Startup therefore can migrate and must be controlled in
+  validates schema v14. Startup therefore can migrate and must be controlled in
   production.
 - Admin audit is an append-only JSONL concern; warehouse mutations have their
   own transactional SQLite audit trail.
@@ -38,6 +38,8 @@ Importance: Critical
   catalog or translate input into the existing warehouse persistent-draft
   flow, while `AssistantReadOnlyTools` delegates allowlisted attendance and
   shift reads through centralized access checks.
+  Schema-v14 action proposals add restart-safe, opaque confirmation state;
+  `CapabilityRegistry` filters actions by role, private-chat policy and flags.
   General chat returns escaped text only; the separate grounded-search adapter
   returns text plus metadata-backed links and has no registry access.
 

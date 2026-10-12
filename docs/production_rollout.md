@@ -167,7 +167,7 @@ print("migration initialization completed")
 PY
 ```
 
-4. Run full preflight again. It must report schema v13, integrity ok, and no FK violations.
+4. Run full preflight again. It must report schema v14, integrity ok, and no FK violations.
 5. Seed dry-run first:
 
 ```bash

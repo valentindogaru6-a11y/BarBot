@@ -35,6 +35,9 @@ from app.services.assistant import (
     GeminiIntentClient,
     GeminiGroundedSearchClient,
     GroqSpeechToTextClient,
+    AssistantActionProposalService,
+    AssistantCapabilityController,
+    CapabilityRegistry,
 )
 from app.services.audio_service import AudioService
 from app.services.audit_service import AuditService
@@ -71,6 +74,7 @@ from app.storage.warehouse_reminder_database import WarehouseReminderDatabase
 from app.storage.warehouse_schedule_database import WarehouseScheduleDatabase
 from app.storage.warehouse_attendance_database import WarehouseAttendanceDatabase
 from app.storage.assistant_conversation_database import AssistantConversationDatabase
+from app.storage.assistant_action_database import AssistantActionDatabase
 from app.telegram_commands import configure_bot_commands
 
 
@@ -320,6 +324,31 @@ async def main() -> None:
             WarehouseScheduleDatabase(settings.database_path), warehouse_delivery_service,
             auth_service,
         )
+    assistant_capability_registry = CapabilityRegistry()
+    assistant_flags = {
+        "ai_assistant_enabled": settings.ai_assistant_enabled,
+        "warehouse_enabled": settings.warehouse_enabled,
+    }
+    assistant_action_proposals = AssistantActionProposalService(
+        AssistantActionDatabase(settings.database_path),
+        auth_service,
+        assistant_capability_registry,
+        flags=assistant_flags,
+    )
+    assistant_capability_controller = AssistantCapabilityController(
+        assistant_capability_registry,
+        assistant_action_proposals,
+        auth_service,
+        flags=assistant_flags,
+        users=user_service,
+        attendance=warehouse_attendance_service,
+        operations=warehouse_service,
+        closing=warehouse_closing_service,
+        reports=warehouse_report_service,
+        recipients=warehouse_recipient_service,
+        reminders=warehouse_reminder_settings_service,
+        schedules=warehouse_schedule_service,
+    )
     dispatcher = build_dispatcher(
         user_service,
         warehouse_enabled=settings.warehouse_enabled,
@@ -362,6 +391,8 @@ async def main() -> None:
             assistant_speech_client=assistant_speech_client,
             assistant_request_coordinator=assistant_request_coordinator,
             assistant_conversation_memory=assistant_conversation_memory,
+            assistant_action_proposals=assistant_action_proposals,
+            assistant_capability_controller=assistant_capability_controller,
             close_bot_session=False,
         )
     finally:

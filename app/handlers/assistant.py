@@ -21,8 +21,11 @@ from app.config import Settings
 from app.handlers.catalog import _show_item
 from app.handlers.common import answer_callback_safely, load_catalog
 from app.handlers.warehouse import prepare_intake_message
-from app.keyboards.assistant import build_assistant_candidates_keyboard
-from app.keyboards.callbacks import AssistantCandidateCallback
+from app.keyboards.assistant import (
+    build_assistant_candidates_keyboard,
+    build_assistant_proposal_keyboard,
+)
+from app.keyboards.callbacks import AssistantCandidateCallback, AssistantProposalCallback
 from app.models.assistant import AssistantIntentName
 from app.models.user import Role
 from app.services.assistant import (
@@ -34,7 +37,15 @@ from app.services.assistant import (
     ProviderError,
     ProviderErrorKind,
     SpeechToTextClient,
+    AssistantActionProposalService,
+    AssistantCapabilityController,
     extract_catalog_entity,
+)
+from app.services.assistant.proposals import (
+    AssistantProposalError,
+    AssistantProposalExpired,
+    AssistantProposalPermissionDenied,
+    AssistantProposalTargetConflict,
 )
 from app.services.assistant.retrieval import CatalogRetrieval
 from app.services.assistant.tools import AssistantReadOnlyTools
@@ -153,14 +164,14 @@ def _provider_error_text(error: ProviderError) -> str:
     return AI_UNAVAILABLE_TEXT
 
 
-def _private_super_admin(
+def _private_ai_actor(
     message: Message,
     auth_service: AuthService,
 ) -> bool:
     return bool(
         message.from_user is not None
         and message.chat.type == ChatType.PRIVATE
-        and auth_service.get_context(message.from_user.id).role is Role.SUPER_ADMIN
+        and auth_service.get_context(message.from_user.id).role is not Role.BLOCKED
     )
 
 
@@ -176,7 +187,7 @@ class AssistantVoiceEligibleFilter(BaseFilter):
             raw_state is None
             and settings.ai_assistant_enabled
             and settings.ai_voice_enabled
-            and _private_super_admin(message, auth_service)
+            and _private_ai_actor(message, auth_service)
         )
 
 
@@ -195,7 +206,7 @@ class AssistantTextEligibleFilter(BaseFilter):
             or not settings.ai_text_enabled
             or not text
             or text.startswith("/")
-            or not _private_super_admin(message, auth_service)
+            or not _private_ai_actor(message, auth_service)
         ):
             return False
         first_line = next(
@@ -216,7 +227,42 @@ async def _run_assistant(
     warehouse_service: WarehouseOperationsService | None,
     conversation_memory: AssistantConversationMemory | None = None,
     warehouse_attendance_service: WarehouseAttendanceService | None = None,
+    assistant_capability_controller: AssistantCapabilityController | None = None,
 ) -> None:
+    user_id = message.from_user.id if message.from_user is not None else None
+    if assistant_capability_controller is not None and user_id is not None:
+        dispatch = assistant_capability_controller.dispatch(
+            text,
+            actor_user_id=user_id,
+            source_chat_id=message.chat.id,
+            source_message_id=int(getattr(message, "message_id", 0)),
+        )
+        if dispatch is not None:
+            if conversation_memory is not None:
+                conversation_memory.append_turn(
+                    user_id,
+                    chat_id=message.chat.id,
+                    role="user",
+                    text=text,
+                    last_intent=dispatch.capability_id,
+                    topic=dispatch.capability_id,
+                )
+                conversation_memory.append_turn(
+                    user_id,
+                    chat_id=message.chat.id,
+                    role="assistant",
+                    text=dispatch.message,
+                    last_intent=dispatch.capability_id,
+                )
+            await message.answer(
+                escape(dispatch.message),
+                reply_markup=(
+                    build_assistant_proposal_keyboard(dispatch.proposal.token)
+                    if dispatch.proposal is not None
+                    else None
+                ),
+            )
+            return
     try:
         catalog = load_catalog(catalog_path)
     except CatalogStorageError:
@@ -226,7 +272,6 @@ async def _run_assistant(
         await message.answer("Каталог временно недоступен.")
         return
     registry = AssistantToolRegistry(catalog)
-    user_id = message.from_user.id if message.from_user is not None else None
     normalized_command = " ".join(text.casefold().split())
     if normalized_command in _CONVERSATION_RESET_PHRASES:
         if conversation_memory is not None and user_id is not None:
@@ -637,6 +682,9 @@ async def _run_assistant(
         return
 
     if action.kind == "find_tech_card":
+        if user_id is None or not auth_service.can_view_catalog(user_id):
+            await message.answer("Недостаточно прав для просмотра каталога.")
+            return
         if action.catalog_exact and len(action.search_results) == 1:
             result = action.search_results[0]
             if conversation_memory is not None and user_id is not None:
@@ -743,6 +791,65 @@ async def _run_assistant(
 
 
 @voice_router.callback_query(
+    StateFilter(None), AssistantProposalCallback.filter()
+)
+async def handle_assistant_proposal(
+    callback: CallbackQuery,
+    callback_data: AssistantProposalCallback,
+    auth_service: AuthService,
+    assistant_action_proposals: AssistantActionProposalService,
+    assistant_capability_controller: AssistantCapabilityController,
+) -> None:
+    """Confirm only an owned opaque proposal through an allowlisted adapter."""
+
+    if (
+        not isinstance(callback.message, Message)
+        or callback.message.chat.type != ChatType.PRIVATE
+        or auth_service.get_context(callback.from_user.id).role is Role.BLOCKED
+    ):
+        await answer_callback_safely(callback, "Недостаточно прав.", show_alert=True)
+        return
+    try:
+        if callback_data.action == "x":
+            assistant_action_proposals.cancel(
+                callback_data.token,
+                callback.from_user.id,
+                callback.message.chat.id,
+            )
+            if await answer_callback_safely(callback, "Отменено"):
+                await callback.message.answer("Действие отменено. Изменения не применены.")
+            return
+        _proposal, result = assistant_action_proposals.confirm(
+            callback_data.token,
+            callback.from_user.id,
+            callback.message.chat.id,
+            lambda row: assistant_capability_controller.execute(
+                row, callback.from_user.id
+            ),
+        )
+    except AssistantProposalExpired:
+        await answer_callback_safely(callback, "Подтверждение устарело.", show_alert=True)
+        return
+    except (AssistantProposalPermissionDenied, AccessDeniedError):
+        await answer_callback_safely(callback, "Недостаточно прав.", show_alert=True)
+        return
+    except AssistantProposalTargetConflict:
+        await answer_callback_safely(callback, "Данные изменились. Повторите запрос.", show_alert=True)
+        return
+    except AssistantProposalError:
+        await answer_callback_safely(callback, "Действие уже завершено или недоступно.", show_alert=True)
+        return
+    except Exception:
+        logger.exception("Assistant proposal execution failed")
+        await answer_callback_safely(callback, "Не удалось выполнить действие.", show_alert=True)
+        return
+    if not await answer_callback_safely(callback, "Готово"):
+        return
+    status = str(result.get("status", "executed"))
+    await callback.message.answer(escape(f"Действие выполнено: {status}."))
+
+
+@voice_router.callback_query(
     StateFilter(None), AssistantCandidateCallback.filter()
 )
 async def handle_assistant_candidate(
@@ -757,8 +864,8 @@ async def handle_assistant_candidate(
     if (
         not isinstance(callback.message, Message)
         or callback.message.chat.type != ChatType.PRIVATE
-        or auth_service.get_context(callback.from_user.id).role
-        is not Role.SUPER_ADMIN
+        or auth_service.get_context(callback.from_user.id).role is Role.BLOCKED
+        or not auth_service.can_view_catalog(callback.from_user.id)
     ):
         await answer_callback_safely(callback, "Недостаточно прав.", show_alert=True)
         return
@@ -830,6 +937,7 @@ async def handle_assistant_voice(
     assistant_conversation_memory: AssistantConversationMemory | None = None,
     warehouse_service: WarehouseOperationsService | None = None,
     warehouse_attendance_service: WarehouseAttendanceService | None = None,
+    assistant_capability_controller: AssistantCapabilityController | None = None,
 ) -> None:
     voice = message.voice
     if voice is None or assistant_speech_client is None or assistant_orchestrator is None:
@@ -855,6 +963,7 @@ async def handle_assistant_voice(
             assistant_conversation_memory,
             warehouse_service,
             warehouse_attendance_service,
+            assistant_capability_controller,
         )
 
 
@@ -870,6 +979,7 @@ async def _handle_assistant_voice_claimed(
     assistant_conversation_memory: AssistantConversationMemory | None,
     warehouse_service: WarehouseOperationsService | None,
     warehouse_attendance_service: WarehouseAttendanceService | None,
+    assistant_capability_controller: AssistantCapabilityController | None,
 ) -> None:
     """Run the voice pipeline while the caller owns the per-user claim."""
 
@@ -933,6 +1043,7 @@ async def _handle_assistant_voice_claimed(
         warehouse_service=warehouse_service,
         conversation_memory=assistant_conversation_memory,
         warehouse_attendance_service=warehouse_attendance_service,
+        assistant_capability_controller=assistant_capability_controller,
     )
 
 
@@ -947,6 +1058,7 @@ async def handle_assistant_text(
     assistant_conversation_memory: AssistantConversationMemory | None = None,
     warehouse_service: WarehouseOperationsService | None = None,
     warehouse_attendance_service: WarehouseAttendanceService | None = None,
+    assistant_capability_controller: AssistantCapabilityController | None = None,
 ) -> None:
     if assistant_orchestrator is None or message.from_user is None:
         return
@@ -966,4 +1078,5 @@ async def handle_assistant_text(
             warehouse_service=warehouse_service,
             conversation_memory=assistant_conversation_memory,
             warehouse_attendance_service=warehouse_attendance_service,
+            assistant_capability_controller=assistant_capability_controller,
         )

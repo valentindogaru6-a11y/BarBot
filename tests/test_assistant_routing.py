@@ -37,11 +37,14 @@ def settings(**kwargs):
     )
 
 
-def test_text_ai_requires_private_super_admin_and_no_active_fsm() -> None:
+def test_text_ai_requires_private_active_role_and_no_active_fsm() -> None:
     filter_ = AssistantTextEligibleFilter()
     assert asyncio.run(filter_(message(), settings(), Access(Role.SUPER_ADMIN), None))
     assert not asyncio.run(filter_(message(chat_type="group"), settings(), Access(Role.SUPER_ADMIN), None))
-    assert not asyncio.run(filter_(message(), settings(), Access(Role.ADMIN), None))
+    assert asyncio.run(filter_(message(), settings(), Access(Role.ADMIN), None))
+    assert asyncio.run(filter_(message(), settings(), Access(Role.BARTENDER), None))
+    assert asyncio.run(filter_(message(), settings(), Access(Role.ACCOUNTANT), None))
+    assert not asyncio.run(filter_(message(), settings(), Access(Role.BLOCKED), None))
     assert not asyncio.run(filter_(message(), settings(), Access(Role.SUPER_ADMIN), "active:state"))
 
 
