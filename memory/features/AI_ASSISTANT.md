@@ -25,6 +25,9 @@ Importance: High
   by user/private-chat. Retention is 24 hours, 12 turns and 12000 characters,
   with oldest-first eviction, bounded summaries and opportunistic expiry.
   Reset deletes only AI state; FSM and warehouse drafts remain authoritative.
+- Schema-v13 conversation DDL is a sequence of individual statements with no
+  transaction control of its own. The migration coordinator owns the enclosing
+  transaction, so DDL, `user_version=13` and validation roll back together.
 - Structured state keeps the current topic, last catalog query/entity,
   candidates, requested action, tool and one pending clarification. High-
   confidence follow-ups are resolved locally; ambiguous references ask one

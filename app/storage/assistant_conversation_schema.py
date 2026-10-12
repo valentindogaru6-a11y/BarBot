@@ -13,66 +13,73 @@ class AssistantConversationSchemaError(RuntimeError):
 _TABLES = {"assistant_conversation_sessions", "assistant_conversation_turns"}
 
 
-def create_assistant_conversation_schema(connection: sqlite3.Connection) -> None:
-    connection.executescript(
-        """
-        CREATE TABLE assistant_conversation_sessions (
-            id INTEGER PRIMARY KEY,
-            user_id INTEGER NOT NULL,
-            chat_id INTEGER NOT NULL,
-            status TEXT NOT NULL DEFAULT 'active'
-                CHECK (status IN ('active')),
-            started_at_utc TEXT NOT NULL,
-            last_activity_at_utc TEXT NOT NULL,
-            expires_at_utc TEXT NOT NULL,
-            summary_text TEXT NOT NULL DEFAULT ''
-                CHECK (length(summary_text) <= 2000),
-            current_topic TEXT NOT NULL DEFAULT ''
-                CHECK (length(current_topic) <= 500),
-            current_intent TEXT NOT NULL DEFAULT ''
-                CHECK (length(current_intent) <= 100),
-            last_requested_action TEXT NOT NULL DEFAULT ''
-                CHECK (length(last_requested_action) <= 100),
-            last_catalog_query TEXT NOT NULL DEFAULT ''
-                CHECK (length(last_catalog_query) <= 500),
-            last_entity_type TEXT NOT NULL DEFAULT ''
-                CHECK (length(last_entity_type) <= 100),
-            last_entity_id TEXT NOT NULL DEFAULT ''
-                CHECK (length(last_entity_id) <= 300),
-            last_entity_label TEXT NOT NULL DEFAULT ''
-                CHECK (length(last_entity_label) <= 500),
-            last_candidate_ids_json TEXT NOT NULL DEFAULT '[]'
-                CHECK (length(last_candidate_ids_json) <= 2000),
-            last_tool_name TEXT NOT NULL DEFAULT ''
-                CHECK (length(last_tool_name) <= 100),
-            pending_clarification TEXT NOT NULL DEFAULT ''
-                CHECK (length(pending_clarification) <= 500),
-            authorized_action TEXT NOT NULL DEFAULT ''
-                CHECK (length(authorized_action) <= 100),
-            revision INTEGER NOT NULL DEFAULT 1 CHECK (revision > 0),
-            UNIQUE (user_id, chat_id)
-        );
-
-        CREATE INDEX idx_assistant_sessions_expiry
-            ON assistant_conversation_sessions(expires_at_utc, id);
-
-        CREATE TABLE assistant_conversation_turns (
-            id INTEGER PRIMARY KEY,
-            session_id INTEGER NOT NULL
-                REFERENCES assistant_conversation_sessions(id) ON DELETE CASCADE,
-            sequence INTEGER NOT NULL CHECK (sequence > 0),
-            role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
-            content TEXT NOT NULL CHECK (
-                length(content) BETWEEN 1 AND 12000
-            ),
-            created_at_utc TEXT NOT NULL,
-            UNIQUE (session_id, sequence)
-        );
-
-        CREATE INDEX idx_assistant_turns_session_sequence
-            ON assistant_conversation_turns(session_id, sequence);
-        """
+_SCHEMA_STATEMENTS = (
+    """
+    CREATE TABLE assistant_conversation_sessions (
+        id INTEGER PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        chat_id INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'active'
+            CHECK (status IN ('active')),
+        started_at_utc TEXT NOT NULL,
+        last_activity_at_utc TEXT NOT NULL,
+        expires_at_utc TEXT NOT NULL,
+        summary_text TEXT NOT NULL DEFAULT ''
+            CHECK (length(summary_text) <= 2000),
+        current_topic TEXT NOT NULL DEFAULT ''
+            CHECK (length(current_topic) <= 500),
+        current_intent TEXT NOT NULL DEFAULT ''
+            CHECK (length(current_intent) <= 100),
+        last_requested_action TEXT NOT NULL DEFAULT ''
+            CHECK (length(last_requested_action) <= 100),
+        last_catalog_query TEXT NOT NULL DEFAULT ''
+            CHECK (length(last_catalog_query) <= 500),
+        last_entity_type TEXT NOT NULL DEFAULT ''
+            CHECK (length(last_entity_type) <= 100),
+        last_entity_id TEXT NOT NULL DEFAULT ''
+            CHECK (length(last_entity_id) <= 300),
+        last_entity_label TEXT NOT NULL DEFAULT ''
+            CHECK (length(last_entity_label) <= 500),
+        last_candidate_ids_json TEXT NOT NULL DEFAULT '[]'
+            CHECK (length(last_candidate_ids_json) <= 2000),
+        last_tool_name TEXT NOT NULL DEFAULT ''
+            CHECK (length(last_tool_name) <= 100),
+        pending_clarification TEXT NOT NULL DEFAULT ''
+            CHECK (length(pending_clarification) <= 500),
+        authorized_action TEXT NOT NULL DEFAULT ''
+            CHECK (length(authorized_action) <= 100),
+        revision INTEGER NOT NULL DEFAULT 1 CHECK (revision > 0),
+        UNIQUE (user_id, chat_id)
     )
+    """,
+    """
+    CREATE INDEX idx_assistant_sessions_expiry
+        ON assistant_conversation_sessions(expires_at_utc, id)
+    """,
+    """
+    CREATE TABLE assistant_conversation_turns (
+        id INTEGER PRIMARY KEY,
+        session_id INTEGER NOT NULL
+            REFERENCES assistant_conversation_sessions(id) ON DELETE CASCADE,
+        sequence INTEGER NOT NULL CHECK (sequence > 0),
+        role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+        content TEXT NOT NULL CHECK (
+            length(content) BETWEEN 1 AND 12000
+        ),
+        created_at_utc TEXT NOT NULL,
+        UNIQUE (session_id, sequence)
+    )
+    """,
+    """
+    CREATE INDEX idx_assistant_turns_session_sequence
+        ON assistant_conversation_turns(session_id, sequence)
+    """,
+)
+
+
+def create_assistant_conversation_schema(connection: sqlite3.Connection) -> None:
+    for statement in _SCHEMA_STATEMENTS:
+        connection.execute(statement)
 
 
 def assistant_conversation_schema_is_absent(
