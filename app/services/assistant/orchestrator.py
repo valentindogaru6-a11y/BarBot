@@ -84,6 +84,14 @@ _TRANSFER_EVIDENCE_RE = re.compile(
     r"(?:сделай|оформи)\s+перемещени(?:е|я)\b|перемещение\s*:|"
     r"отправь(?:те)?\b.+\bна\s+кухн(?:ю|е)\b)",
 )
+_OPEN_ATTENDANCE_RE = re.compile(
+    r"\b(?:чьи|какие|открыт\w*)\b.*\b(?:смен\w*|сесси\w*)\b|"
+    r"\b(?:смен\w*|сесси\w*)\b.*\b(?:открыт\w*|до сих пор)\b",
+    re.IGNORECASE,
+)
+_CURRENT_SHIFT_RE = re.compile(
+    r"\b(?:текущ\w*|сейчас)\b.*\bсмен\w*\b", re.IGNORECASE
+)
 
 
 class AssistantUnavailableError(RuntimeError):
@@ -101,6 +109,8 @@ class AssistantToolAction:
         "unsupported",
         "general_chat",
         "web_search",
+        "list_open_attendance_sessions",
+        "get_current_shift_summary",
     ]
     message: str | None = None
     raw_intake: str | None = None
@@ -177,6 +187,10 @@ class AssistantOrchestrator:
                 query=cleaned,
                 needs_web=True,
             )
+        if _OPEN_ATTENDANCE_RE.search(cleaned):
+            return AssistantIntent(intent=AssistantIntentName.LIST_OPEN_ATTENDANCE_SESSIONS)
+        if _CURRENT_SHIFT_RE.search(cleaned):
+            return AssistantIntent(intent=AssistantIntentName.GET_CURRENT_SHIFT_SUMMARY)
         if _UNSUPPORTED_RE.search(cleaned):
             return AssistantIntent(intent=AssistantIntentName.UNSUPPORTED)
         for pattern in _TECH_PATTERNS:
@@ -297,6 +311,10 @@ class AssistantToolRegistry:
                 "web_search",
                 entity_query=intent.query,
             )
+        if intent.intent is AssistantIntentName.LIST_OPEN_ATTENDANCE_SESSIONS:
+            return AssistantToolAction("list_open_attendance_sessions")
+        if intent.intent is AssistantIntentName.GET_CURRENT_SHIFT_SUMMARY:
+            return AssistantToolAction("get_current_shift_summary")
         if intent.intent is AssistantIntentName.UNSUPPORTED:
             return AssistantToolAction(
                 "unsupported",

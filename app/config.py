@@ -111,9 +111,9 @@ class Settings(BaseSettings):
         le=50 * 1024 * 1024,
     )
     ai_request_timeout_seconds: int = Field(default=30, gt=0, le=120)
-    ai_conversation_ttl_seconds: int = Field(default=1800, gt=0, le=86_400)
-    ai_conversation_max_turns: int = Field(default=6, gt=0, le=20)
-    ai_conversation_max_chars: int = Field(default=6000, gt=0, le=20_000)
+    ai_conversation_ttl_seconds: int = Field(default=86_400, gt=0, le=86_400)
+    ai_conversation_max_turns: int = Field(default=12, gt=0, le=20)
+    ai_conversation_max_chars: int = Field(default=12_000, gt=0, le=20_000)
     ai_web_search_max_provider_calls_per_update: int = Field(
         default=1,
         ge=1,

@@ -16,6 +16,8 @@ class AssistantIntentName(StrEnum):
     UNSUPPORTED = "unsupported"
     GENERAL_CHAT = "general_chat"
     WEB_SEARCH = "web_search"
+    LIST_OPEN_ATTENDANCE_SESSIONS = "list_open_attendance_sessions"
+    GET_CURRENT_SHIFT_SUMMARY = "get_current_shift_summary"
 
 
 class AssistantIntentItem(BaseModel):

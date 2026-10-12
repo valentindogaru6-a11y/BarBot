@@ -37,7 +37,7 @@ revalidation before production actions:
 - verified backup recorded at the approved production backup root;
 - GitHub remote configured and the v12 rollout completed.
 
-Current development state: an opt-in Phase 1 AI pilot uses Groq Whisper for
+Current development state: an opt-in Phase 2 AI pilot uses Groq Whisper for
 voice and Gemini for strict intent classification, only for `super_admin` in a
 private chat. It delegates catalog lookup and warehouse draft preparation to
 existing services; mutations retain preview/confirmation. All AI flags default
@@ -47,15 +47,19 @@ is constrained by a Gemini-side JSON schema and authoritative local Pydantic
 validation. The AI layer has no direct SQLite, shell, systemd, deployment,
 or catalog-editing tools. Optional Google Search grounding is a separate
 text-only provider path; its untrusted output cannot invoke local tools.
-Production deployment of this development phase is unverified.
+Production deployment of this development phase is unverified. Code now
+targets schema v13, adding only bounded assistant conversation tables; the
+owner-confirmed production runtime above remains v12 until a separate rollout.
 One process-local per-user claim coordinates text and voice so concurrent AI
 requests cannot duplicate provider work; every exit path releases the claim.
-Catalog lookup now resolves locally through normalized exact/token/searchable
-and bounded fuzzy stages before an honest absence result. Gemini receives a
-short versioned role and at most five local candidate labels. A separate
-bounded 30-minute process-local context stores structured follow-up slots and
-at most six short dialog turns (6000 characters); it cannot bypass FSM,
-permissions, drafts, or confirmation and is never persisted or logged.
+Catalog lookup resolves locally through normalized exact/token/metadata and
+bounded fuzzy stages before an honest absence result. Gemini receives a short
+versioned role and bounded local candidates. Persistent context is isolated by
+user/private-chat, survives restart, expires after 24 hours, and retains at
+most 12 turns/12000 characters plus structured topic/entity/tool state. Typed
+read-only catalog, attendance and current-shift tools recheck super-admin
+access; context cannot bypass FSM, permissions, drafts, or confirmation and is
+never logged.
 Live Gemini structured output was owner-authorized and passed on 2026-10-10.
 Groq is still `NOT TESTED — AUDIO SAMPLE REQUIRED`; final verification is a
 controlled owner-only Telegram voice request, not a synthetic production file.

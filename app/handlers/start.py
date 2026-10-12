@@ -22,6 +22,10 @@ from app.models.user import Role
 from app.services.access_service import UserContext
 from app.services.auth_service import AuthService
 from app.services.warehouse.attendance_service import WarehouseAttendanceService
+from app.services.assistant.context import (
+    AssistantConversationMemory,
+    PersistentAssistantConversationMemory,
+)
 from app.telegram_commands import update_user_commands
 
 router = Router(name=__name__)
@@ -95,6 +99,7 @@ async def handle_start(
     bot: Bot,
     warehouse_enabled: bool = False,
     warehouse_attendance_service: WarehouseAttendanceService | None = None,
+    assistant_conversation_memory: AssistantConversationMemory | PersistentAssistantConversationMemory | None = None,
 ) -> None:
     """Show the main menu and reset an unfinished interaction."""
 
@@ -108,6 +113,8 @@ async def handle_start(
     user = message.from_user
     if user is None:
         return
+    if assistant_conversation_memory is not None:
+        assistant_conversation_memory.clear(user.id, message.chat.id)
     context = auth_service.get_context(user.id)
     await update_user_commands(
         bot, user.id, context.role, warehouse_enabled=warehouse_enabled
@@ -144,6 +151,7 @@ async def handle_help(
     auth_service: AuthService,
     warehouse_enabled: bool = False,
     warehouse_attendance_service: WarehouseAttendanceService | None = None,
+    assistant_conversation_memory: AssistantConversationMemory | PersistentAssistantConversationMemory | None = None,
 ) -> None:
     """Show concise usage help and the role-aware main menu."""
 
@@ -155,6 +163,8 @@ async def handle_help(
         )
     await state.clear()
     user = message.from_user
+    if user is not None and assistant_conversation_memory is not None:
+        assistant_conversation_memory.clear(user.id, message.chat.id)
     context = auth_service.get_context(user.id) if user else None
     if context and context.role is Role.BLOCKED:
         await message.answer(BLOCKED_TEXT)
@@ -193,9 +203,12 @@ async def handle_home(
     auth_service: AuthService,
     warehouse_enabled: bool = False,
     warehouse_attendance_service: WarehouseAttendanceService | None = None,
+    assistant_conversation_memory: AssistantConversationMemory | PersistentAssistantConversationMemory | None = None,
 ) -> None:
     """Return to the main menu."""
 
+    if assistant_conversation_memory is not None and isinstance(callback.message, Message):
+        assistant_conversation_memory.clear(callback.from_user.id, callback.message.chat.id)
     context = auth_service.get_context(callback.from_user.id)
     if context.role is Role.BLOCKED:
         await callback.answer(BLOCKED_TEXT, show_alert=True)

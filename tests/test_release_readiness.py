@@ -95,7 +95,7 @@ def test_migration_rehearsal_fresh_v10_repeat_integrity_and_rollback(
     UserDatabase(fresh).initialize()
     UserDatabase(fresh).initialize()
     with sqlite3.connect(fresh) as connection:
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 12
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 13
         assert connection.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
         assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
 
@@ -112,7 +112,7 @@ def test_migration_rehearsal_fresh_v10_repeat_integrity_and_rollback(
     UserDatabase(upgraded).initialize()
     UserDatabase(upgraded).initialize()
     with sqlite3.connect(upgraded) as connection:
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 12
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 13
         assert connection.execute(
             "SELECT username,role,has_started FROM users WHERE telegram_user_id=10"
         ).fetchone() == ("admin", "admin", 1)

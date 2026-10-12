@@ -21,6 +21,6 @@ Importance: High
 | Attendance | attendance handler/service/database/XLSX coordinator | attendance safeguard/regression/migration tests |
 | Release safety | `app/release_preflight.py`, `app/storage/release_inspection.py`, production docs | release inspection/preflight/readiness tests |
 | Spreadsheet import | `source/import_bar_xls.py`, catalog JSON | imported-catalog/storage tests |
-| [AI assistant pilot](AI_ASSISTANT.md) | `app/handlers/assistant.py`, `app/services/assistant/`, strict assistant models | assistant retrieval/context/provider/orchestrator/routing/handler tests |
+| [AI assistant pilot](AI_ASSISTANT.md) | `app/handlers/assistant.py`, `app/services/assistant/`, `app/storage/assistant_conversation_*`, strict assistant/tool models | assistant retrieval/context/provider/orchestrator/routing/tool/migration tests |
 
 Use this table to localize; read exact code when changing behavior.

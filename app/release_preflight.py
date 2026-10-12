@@ -614,8 +614,8 @@ def run_preflight(
         ))
     checks.append(Check(
         "schema.target",
-        Status.PASS if CURRENT_SCHEMA_VERSION == 12 else Status.FAIL,
-        f"v{CURRENT_SCHEMA_VERSION}; expected v12",
+        Status.PASS if CURRENT_SCHEMA_VERSION == 13 else Status.FAIL,
+        f"v{CURRENT_SCHEMA_VERSION}; expected v13",
     ))
 
     try:

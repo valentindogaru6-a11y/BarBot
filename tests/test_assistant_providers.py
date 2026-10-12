@@ -153,6 +153,8 @@ def test_gemini_accepts_only_allowed_structured_intents(payload) -> None:
         "unsupported",
         "general_chat",
         "web_search",
+            "list_open_attendance_sessions",
+            "get_current_shift_summary",
     ]
     expected_intents.extend(value.value for value in action)
     assert schema["properties"]["intent"]["enum"] == expected_intents
@@ -195,7 +197,7 @@ def test_provider_rejects_action_outside_dynamic_schema() -> None:
 
 def test_system_prompt_is_short_versioned_and_contains_no_runtime_data() -> None:
     prompt = build_assistant_system_prompt()
-    assert ASSISTANT_SYSTEM_PROMPT_VERSION == "barbot-assistant-v3"
+    assert ASSISTANT_SYSTEM_PROMPT_VERSION == "barbot-assistant-v4"
     assert 50 < len(prompt.split()) < 300
     assert "Truffle" in prompt and "по-русски" in prompt
     assert "Telegram ID" not in prompt

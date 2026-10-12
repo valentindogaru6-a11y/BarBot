@@ -12,7 +12,7 @@ Importance: High
 - `app.config.Settings`: validated environment-backed configuration and paths.
 - `app.services.access_service.UserContext`: role capability source of truth.
 - `app.storage.user_database.UserDatabase.initialize`: database initialization/migration entrypoint.
-- `app.storage.migrations.CURRENT_SCHEMA_VERSION`: current schema target (`12`).
+- `app.storage.migrations.CURRENT_SCHEMA_VERSION`: current code schema target (`13`).
 - `app.storage.release_inspection.open_release_inspection`: logical read-only release connection.
 - `app.storage.json_storage.JsonCatalogStorage`: validated atomic catalog persistence.
 - `app.services.warehouse.BusinessDateService`: Kyiv cutoff/business period semantics.
@@ -25,7 +25,8 @@ Importance: High
 - `AssistantOrchestrator.interpret`: local-first intent selection with optional Gemini fallback.
 - `AssistantToolRegistry.execute`: narrow catalog-search/warehouse-draft tool allowlist.
 - `AssistantCatalogRetriever.retrieve`: exact/token/searchable/fuzzy catalog ranking with bounded candidates.
-- `AssistantConversationMemory`: per-user bounded TTL context without transcripts or persistence.
+- `PersistentAssistantConversationMemory`: bounded SQLite context isolated by user/private-chat.
+- `AssistantReadOnlyTools`: typed super-admin-only catalog, attendance and shift reads.
 - `build_assistant_system_prompt`: versioned Gemini role shared by text and voice.
 - `GroqSpeechToTextClient` / `GeminiIntentClient`: bounded asynchronous provider adapters.
 

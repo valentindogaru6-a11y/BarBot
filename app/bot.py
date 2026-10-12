@@ -30,7 +30,7 @@ from app.services.assistant import (
     AioHttpTransport,
     AssistantHttpTransport,
     AssistantOrchestrator,
-    AssistantConversationMemory,
+    PersistentAssistantConversationMemory,
     AssistantRequestCoordinator,
     GeminiIntentClient,
     GeminiGroundedSearchClient,
@@ -70,6 +70,7 @@ from app.storage.warehouse_delivery_database import WarehouseDeliveryDatabase
 from app.storage.warehouse_reminder_database import WarehouseReminderDatabase
 from app.storage.warehouse_schedule_database import WarehouseScheduleDatabase
 from app.storage.warehouse_attendance_database import WarehouseAttendanceDatabase
+from app.storage.assistant_conversation_database import AssistantConversationDatabase
 from app.telegram_commands import configure_bot_commands
 
 
@@ -236,7 +237,8 @@ async def main() -> None:
         settings
     )
     assistant_request_coordinator = AssistantRequestCoordinator()
-    assistant_conversation_memory = AssistantConversationMemory(
+    assistant_conversation_memory = PersistentAssistantConversationMemory(
+        AssistantConversationDatabase(settings.database_path),
         ttl_seconds=settings.ai_conversation_ttl_seconds,
         max_turns=settings.ai_conversation_max_turns,
         max_chars=settings.ai_conversation_max_chars,

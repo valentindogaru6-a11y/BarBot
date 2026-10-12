@@ -358,7 +358,7 @@ def _remember(memory: AssistantConversationMemory) -> None:
     )
 
 
-def test_provider_timeout_clears_context(tmp_path) -> None:
+def test_provider_timeout_preserves_bounded_context(tmp_path) -> None:
     memory = AssistantConversationMemory()
     _remember(memory)
     message = _message(1, "500 грамм")
@@ -378,11 +378,11 @@ def test_provider_timeout_clears_context(tmp_path) -> None:
             conversation_memory=memory,
         )
     )
-    assert memory.get(1) is None
-    assert message.answer.await_args.args[0] == assistant.AI_UNAVAILABLE_TEXT
+    assert memory.get(1) is not None
+    assert "Gemini временно недоступен" in message.answer.await_args.args[0]
 
 
-def test_cancellation_clears_context_and_propagates(tmp_path) -> None:
+def test_cancellation_preserves_context_and_propagates(tmp_path) -> None:
     memory = AssistantConversationMemory()
     _remember(memory)
     with pytest.raises(asyncio.CancelledError):
@@ -400,7 +400,7 @@ def test_cancellation_clears_context_and_propagates(tmp_path) -> None:
                 conversation_memory=memory,
             )
         )
-    assert memory.get(1) is None
+    assert memory.get(1) is not None
 
 
 def test_safe_observability_has_no_query_or_user_id(

@@ -153,7 +153,7 @@ hardening before migration or start.
 
 1. Checkout the exact approved release commit and re-confirm clean tree.
 2. Run full read-only preflight against the stopped instance. Before migration,
-   a schema older than v12 is expected to fail only the schema check; every
+   a schema older than v13 is expected to fail only the schema check; every
    other blocking failure must be resolved.
 3. Apply migration exactly once through the application migration runner:
 
@@ -167,7 +167,7 @@ print("migration initialization completed")
 PY
 ```
 
-4. Run full preflight again. It must report schema v12, integrity ok, and no FK violations.
+4. Run full preflight again. It must report schema v13, integrity ok, and no FK violations.
 5. Seed dry-run first:
 
 ```bash

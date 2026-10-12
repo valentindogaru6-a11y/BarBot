@@ -39,6 +39,8 @@ GEMINI_INTENT_SCHEMA: Mapping[str, object] = {
                 "unsupported",
                 "general_chat",
                 "web_search",
+                "list_open_attendance_sessions",
+                "get_current_shift_summary",
             ],
         },
         "confidence": {"type": "integer", "minimum": 0, "maximum": 10_000},
@@ -77,6 +79,8 @@ _NON_ACTION_INTENTS = (
     "unsupported",
     "general_chat",
     "web_search",
+    "list_open_attendance_sessions",
+    "get_current_shift_summary",
 )
 
 

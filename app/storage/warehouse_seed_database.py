@@ -108,9 +108,9 @@ class WarehouseSeedDatabase:
     @staticmethod
     def _validate_schema(connection: sqlite3.Connection) -> None:
         version = WarehouseSeedDatabase._schema_version(connection)
-        if version not in {3, 4, 5, 6, 7, 8, 9, 10, 11, 12}:
+        if version not in {3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13}:
             raise WarehouseSeedImportError(
-                "Warehouse schema v3 through v12 required; "
+                "Warehouse schema v3 through v13 required; "
                 f"found v{version}"
             )
         try:

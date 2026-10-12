@@ -5,6 +5,7 @@ from app.services.assistant.context import (
     AssistantConversationContext,
     AssistantConversationMemory,
     AssistantConversationTurn,
+    PersistentAssistantConversationMemory,
 )
 from app.services.assistant.orchestrator import (
     AssistantOrchestrator,
@@ -46,6 +47,7 @@ __all__ = [
     "AssistantConversationContext",
     "AssistantConversationMemory",
     "AssistantConversationTurn",
+    "PersistentAssistantConversationMemory",
     "AssistantCatalogRetriever",
     "AssistantToolAction",
     "AssistantToolRegistry",

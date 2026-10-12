@@ -167,7 +167,7 @@ def test_migrates_v1_through_v2_to_v3_and_preserves_every_user_column(
     database = UserDatabase(path)
     database.initialize()
 
-    assert database.settings()["user_version"] == 12
+    assert database.settings()["user_version"] == 13
     assert _read_rows(path) == expected
     previous, updated = database.set_role(
         303,
@@ -205,7 +205,7 @@ def test_fresh_database_is_created_directly_as_v6(tmp_path: Path) -> None:
 
     database.initialize()
 
-    assert database.settings()["user_version"] == 12
+    assert database.settings()["user_version"] == 13
     database.ensure_user(606)
     assert database.set_role(
         606,
@@ -272,7 +272,7 @@ def test_migrates_v2_to_v3_with_default_location_and_settings(
 
     UserDatabase(path).initialize()
 
-    assert _version(path) == 12
+    assert _version(path) == 13
     warehouse = WarehouseDatabase(path)
     locations = warehouse.list_locations()
     settings = warehouse.get_settings()
@@ -326,7 +326,7 @@ def test_rejects_corrupted_v3_schema(tmp_path: Path) -> None:
     with pytest.raises(SchemaValidationError, match="Индексы"):
         UserDatabase(path).initialize()
 
-    assert _version(path) == 12
+    assert _version(path) == 13
 
 
 def test_rejects_invalid_stored_role_before_migration(tmp_path: Path) -> None:

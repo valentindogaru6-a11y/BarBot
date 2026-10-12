@@ -3,7 +3,7 @@
 Scope: bounded owner-only intent, conversation, retrieval, search, and drafts
 Trust: Confirmed from code and tests
 Lifecycle: Fresh
-Last verified: 2026-10-10
+Last verified: 2026-10-12
 Evidence: `app/services/assistant/`, `app/handlers/assistant.py`, assistant tests
 Depends on: catalog services, centralized access, warehouse draft confirmation
 Importance: High
@@ -14,17 +14,25 @@ Importance: High
 - `AssistantCatalogRetriever` is the factual boundary. It normalizes commands,
   Unicode, `ё/е`, punctuation, Russian endings and token order; exact/token
   matches precede aliases/searchable fields and bounded fuzzy candidates.
-- Gemini receives the request, normalized entity and at most five local
+- Gemini receives the request, normalized entity and only bounded local
   candidate labels. Its output remains strict schema/Pydantic data and cannot
   supply database IDs, callbacks, SQL, or service methods.
 - Warehouse intent classification is not authority. A normalized local action
   gate must find an explicit writeoff/transfer command, or a previously gated
   pending action must still be live. The provider enum is narrowed per request,
   and local post-validation blocks escalation before persistent-draft creation.
-- `AssistantConversationMemory` combines structured clarification fields with
-  at most six normalized user/assistant turns, 6000 characters and a 30-minute
-  TTL. It is process-local, isolated for at most 100 users, never logged or
-  persisted, and its reset phrases do not clear FSM or warehouse drafts.
+- `PersistentAssistantConversationMemory` stores schema-v13 sessions and turns
+  by user/private-chat. Retention is 24 hours, 12 turns and 12000 characters,
+  with oldest-first eviction, bounded summaries and opportunistic expiry.
+  Reset deletes only AI state; FSM and warehouse drafts remain authoritative.
+- Structured state keeps the current topic, last catalog query/entity,
+  candidates, requested action, tool and one pending clarification. High-
+  confidence follow-ups are resolved locally; ambiguous references ask one
+  question rather than guessing.
+- `AssistantReadOnlyTools` exposes only typed catalog lookup, open attendance
+  sessions and current-shift summary. Every call rechecks private pilot
+  authority server-side and delegates to existing read services; there is no
+  arbitrary SQL or mutation surface.
 - Candidate callbacks contain stable local catalog IDs and are revalidated
   against both current context and the current catalog. Active FSM, commands,
   exact warehouse triggers, permissions, single-flight, persistent drafts, and

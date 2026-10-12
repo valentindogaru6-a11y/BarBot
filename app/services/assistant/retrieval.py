@@ -12,10 +12,14 @@ from app.models.catalog import Catalog
 from app.services.catalog_service import CatalogService
 from app.services.search_service import SearchResult
 
-MAX_CATALOG_CANDIDATES = 5
+MAX_CATALOG_CANDIDATES = 10
 _COMMAND_PHRASES = re.compile(
     r"\b(?:найди(?:\s+мне)?|покажи|тех(?:нологическ\w*\s+)?карт\w*|"
     r"рецепт\w*|как\s+приготовить|как\s+делать|как\s+готовится)\b",
+    re.IGNORECASE,
+)
+_QUERY_FILLER_RE = re.compile(
+    r"^\s*(?:что\s+у\s+нас\s+есть\s+с|что\s+есть\s+с|у\s+нас\s+с)\s+",
     re.IGNORECASE,
 )
 _COMMAND_TOKENS = {
@@ -48,7 +52,8 @@ def normalize_assistant_text(value: str) -> str:
 def extract_catalog_entity(value: str) -> str:
     """Remove command language while retaining category/style modifiers."""
 
-    without_phrases = _COMMAND_PHRASES.sub(" ", value)
+    without_phrases = _QUERY_FILLER_RE.sub("", value)
+    without_phrases = _COMMAND_PHRASES.sub(" ", without_phrases)
     tokens = [
         token
         for token in normalize_assistant_text(without_phrases).split()
@@ -120,7 +125,7 @@ class AssistantCatalogRetriever:
     def __init__(self, catalog: Catalog) -> None:
         self.catalog_service = CatalogService(catalog)
 
-    def retrieve(self, query: str, *, limit: int = MAX_CATALOG_CANDIDATES) -> CatalogRetrieval:
+    def retrieve(self, query: str, *, limit: int = 5) -> CatalogRetrieval:
         normalized_query = extract_catalog_entity(query)
         if not normalized_query:
             return CatalogRetrieval(normalized_query="")
@@ -168,6 +173,10 @@ class AssistantCatalogRetriever:
             None,
         )
 
+    @staticmethod
+    def key_for(result: SearchResult) -> str:
+        return candidate_key(result)
+
     def _active_results(self) -> Iterable[SearchResult]:
         for category in self.catalog_service.get_active_categories():
             for item in self.catalog_service.get_active_items(category.id):
@@ -212,6 +221,27 @@ class AssistantCatalogRetriever:
         ]
         if any(query and query in value for value in searchable):
             return 700, "searchable_text"
+        searchable_token_sets = [set(_token_key(value)) for value in searchable]
+        if len(query_set) >= 2 and any(
+            all(
+                any(left.startswith(right) or right.startswith(left) for right in tokens)
+                for left in query_set
+            )
+            for tokens in searchable_token_sets
+            if tokens
+        ):
+            title_prefix_match = all(
+                any(left.startswith(right) or right.startswith(left) for right in title_set)
+                for left in query_set
+            ) if title_set else False
+            return (830 if title_prefix_match else 680), (
+                "title_tokens" if title_prefix_match else "metadata_tokens"
+            )
+        if query_set and title_set and all(
+            any(left.startswith(right) or right.startswith(left) for right in title_set)
+            for left in query_set
+        ):
+            return 830, "title_tokens"
         token_overlap = 0.0
         if query_set and title_set:
             token_overlap = len(query_set & title_set) / len(query_set | title_set)

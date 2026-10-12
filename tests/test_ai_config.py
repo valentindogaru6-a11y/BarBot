@@ -23,9 +23,9 @@ def test_ai_defaults_are_disabled_and_do_not_require_keys() -> None:
     assert settings.ai_voice_max_duration_seconds == 180
     assert settings.ai_voice_max_file_bytes == 20 * 1024 * 1024
     assert settings.ai_request_timeout_seconds == 30
-    assert settings.ai_conversation_ttl_seconds == 1800
-    assert settings.ai_conversation_max_turns == 6
-    assert settings.ai_conversation_max_chars == 6000
+    assert settings.ai_conversation_ttl_seconds == 86400
+    assert settings.ai_conversation_max_turns == 12
+    assert settings.ai_conversation_max_chars == 12000
     assert settings.ai_web_search_max_provider_calls_per_update == 1
 
 

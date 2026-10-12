@@ -85,3 +85,12 @@ flags; web content cannot select or invoke a local tool, and source links come
 only from provider grounding metadata.
 Warehouse mutations retain preview, authorization recheck, idempotency, and
 explicit confirmation.
+
+## D13 — Persistent AI context is bounded and not authority
+
+Bar Jarvis dialog state lives in schema v13, isolated by user/private-chat and
+bounded to 24 hours, 12 turns and 12000 characters with oldest-first eviction.
+Structured topic/entity/tool fields may resolve follow-ups but never authorize
+warehouse mutations. Read-only operational tools use fixed Pydantic contracts,
+centralized server-side role checks and existing read services; Gemini cannot
+choose SQL, tables, database identifiers or mutation methods.

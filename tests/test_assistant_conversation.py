@@ -78,7 +78,10 @@ def test_followup_receives_prior_text_and_assistant_turns() -> None:
     memory = AssistantConversationMemory()
     asyncio.run(_run(_message("назови три варианта"), client, memory))
     asyncio.run(_run(_message("а какой лучше?"), client, memory))
-    assert client.calls[1][1] == (
+    assert client.calls[1][1][0] == (
+        "user", "[Рабочий контекст: тема: назови три варианта]"
+    )
+    assert client.calls[1][1][1:] == (
         ("user", "назови три варианта"),
         ("assistant", "Три варианта."),
     )
@@ -141,7 +144,10 @@ def test_voice_transcript_and_text_share_same_history() -> None:
     # normal user turn before the next text request.
     asyncio.run(_run(_message("голосовой вопрос"), client, memory))
     asyncio.run(_run(_message("уточни"), client, memory))
-    assert client.calls[1][1][0] == ("user", "голосовой вопрос")
+    assert client.calls[1][1][0] == (
+        "user", "[Рабочий контекст: тема: голосовой вопрос]"
+    )
+    assert client.calls[1][1][1] == ("user", "голосовой вопрос")
 
 
 def test_general_chat_disabled_preserves_existing_opt_in_boundary() -> None:

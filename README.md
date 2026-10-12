@@ -193,13 +193,17 @@ If no real card or relevant candidate exists, the assistant says so without
 inventing a recipe. In particular, the committed catalog currently contains no
 card whose searchable fields mention `мохито`.
 
-Gemini receives a short versioned BarBot/Truffle system role plus at most five
+Gemini receives a short versioned BarBot/Truffle system role plus at most ten
 local candidate labels, never the whole catalog, KOS, database or secrets. A
-bounded process-local conversation context retains at most six short
-user/assistant turns for 30 minutes, plus structured clarification fields. It
-is isolated per user, capped at 6000 characters, never persisted or logged,
-and disappears on restart. The phrases `забудь этот разговор`, `начнём заново`
+bounded SQLite conversation context retains at most 12 short user/assistant
+turns and 12000 characters for 24 hours, plus structured topic, entity,
+candidate, tool and clarification state. It is isolated by user and private
+chat, survives process restart, is never logged, and is evicted oldest-first.
+The phrases `забудь этот разговор`, `начать новый разговор`, `начнём заново`
 and `сбрось контекст` clear only this AI memory, not FSM or warehouse drafts.
+Schema v13 adds only these bounded conversation tables. Read-only assistant
+tools expose allowlisted catalog, open-attendance and current-shift reads to
+the private-chat super-admin pilot; Gemini cannot select SQL, tables or IDs.
 KOS remains developer/Codex project memory; the runtime system context defines
 the assistant role; conversation memory is temporary dialog state; local
 retrieval is the factual BarBot source; Google Search grounding is clearly
@@ -224,9 +228,9 @@ GEMINI_STRONG_MODEL=gemini-3.8-flash
 AI_VOICE_MAX_DURATION_SECONDS=180
 AI_VOICE_MAX_FILE_BYTES=20971520
 AI_REQUEST_TIMEOUT_SECONDS=30
-AI_CONVERSATION_TTL_SECONDS=1800
-AI_CONVERSATION_MAX_TURNS=6
-AI_CONVERSATION_MAX_CHARS=6000
+AI_CONVERSATION_TTL_SECONDS=86400
+AI_CONVERSATION_MAX_TURNS=12
+AI_CONVERSATION_MAX_CHARS=12000
 AI_WEB_SEARCH_MAX_PROVIDER_CALLS_PER_UPDATE=1
 ```
 

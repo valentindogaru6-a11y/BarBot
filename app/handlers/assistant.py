@@ -32,14 +32,18 @@ from app.services.assistant import (
     AssistantToolRegistry,
     AssistantUnavailableError,
     ProviderError,
+    ProviderErrorKind,
     SpeechToTextClient,
     extract_catalog_entity,
 )
 from app.services.assistant.retrieval import CatalogRetrieval
+from app.services.assistant.tools import AssistantReadOnlyTools
 from app.services.auth_service import AuthService
+from app.services.access_service import AccessDeniedError
 from app.services.audio_service import temporary_audio_files
 from app.services.warehouse.intake_parser import is_warehouse_trigger_header
 from app.services.warehouse.operations_service import WarehouseOperationsService
+from app.services.warehouse.attendance_service import WarehouseAttendanceService
 from app.storage.json_storage import CatalogStorageError
 
 voice_router = Router(name="app.handlers.assistant_voice")
@@ -53,6 +57,7 @@ AI_REQUEST_BUSY_TEXT = (
 )
 AI_CONTEXT_CANCELLED_TEXT = "Текущий AI-запрос отменён."
 AI_CONTEXT_RESET_TEXT = "Контекст разговора очищен. Начнём заново."
+AI_RATE_LIMIT_TEXT = "Лимит AI временно исчерпан. Попробуйте немного позже."
 WEB_SEARCH_UNAVAILABLE_TEXT = (
     "Актуальный поиск в интернете пока недоступен. Могу ответить по общим "
     "знаниям или помочь с данными BarBot."
@@ -62,7 +67,17 @@ _CONVERSATION_RESET_PHRASES = {
     "начнем заново",
     "начнём заново",
     "сбрось контекст",
+    "начать новый разговор",
 }
+_OPEN_SESSIONS_RE = re.compile(
+    r"\b(?:чьи|какие|открыт\w*)\b.*\b(?:смен\w*|сесси\w*)\b|"
+    r"\b(?:смен\w*|сесси\w*)\b.*\b(?:открыт\w*|до сих пор)\b",
+    re.IGNORECASE,
+)
+_SIMILAR_FOLLOWUP_RE = re.compile(r"\b(?:что[- ]?то\s+)?похож\w*\b", re.IGNORECASE)
+_IMAGE_FOLLOWUP_RE = re.compile(r"\b(?:картинк\w*|изображени\w*|фото)\b", re.IGNORECASE)
+_OFFLINE_FOLLOWUP_RE = re.compile(r"\b(?:без\s+интернет\w*|выдай\s+что\s+знаешь)\b", re.IGNORECASE)
+_REFERENCE_RE = re.compile(r"\b(?:его|ее|её|это|похож\w*)\b", re.IGNORECASE)
 _MARKDOWN_LINK_RE = re.compile(r"\[([^\]]+)\]\(https?://[^)\s]+\)", re.IGNORECASE)
 _BARE_URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
 
@@ -72,6 +87,27 @@ def _without_model_links(text: str) -> str:
 
     without_markdown = _MARKDOWN_LINK_RE.sub(r"\1", text)
     return " ".join(_BARE_URL_RE.sub("", without_markdown).split())
+
+
+def resolve_contextual_request(
+    text: str,
+    context: Any | None,
+) -> tuple[str, bool]:
+    """Resolve only high-confidence references; otherwise request clarification."""
+
+    if context is None:
+        return text, bool(_REFERENCE_RE.search(text))
+    anchor = context.last_query or context.last_entity_label or context.topic
+    if _SIMILAR_FOLLOWUP_RE.search(text):
+        return (f"покажи техкарту {anchor}", False) if anchor else (text, True)
+    if _OFFLINE_FOLLOWUP_RE.search(text) and context.topic:
+        return (
+            f"Расскажи по общим знаниям без поиска в интернете: {context.topic}. {text}",
+            False,
+        )
+    if _REFERENCE_RE.search(text) and not anchor:
+        return text, True
+    return text, False
 
 
 async def _answer_safe_text(
@@ -107,6 +143,14 @@ def _latency_bucket(elapsed: float) -> str:
     if elapsed < 3:
         return "lt_3s"
     return "gte_3s"
+
+
+def _provider_error_text(error: ProviderError) -> str:
+    if error.kind is ProviderErrorKind.RATE_LIMIT:
+        return AI_RATE_LIMIT_TEXT
+    if error.kind in {ProviderErrorKind.TIMEOUT, ProviderErrorKind.SERVER, ProviderErrorKind.UNAVAILABLE}:
+        return "Gemini временно недоступен. Локальные функции BarBot продолжают работать."
+    return AI_UNAVAILABLE_TEXT
 
 
 def _private_super_admin(
@@ -171,6 +215,7 @@ async def _run_assistant(
     orchestrator: AssistantOrchestrator,
     warehouse_service: WarehouseOperationsService | None,
     conversation_memory: AssistantConversationMemory | None = None,
+    warehouse_attendance_service: WarehouseAttendanceService | None = None,
 ) -> None:
     try:
         catalog = load_catalog(catalog_path)
@@ -198,6 +243,66 @@ async def _run_assistant(
         if conversation_memory is not None and user_id is not None
         else None
     )
+    if (
+        context is not None
+        and context.pending_slots == ("reference",)
+        and conversation_memory is not None
+        and user_id is not None
+    ):
+        conversation_memory.clear_structured(
+            user_id, last_intent="clarification_answer", topic=text
+        )
+        context = conversation_memory.get(user_id)
+    if user_id is not None and _OPEN_SESSIONS_RE.search(text):
+        tools = AssistantReadOnlyTools(
+            catalog,
+            auth_service,
+            attendance=warehouse_attendance_service,
+            operations=warehouse_service,
+        )
+        try:
+            sessions = tools.list_open_attendance_sessions(user_id)
+        except AccessDeniedError:
+            await message.answer("Недостаточно прав для просмотра открытых смен.")
+            return
+        except Exception:
+            logger.exception("Assistant read-only attendance tool failed")
+            await message.answer("Не удалось прочитать открытые смены. Попробуйте позже.")
+            return
+        if sessions:
+            lines = ["Сейчас открыты персональные смены:"]
+            for session in sessions:
+                hours, remainder = divmod(session.duration_seconds, 3600)
+                minutes = remainder // 60
+                label = session.employee
+                if session.username:
+                    label += f" (@{session.username})"
+                lines.append(
+                    f"• {label} — {session.location}, {hours} ч {minutes} мин"
+                )
+            answer = "\n".join(lines)
+        else:
+            answer = "Открытых персональных смен сейчас нет."
+        if conversation_memory is not None:
+            conversation_memory.append_turn(user_id, role="user", text=text, last_intent="list_open_attendance_sessions", topic="открытые смены")
+            conversation_memory.append_turn(user_id, role="assistant", text=answer, last_intent="list_open_attendance_sessions")
+            conversation_memory.remember(
+                user_id, last_intent="list_open_attendance_sessions",
+                last_entity_type="attendance", last_query="открытые смены",
+                topic="открытые смены", last_tool_name="list_open_attendance_sessions",
+            )
+        await _answer_safe_text(message, answer)
+        return
+    if context is not None and _IMAGE_FOLLOWUP_RE.search(text):
+        answer = (
+            "Сейчас я не умею присылать изображения. "
+            f"Могу продолжить по теме «{context.topic or context.last_query}» текстом."
+        )
+        if conversation_memory is not None and user_id is not None:
+            conversation_memory.append_turn(user_id, role="user", text=text, last_intent="unsupported")
+            conversation_memory.append_turn(user_id, role="assistant", text=answer, last_intent="unsupported")
+        await _answer_safe_text(message, answer)
+        return
     allowed_action = orchestrator.local_action_evidence(text)
     if (
         allowed_action is None
@@ -216,7 +321,35 @@ async def _run_assistant(
         else ()
     )
     if context is not None:
-        if context.last_entity_type == "tech_card":
+        compact_context = "; ".join(
+            part for part in (
+                f"тема: {context.topic}" if context.topic else "",
+                f"последний запрос каталога: {context.last_query}" if context.last_query else "",
+                f"последнее действие: {context.last_requested_action}" if context.last_requested_action else "",
+                f"summary: {context.summary_text}" if context.summary_text else "",
+            ) if part
+        )[:1000]
+        if compact_context:
+            provider_history = (("user", f"[Рабочий контекст: {compact_context}]"), *provider_history)
+    if context is not None:
+        request_text, ambiguous_reference = resolve_contextual_request(text, context)
+        if ambiguous_reference:
+            if conversation_memory is not None and user_id is not None:
+                conversation_memory.remember(
+                    user_id, last_intent="clarify", last_entity_type="conversation",
+                    last_query="", pending_slots=("reference",),
+                    topic=context.topic,
+                )
+            await message.answer("Уточните, пожалуйста, о какой позиции или теме речь.")
+            return
+        if (
+            request_text == text
+            and context.last_entity_type == "tech_card"
+            and (
+                _REFERENCE_RE.search(text)
+                or context.pending_slots == ("candidate",)
+            )
+        ):
             request_text = f"покажи техкарту {context.last_query} {text}"
         elif (
             context.last_entity_type == "warehouse_product"
@@ -228,6 +361,16 @@ async def _run_assistant(
                 else "перемести"
             )
             request_text = f"{verb} {context.last_query} {text}"
+    else:
+        request_text, ambiguous_reference = resolve_contextual_request(text, None)
+        if ambiguous_reference:
+            if conversation_memory is not None and user_id is not None:
+                conversation_memory.remember(
+                    user_id, last_intent="clarify", last_entity_type="conversation",
+                    last_query="", pending_slots=("reference",), topic="",
+                )
+            await message.answer("Уточните, пожалуйста, о какой позиции или теме речь.")
+            return
 
     local_exact_hit = False
     provider_latency_bucket = "local"
@@ -329,27 +472,19 @@ async def _run_assistant(
             ):
                 intent, action = refined, refined_action
     except AssistantUnavailableError:
-        if conversation_memory is not None and user_id is not None:
-            conversation_memory.clear(user_id)
         await message.answer(AI_UNAVAILABLE_TEXT)
         return
     except ProviderError as exc:
-        if conversation_memory is not None and user_id is not None:
-            conversation_memory.clear(user_id)
         logger.warning(
             "Assistant intent provider failed: provider=%s kind=%s",
             exc.provider,
             exc.kind.value,
         )
-        await message.answer(AI_UNAVAILABLE_TEXT)
+        await message.answer(_provider_error_text(exc))
         return
     except asyncio.CancelledError:
-        if conversation_memory is not None and user_id is not None:
-            conversation_memory.clear(user_id)
         raise
     except Exception:
-        if conversation_memory is not None and user_id is not None:
-            conversation_memory.clear(user_id)
         raise
 
     logger.info(
@@ -362,6 +497,59 @@ async def _run_assistant(
         action.kind,
         provider_latency_bucket,
     )
+
+    if action.kind == "list_open_attendance_sessions":
+        tools = AssistantReadOnlyTools(
+            catalog, auth_service, attendance=warehouse_attendance_service,
+            operations=warehouse_service,
+        )
+        try:
+            sessions = tools.list_open_attendance_sessions(user_id) if user_id is not None else ()
+        except AccessDeniedError:
+            await message.answer("Недостаточно прав для просмотра открытых смен.")
+            return
+        except Exception:
+            logger.exception("Assistant read-only attendance tool failed")
+            await message.answer("Не удалось прочитать открытые смены. Попробуйте позже.")
+            return
+        if sessions:
+            lines = ["Сейчас открыты персональные смены:"]
+            for session in sessions:
+                hours, remainder = divmod(session.duration_seconds, 3600)
+                minutes = remainder // 60
+                label = session.employee + (f" (@{session.username})" if session.username else "")
+                lines.append(f"• {label} — {session.location}, {hours} ч {minutes} мин")
+            answer = "\n".join(lines)
+        else:
+            answer = "Открытых персональных смен сейчас нет."
+        await _answer_safe_text(message, answer)
+        return
+
+    if action.kind == "get_current_shift_summary":
+        tools = AssistantReadOnlyTools(
+            catalog, auth_service, attendance=warehouse_attendance_service,
+            operations=warehouse_service,
+        )
+        try:
+            shift = tools.get_current_shift_summary(user_id) if user_id is not None else None
+        except AccessDeniedError:
+            await message.answer("Недостаточно прав для просмотра текущей смены.")
+            return
+        except Exception:
+            logger.exception("Assistant read-only shift tool failed")
+            await message.answer("Не удалось прочитать текущую смену. Попробуйте позже.")
+            return
+        assert shift is not None
+        answer = (
+            f"Текущая смена: {shift.location}, {shift.business_date}, статус {shift.status}."
+            if shift.exists else
+            f"Для {shift.location} на {shift.business_date} складская смена ещё не создана."
+        )
+        if conversation_memory is not None and user_id is not None:
+            conversation_memory.append_turn(user_id, role="user", text=text, last_intent=action.kind, topic="текущая смена")
+            conversation_memory.append_turn(user_id, role="assistant", text=answer, last_intent=action.kind)
+        await _answer_safe_text(message, answer)
+        return
 
     if action.kind == "general_chat":
         if not orchestrator.general_chat_enabled:
@@ -376,7 +564,7 @@ async def _run_assistant(
                 role="user",
                 text=text,
                 last_intent="general_chat",
-                topic=intent.query or "general_chat",
+                topic=(context.topic if context else text),
             )
             conversation_memory.append_turn(
                 user_id,
@@ -388,6 +576,17 @@ async def _run_assistant(
         return
     if action.kind == "web_search":
         if not orchestrator.web_search_enabled:
+            if conversation_memory is not None and user_id is not None:
+                conversation_memory.append_turn(
+                    user_id, role="user", text=text, last_intent="web_search",
+                    topic=action.entity_query or (context.topic if context else ""),
+                )
+                conversation_memory.remember(
+                    user_id, last_intent="web_search", last_entity_type="conversation",
+                    last_query=context.last_query if context else "",
+                    topic=action.entity_query or (context.topic if context else text),
+                    last_requested_action="web_search",
+                )
             await message.answer(WEB_SEARCH_UNAVAILABLE_TEXT)
             return
         try:
@@ -445,6 +644,16 @@ async def _run_assistant(
                     user_id,
                     last_intent="find_tech_card",
                     topic=result.item.name,
+                )
+                conversation_memory.remember(
+                    user_id,
+                    last_intent="find_tech_card",
+                    last_entity_type="tech_card",
+                    last_query=result.item.name,
+                    topic=result.item.name,
+                    last_entity_id=AssistantToolRegistry._candidate_key(result),
+                    last_entity_label=result.item.name,
+                    last_requested_action="find_tech_card",
                 )
                 conversation_memory.append_turn(
                     user_id,
@@ -620,6 +829,7 @@ async def handle_assistant_voice(
     assistant_request_coordinator: AssistantRequestCoordinator,
     assistant_conversation_memory: AssistantConversationMemory | None = None,
     warehouse_service: WarehouseOperationsService | None = None,
+    warehouse_attendance_service: WarehouseAttendanceService | None = None,
 ) -> None:
     voice = message.voice
     if voice is None or assistant_speech_client is None or assistant_orchestrator is None:
@@ -644,6 +854,7 @@ async def handle_assistant_voice(
             assistant_speech_client,
             assistant_conversation_memory,
             warehouse_service,
+            warehouse_attendance_service,
         )
 
 
@@ -658,6 +869,7 @@ async def _handle_assistant_voice_claimed(
     assistant_speech_client: SpeechToTextClient,
     assistant_conversation_memory: AssistantConversationMemory | None,
     warehouse_service: WarehouseOperationsService | None,
+    warehouse_attendance_service: WarehouseAttendanceService | None,
 ) -> None:
     """Run the voice pipeline while the caller owns the per-user claim."""
 
@@ -691,8 +903,6 @@ async def _handle_assistant_voice_claimed(
                 content_type=content_type,
             )
     except ProviderError as exc:
-        if assistant_conversation_memory is not None and message.from_user is not None:
-            assistant_conversation_memory.clear(message.from_user.id)
         logger.warning(
             "Assistant voice provider failed: provider=%s kind=%s",
             exc.provider,
@@ -701,12 +911,8 @@ async def _handle_assistant_voice_claimed(
         await message.answer(VOICE_UNAVAILABLE_TEXT)
         return
     except asyncio.CancelledError:
-        if assistant_conversation_memory is not None and message.from_user is not None:
-            assistant_conversation_memory.clear(message.from_user.id)
         raise
     except OSError:
-        if assistant_conversation_memory is not None and message.from_user is not None:
-            assistant_conversation_memory.clear(message.from_user.id)
         logger.exception("Assistant voice temporary-file processing failed")
         await message.answer(VOICE_UNAVAILABLE_TEXT)
         return
@@ -726,6 +932,7 @@ async def _handle_assistant_voice_claimed(
         orchestrator=assistant_orchestrator,
         warehouse_service=warehouse_service,
         conversation_memory=assistant_conversation_memory,
+        warehouse_attendance_service=warehouse_attendance_service,
     )
 
 
@@ -739,6 +946,7 @@ async def handle_assistant_text(
     assistant_request_coordinator: AssistantRequestCoordinator,
     assistant_conversation_memory: AssistantConversationMemory | None = None,
     warehouse_service: WarehouseOperationsService | None = None,
+    warehouse_attendance_service: WarehouseAttendanceService | None = None,
 ) -> None:
     if assistant_orchestrator is None or message.from_user is None:
         return
@@ -757,4 +965,5 @@ async def handle_assistant_text(
             orchestrator=assistant_orchestrator,
             warehouse_service=warehouse_service,
             conversation_memory=assistant_conversation_memory,
+            warehouse_attendance_service=warehouse_attendance_service,
         )

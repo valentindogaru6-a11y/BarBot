@@ -62,8 +62,14 @@ from app.storage.warehouse_attendance_schema import (
     validate_warehouse_attendance_schema,
     warehouse_attendance_schema_is_absent,
 )
+from app.storage.assistant_conversation_schema import (
+    AssistantConversationSchemaError,
+    assistant_conversation_schema_is_absent,
+    create_assistant_conversation_schema,
+    validate_assistant_conversation_schema,
+)
 
-CURRENT_SCHEMA_VERSION = 12
+CURRENT_SCHEMA_VERSION = 13
 
 USER_COLUMNS = (
     "telegram_user_id",
@@ -338,6 +344,8 @@ def _migrate_v1_to_v2(connection: sqlite3.Connection) -> None:
 
 
 def _validate_schema(connection: sqlite3.Connection, version: int) -> None:
+    if version < 13 and not assistant_conversation_schema_is_absent(connection):
+        raise SchemaValidationError("Assistant conversation schema must not exist before v13")
     if version < 12 and not warehouse_attendance_schema_is_absent(connection):
         raise SchemaValidationError("Warehouse attendance schema must not exist before v12")
     if version < 11 and not warehouse_correction_schema_is_absent(connection):
@@ -515,7 +523,7 @@ def _validate_schema(connection: sqlite3.Connection, version: int) -> None:
         ) as exc:
             raise SchemaValidationError(str(exc)) from exc
         return
-    if version == 12:
+    if version in {12, 13}:
         validate_users_schema(connection, 2, allow_dependent_objects=True)
         try:
             validate_warehouse_closing_schema(connection)
@@ -525,11 +533,13 @@ def _validate_schema(connection: sqlite3.Connection, version: int) -> None:
             validate_warehouse_schedule_schema(connection)
             validate_warehouse_correction_schema(connection)
             validate_warehouse_attendance_schema(connection)
+            if version == 13:
+                validate_assistant_conversation_schema(connection)
         except (
             WarehouseClosingSchemaError, WarehouseV7SchemaError,
             WarehouseDeliverySchemaError, WarehouseReminderSchemaError,
             WarehouseScheduleSchemaError, WarehouseCorrectionSchemaError,
-            WarehouseAttendanceSchemaError,
+            WarehouseAttendanceSchemaError, AssistantConversationSchemaError,
         ) as exc:
             raise SchemaValidationError(str(exc)) from exc
         return
@@ -600,6 +610,13 @@ def _migrate_v11_to_v12(connection: sqlite3.Connection) -> None:
     _validate_schema(connection, 12)
 
 
+def _migrate_v12_to_v13(connection: sqlite3.Connection) -> None:
+    _validate_schema(connection, 12)
+    create_assistant_conversation_schema(connection)
+    connection.execute("PRAGMA user_version = 13")
+    _validate_schema(connection, 13)
+
+
 def _create_fresh_v6(connection: sqlite3.Connection) -> None:
     if _table_sql(connection, "users") is not None:
         raise SchemaValidationError(
@@ -655,6 +672,10 @@ def _create_fresh_v12(connection: sqlite3.Connection) -> None:
     _create_fresh_v11(connection); _migrate_v11_to_v12(connection)
 
 
+def _create_fresh_v13(connection: sqlite3.Connection) -> None:
+    _create_fresh_v12(connection); _migrate_v12_to_v13(connection)
+
+
 Migration = Callable[[sqlite3.Connection], None]
 MIGRATIONS: dict[int, Migration] = {
     1: _migrate_v1_to_v2,
@@ -668,6 +689,7 @@ MIGRATIONS: dict[int, Migration] = {
     9: _migrate_v9_to_v10,
     10: _migrate_v10_to_v11,
     11: _migrate_v11_to_v12,
+    12: _migrate_v12_to_v13,
 }
 
 
@@ -720,7 +742,7 @@ def run_migrations(connection: sqlite3.Connection) -> None:
     if version == 0:
         _run_atomic_step(
             connection,
-            _create_fresh_v12,
+            _create_fresh_v13,
             disable_foreign_keys=True,
         )
         return
