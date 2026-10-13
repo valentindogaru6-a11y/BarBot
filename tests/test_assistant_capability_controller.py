@@ -1,10 +1,15 @@
 from pathlib import Path
 
+import pytest
+
 from app.models.user import Role
+from app.config import Settings
 from app.services.auth_service import AuthService
 from app.services.assistant.capabilities import CapabilityBinding, CapabilityRegistry
 from app.services.assistant.capability_controller import AssistantCapabilityController
 from app.services.assistant.proposals import AssistantActionProposalService
+from app.services.assistant.access_policy import AssistantAccessPolicy
+from app.services.access_service import AccessDeniedError
 from app.services.user_service import UserService
 from app.storage.assistant_action_database import AssistantActionDatabase
 from app.storage.user_database import UserDatabase
@@ -38,13 +43,19 @@ def _controller(path: Path):
         users.set_role(user_id, role, actor_user_id=10)
     access = AuthService(frozenset(), users)
     registry = CapabilityRegistry()
+    settings = Settings(
+        _env_file=None, bot_token="test", ai_assistant_enabled=True,
+        ai_access_mode="role_based", warehouse_enabled=True,
+    )
+    policy = AssistantAccessPolicy(access, registry, settings)
     proposals = AssistantActionProposalService(
-        AssistantActionDatabase(path), access, registry
+        AssistantActionDatabase(path), access, registry, policy
     )
     return AssistantCapabilityController(
         registry,
         proposals,
         access,
+        policy,
         flags={"ai_assistant_enabled": True, "warehouse_enabled": True},
         users=users,
         attendance=Attendance(),
@@ -138,12 +149,22 @@ def test_full_runtime_binding_matrix_and_ui_routes_are_concrete(
         )
     }
     proposals = AssistantActionProposalService(
-        AssistantActionDatabase(path), access, registry
+        AssistantActionDatabase(path), access, registry,
+        AssistantAccessPolicy(
+            access,
+            registry,
+            Settings(
+                _env_file=None, bot_token="test", ai_assistant_enabled=True,
+                ai_access_mode="role_based", warehouse_enabled=True,
+            ),
+        ),
     )
+    policy = proposals.access_policy
     controller = AssistantCapabilityController(
         registry,
         proposals,
         access,
+        policy,
         flags={"ai_assistant_enabled": True, "warehouse_enabled": True},
         users=users,
         attendance=marker,
@@ -202,3 +223,22 @@ def test_full_runtime_binding_matrix_and_ui_routes_are_concrete(
         )
         assert dispatch is not None
         assert (dispatch.capability_id, dispatch.ui_action) == expected
+
+
+def test_denied_actor_cannot_discover_tools_or_enter_report_delivery(
+    tmp_path: Path,
+) -> None:
+    controller = _controller(tmp_path / "denied-controller.db")
+
+    for text in (
+        "что ты умеешь?",
+        "сделай табель за текущий месяц",
+        "отправь сегодняшние списания в рабочую группу",
+    ):
+        with pytest.raises(AccessDeniedError):
+            controller.dispatch(
+                text,
+                actor_user_id=999,
+                source_chat_id=999,
+                source_message_id=1,
+            )

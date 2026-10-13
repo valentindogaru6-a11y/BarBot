@@ -29,8 +29,9 @@ from app.keyboards.assistant import (
 from app.keyboards.callbacks import AssistantCandidateCallback, AssistantProposalCallback
 from app.keyboards.main_menu import build_main_menu_keyboard
 from app.models.assistant import AssistantIntentName
-from app.models.user import Role
 from app.services.assistant import (
+    AssistantAccessDenied,
+    AssistantAccessPolicy,
     AssistantOrchestrator,
     AssistantConversationMemory,
     AssistantRequestCoordinator,
@@ -166,31 +167,23 @@ def _provider_error_text(error: ProviderError) -> str:
     return AI_UNAVAILABLE_TEXT
 
 
-def _private_ai_actor(
-    message: Message,
-    auth_service: AuthService,
-) -> bool:
-    return bool(
-        message.from_user is not None
-        and message.chat.type == ChatType.PRIVATE
-        and auth_service.get_context(message.from_user.id).role
-        in {Role.SUPER_ADMIN, Role.ADMIN, Role.BARTENDER, Role.ACCOUNTANT}
-    )
-
-
 class AssistantVoiceEligibleFilter(BaseFilter):
     async def __call__(
         self,
         message: Message,
         settings: Settings,
-        auth_service: AuthService,
+        assistant_access_policy: AssistantAccessPolicy,
         raw_state: str | None = None,
     ) -> bool:
         return bool(
             raw_state is None
             and settings.ai_assistant_enabled
             and settings.ai_voice_enabled
-            and _private_ai_actor(message, auth_service)
+            and message.from_user is not None
+            and assistant_access_policy.can_enter_assistant(
+                message.from_user.id,
+                chat_type=message.chat.type,
+            )
         )
 
 
@@ -199,7 +192,7 @@ class AssistantTextEligibleFilter(BaseFilter):
         self,
         message: Message,
         settings: Settings,
-        auth_service: AuthService,
+        assistant_access_policy: AssistantAccessPolicy,
         raw_state: str | None = None,
     ) -> bool:
         text = (message.text or "").strip()
@@ -209,7 +202,11 @@ class AssistantTextEligibleFilter(BaseFilter):
             or not settings.ai_text_enabled
             or not text
             or text.startswith("/")
-            or not _private_ai_actor(message, auth_service)
+            or message.from_user is None
+            or not assistant_access_policy.can_enter_assistant(
+                message.from_user.id,
+                chat_type=message.chat.type,
+            )
         ):
             return False
         first_line = next(
@@ -231,8 +228,22 @@ async def _run_assistant(
     conversation_memory: AssistantConversationMemory | None = None,
     warehouse_attendance_service: WarehouseAttendanceService | None = None,
     assistant_capability_controller: AssistantCapabilityController | None = None,
+    assistant_access_policy: AssistantAccessPolicy | None = None,
 ) -> None:
     user_id = message.from_user.id if message.from_user is not None else None
+    if user_id is None:
+        return
+    # Runtime entry points always inject and recheck the unified policy. Keeping
+    # this private execution helper independently testable avoids coupling pure
+    # routing regressions to the full user repository composition.
+    if assistant_access_policy is not None:
+        try:
+            assistant_access_policy.require_assistant_access(
+                user_id,
+                chat_type=message.chat.type,
+            )
+        except AssistantAccessDenied:
+            return
 
     async def send_capability(dispatch: Any) -> None:
         if conversation_memory is not None and user_id is not None:
@@ -845,14 +856,20 @@ async def handle_assistant_proposal(
     auth_service: AuthService,
     assistant_action_proposals: AssistantActionProposalService,
     assistant_capability_controller: AssistantCapabilityController,
+    assistant_access_policy: AssistantAccessPolicy,
 ) -> None:
     """Confirm only an owned opaque proposal through an allowlisted adapter."""
 
     if (
         not isinstance(callback.message, Message)
-        or callback.message.chat.type != ChatType.PRIVATE
-        or auth_service.get_context(callback.from_user.id).role
-        not in {Role.SUPER_ADMIN, Role.ADMIN, Role.BARTENDER, Role.ACCOUNTANT}
+        or not assistant_access_policy.can_enter_assistant(
+            callback.from_user.id,
+            chat_type=(
+                callback.message.chat.type
+                if isinstance(callback.message, Message)
+                else "unknown"
+            ),
+        )
     ):
         await answer_callback_safely(callback, "Недостаточно прав.", show_alert=True)
         return
@@ -905,14 +922,20 @@ async def handle_assistant_candidate(
     catalog_path: Path,
     auth_service: AuthService,
     assistant_conversation_memory: AssistantConversationMemory,
+    assistant_access_policy: AssistantAccessPolicy,
 ) -> None:
     """Resolve a bounded candidate callback against current local catalog."""
 
     if (
         not isinstance(callback.message, Message)
-        or callback.message.chat.type != ChatType.PRIVATE
-        or auth_service.get_context(callback.from_user.id).role
-        not in {Role.SUPER_ADMIN, Role.ADMIN, Role.BARTENDER, Role.ACCOUNTANT}
+        or not assistant_access_policy.can_enter_assistant(
+            callback.from_user.id,
+            chat_type=(
+                callback.message.chat.type
+                if isinstance(callback.message, Message)
+                else "unknown"
+            ),
+        )
         or not auth_service.can_view_catalog(callback.from_user.id)
     ):
         await answer_callback_safely(callback, "Недостаточно прав.", show_alert=True)
@@ -982,6 +1005,7 @@ async def handle_assistant_voice(
     assistant_orchestrator: AssistantOrchestrator | None,
     assistant_speech_client: SpeechToTextClient | None,
     assistant_request_coordinator: AssistantRequestCoordinator,
+    assistant_access_policy: AssistantAccessPolicy,
     assistant_conversation_memory: AssistantConversationMemory | None = None,
     warehouse_service: WarehouseOperationsService | None = None,
     warehouse_attendance_service: WarehouseAttendanceService | None = None,
@@ -991,7 +1015,13 @@ async def handle_assistant_voice(
     if voice is None or assistant_speech_client is None or assistant_orchestrator is None:
         await message.answer(VOICE_UNAVAILABLE_TEXT)
         return
-    if message.from_user is None:
+    if (
+        message.from_user is None
+        or not assistant_access_policy.can_enter_assistant(
+            message.from_user.id,
+            chat_type=message.chat.type,
+        )
+    ):
         return
     async with assistant_request_coordinator.claim(
         message.from_user.id
@@ -1012,6 +1042,7 @@ async def handle_assistant_voice(
             warehouse_service,
             warehouse_attendance_service,
             assistant_capability_controller,
+            assistant_access_policy,
         )
 
 
@@ -1028,6 +1059,7 @@ async def _handle_assistant_voice_claimed(
     warehouse_service: WarehouseOperationsService | None,
     warehouse_attendance_service: WarehouseAttendanceService | None,
     assistant_capability_controller: AssistantCapabilityController | None,
+    assistant_access_policy: AssistantAccessPolicy | None,
 ) -> None:
     """Run the voice pipeline while the caller owns the per-user claim."""
 
@@ -1092,6 +1124,7 @@ async def _handle_assistant_voice_claimed(
         conversation_memory=assistant_conversation_memory,
         warehouse_attendance_service=warehouse_attendance_service,
         assistant_capability_controller=assistant_capability_controller,
+        assistant_access_policy=assistant_access_policy,
     )
 
 
@@ -1103,12 +1136,20 @@ async def handle_assistant_text(
     auth_service: AuthService,
     assistant_orchestrator: AssistantOrchestrator | None,
     assistant_request_coordinator: AssistantRequestCoordinator,
+    assistant_access_policy: AssistantAccessPolicy,
     assistant_conversation_memory: AssistantConversationMemory | None = None,
     warehouse_service: WarehouseOperationsService | None = None,
     warehouse_attendance_service: WarehouseAttendanceService | None = None,
     assistant_capability_controller: AssistantCapabilityController | None = None,
 ) -> None:
-    if assistant_orchestrator is None or message.from_user is None:
+    if (
+        assistant_orchestrator is None
+        or message.from_user is None
+        or not assistant_access_policy.can_enter_assistant(
+            message.from_user.id,
+            chat_type=message.chat.type,
+        )
+    ):
         return
     async with assistant_request_coordinator.claim(
         message.from_user.id
@@ -1127,4 +1168,5 @@ async def handle_assistant_text(
             conversation_memory=assistant_conversation_memory,
             warehouse_attendance_service=warehouse_attendance_service,
             assistant_capability_controller=assistant_capability_controller,
+            assistant_access_policy=assistant_access_policy,
         )

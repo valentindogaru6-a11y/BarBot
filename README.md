@@ -161,6 +161,17 @@ gate. Gemini classification alone cannot start a writeoff or transfer draft;
 an explicit command such as `спиши ...` or `перемести ...` (or an already
 authorized pending clarification) must be present.
 
+AI entry and capability authorization are separate. `AI_ACCESS_MODE` defaults
+to `pilot_allowlist`: an active, non-blocked `super_admin` in a private chat
+must also be explicitly listed in `AI_PILOT_USER_IDS`. When the master AI flag
+is enabled, an empty or malformed pilot list fails startup validation instead
+of widening access. The future `role_based` mode admits active private-chat
+roles supported by the existing policy, while `CapabilityRegistry` and
+`AccessService` still filter every available action. A role change, block,
+allowlist removal, mode change, or disabled feature is rechecked before a
+proposal mutation. IDs are configuration secrets and are not included in
+callbacks, provider requests, diagnostics, or logs.
+
 The pilot is off unless `AI_ASSISTANT_ENABLED` and the corresponding text or
 voice flag are enabled. Text mode requires `GEMINI_API_KEY`; voice mode uses
 Groq STT followed by Gemini intent classification and therefore requires both
@@ -228,6 +239,8 @@ separately authorized rollout step.
 
 ```dotenv
 AI_ASSISTANT_ENABLED=false
+AI_ACCESS_MODE=pilot_allowlist
+AI_PILOT_USER_IDS=
 AI_TEXT_ENABLED=false
 AI_VOICE_ENABLED=false
 AI_GENERAL_CHAT_ENABLED=false

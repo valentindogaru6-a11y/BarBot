@@ -51,6 +51,11 @@ from app.services.assistant.capability_controller import (
     AssistantCapabilityController,
     CapabilityDispatch,
 )
+from app.services.assistant.access_policy import (
+    AssistantAccessDenied,
+    AssistantAccessPolicy,
+    PILOT_DENIED_TEXT,
+)
 
 __all__ = [
     "AssistantOrchestrator",
@@ -90,4 +95,7 @@ __all__ = [
     "AssistantActionProposalService",
     "AssistantCapabilityController",
     "CapabilityDispatch",
+    "AssistantAccessDenied",
+    "AssistantAccessPolicy",
+    "PILOT_DENIED_TEXT",
 ]

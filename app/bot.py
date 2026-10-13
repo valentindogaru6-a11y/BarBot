@@ -37,6 +37,7 @@ from app.services.assistant import (
     GroqSpeechToTextClient,
     AssistantActionProposalService,
     AssistantCapabilityController,
+    AssistantAccessPolicy,
     CapabilityBinding,
     CapabilityRegistry,
 )
@@ -326,6 +327,11 @@ async def main() -> None:
             auth_service,
         )
     assistant_capability_registry = CapabilityRegistry()
+    assistant_access_policy = AssistantAccessPolicy(
+        auth_service,
+        assistant_capability_registry,
+        settings,
+    )
     assistant_flags = {
         "ai_assistant_enabled": settings.ai_assistant_enabled,
         "warehouse_enabled": settings.warehouse_enabled,
@@ -334,6 +340,7 @@ async def main() -> None:
         AssistantActionDatabase(settings.database_path),
         auth_service,
         assistant_capability_registry,
+        assistant_access_policy,
         flags=assistant_flags,
     )
     external_bindings: dict[str, CapabilityBinding] = {
@@ -374,6 +381,7 @@ async def main() -> None:
         assistant_capability_registry,
         assistant_action_proposals,
         auth_service,
+        assistant_access_policy,
         flags=assistant_flags,
         users=user_service,
         attendance=warehouse_attendance_service,
@@ -433,6 +441,7 @@ async def main() -> None:
             assistant_conversation_memory=assistant_conversation_memory,
             assistant_action_proposals=assistant_action_proposals,
             assistant_capability_controller=assistant_capability_controller,
+            assistant_access_policy=assistant_access_policy,
             close_bot_session=False,
         )
     finally:

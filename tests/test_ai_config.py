@@ -44,6 +44,7 @@ def test_enabled_general_chat_and_search_require_only_gemini() -> None:
         _env_file=None,
         bot_token="test",
         ai_assistant_enabled=True,
+        ai_access_mode="role_based",
         ai_text_enabled=True,
         ai_general_chat_enabled=True,
         ai_web_search_enabled=True,
@@ -69,6 +70,7 @@ def test_general_and_web_require_master_and_input_channel(feature) -> None:
             _env_file=None,
             bot_token="test",
             ai_assistant_enabled=True,
+            ai_access_mode="role_based",
             gemini_api_key="gemini",
             **{feature: True},
         )
@@ -81,6 +83,7 @@ def test_general_and_web_require_master_and_input_channel(feature) -> None:
 def test_general_and_web_accept_each_enabled_input_channel(channel, feature) -> None:
     values = {
         "ai_assistant_enabled": True,
+        "ai_access_mode": "role_based",
         channel: True,
         feature: True,
         "gemini_api_key": "gemini",
@@ -135,6 +138,7 @@ def test_enabled_master_with_no_paths_is_documented_inert_mode() -> None:
         _env_file=None,
         bot_token="test",
         ai_assistant_enabled=True,
+        ai_access_mode="role_based",
         ai_text_enabled=False,
         ai_voice_enabled=False,
     )
@@ -156,6 +160,7 @@ def test_enabled_ai_matrix_accepts_exact_required_keys(text, voice, groq, gemini
         _env_file=None,
         bot_token="test",
         ai_assistant_enabled=True,
+        ai_access_mode="role_based",
         ai_text_enabled=text,
         ai_voice_enabled=voice,
         groq_api_key=groq,
@@ -184,6 +189,7 @@ def test_voice_only_builds_both_adapters_and_transcript_reaches_gemini() -> None
         _env_file=None,
         bot_token="test",
         ai_assistant_enabled=True,
+        ai_access_mode="role_based",
         ai_voice_enabled=True,
         groq_api_key="groq",
         gemini_api_key="gemini",
@@ -202,6 +208,7 @@ def test_provider_keys_are_secret_values() -> None:
         _env_file=None,
         bot_token="test",
         ai_assistant_enabled=True,
+        ai_access_mode="role_based",
         ai_text_enabled=True,
         ai_voice_enabled=True,
         groq_api_key="groq-secret",

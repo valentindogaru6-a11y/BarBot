@@ -42,11 +42,17 @@ def _settings() -> Settings:
         _env_file=None,
         bot_token="test",
         ai_assistant_enabled=True,
+        ai_access_mode="role_based",
         ai_text_enabled=True,
         ai_voice_enabled=True,
         groq_api_key="groq-test",
         gemini_api_key="gemini-test",
     )
+
+
+class AllowPolicy:
+    def can_enter_assistant(self, _user_id, *, chat_type):
+        return chat_type == "private"
 
 
 def test_parallel_text_for_same_user_calls_provider_once_and_releases(
@@ -75,6 +81,7 @@ def test_parallel_text_for_same_user_calls_provider_once_and_releases(
                 AuthService(frozenset({10})),
                 SimpleNamespace(),
                 coordinator,
+                AllowPolicy(),
             )
         )
         await started.wait()
@@ -85,6 +92,7 @@ def test_parallel_text_for_same_user_calls_provider_once_and_releases(
             AuthService(frozenset({10})),
             SimpleNamespace(),
             coordinator,
+            AllowPolicy(),
         )
         assert calls == 1
         assert rejected.answer.await_args.args[0] == assistant.AI_REQUEST_BUSY_TEXT
@@ -99,6 +107,7 @@ def test_parallel_text_for_same_user_calls_provider_once_and_releases(
             AuthService(frozenset({10})),
             SimpleNamespace(),
             coordinator,
+            AllowPolicy(),
         )
         assert calls == 2
 
@@ -124,6 +133,7 @@ def test_text_and_voice_for_same_user_share_one_claim(monkeypatch) -> None:
                 AuthService(frozenset({11})),
                 SimpleNamespace(),
                 coordinator,
+                AllowPolicy(),
             )
         )
         await started.wait()
@@ -140,6 +150,7 @@ def test_text_and_voice_for_same_user_share_one_claim(monkeypatch) -> None:
             SimpleNamespace(),
             speech,
             coordinator,
+            AllowPolicy(),
         )
         speech.transcribe.assert_not_awaited()
         telegram.download.assert_not_awaited()
@@ -174,6 +185,7 @@ def test_different_users_do_not_block_each_other(monkeypatch) -> None:
                     AuthService(frozenset({user_id})),
                     SimpleNamespace(),
                     coordinator,
+                    AllowPolicy(),
                 )
             )
             for user_id in (20, 21)
@@ -245,6 +257,7 @@ def test_rejected_concurrent_request_never_reaches_warehouse(monkeypatch) -> Non
                 AuthService(frozenset({50})),
                 SimpleNamespace(),
                 coordinator,
+                AllowPolicy(),
                 warehouse_service=SimpleNamespace(),
             )
         prepare.assert_not_awaited()

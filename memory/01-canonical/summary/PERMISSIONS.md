@@ -30,3 +30,10 @@ services/storage repeat permission checks before mutations.
 No actor can change their own role or a `super_admin`. An `admin` cannot create,
 modify, or demote another `admin`. Exact permission-sensitive changes require a
 fresh source/test check.
+
+AI entry is an additional boundary, not a role capability. The default
+`pilot_allowlist` mode requires an active allowlisted `super_admin` in a private
+chat; an ID alone never grants access. The implemented `role_based` mode is for
+future rollout and still applies this table through `CapabilityRegistry` and
+`AccessService`. Production rollout must explicitly choose and validate the
+mode and must never infer pilot membership from a stored role.

@@ -3,6 +3,7 @@
 import json
 import logging
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -63,6 +64,7 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
+        hide_input_in_errors=True,
     )
 
     bot_token: SecretStr
@@ -83,6 +85,8 @@ class Settings(BaseSettings):
         validate_default=True,
     )
     ai_assistant_enabled: bool = False
+    ai_access_mode: Literal["pilot_allowlist", "role_based"] = "pilot_allowlist"
+    ai_pilot_user_ids: frozenset[int] = frozenset()
     ai_text_enabled: bool = False
     ai_voice_enabled: bool = False
     ai_general_chat_enabled: bool = False
@@ -136,6 +140,13 @@ class Settings(BaseSettings):
         """Parse the deprecated comma-separated administrator setting."""
 
         return _parse_positive_ids(value, "ADMIN_IDS") or frozenset()
+
+    @field_validator("ai_pilot_user_ids", mode="before")
+    @classmethod
+    def parse_ai_pilot_user_ids(cls, value: object) -> frozenset[int]:
+        """Parse owner-only pilot IDs without retaining duplicates."""
+
+        return _parse_positive_ids(value, "AI_PILOT_USER_IDS") or frozenset()
 
     @field_validator("catalog_path", "database_path")
     @classmethod
@@ -235,5 +246,9 @@ class Settings(BaseSettings):
         ):
             raise ValueError(
                 "GEMINI_API_KEY обязателен при включённом AI text/voice pilot"
+            )
+        if self.ai_access_mode == "pilot_allowlist" and not self.ai_pilot_user_ids:
+            raise ValueError(
+                "AI_PILOT_USER_IDS обязателен для закрытого AI pilot"
             )
         return self

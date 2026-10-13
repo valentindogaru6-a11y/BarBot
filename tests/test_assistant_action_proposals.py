@@ -9,9 +9,11 @@ import pytest
 
 from app.models.assistant_capabilities import CapabilityStatus
 from app.models.user import Role
+from app.config import Settings
 from app.services.access_service import AccessDeniedError
 from app.services.assistant.capabilities import CapabilityRegistry
 from app.services.assistant.capabilities import CapabilityBinding
+from app.services.assistant.access_policy import AssistantAccessPolicy
 from app.services.assistant.proposals import (
     AssistantActionProposalService,
     AssistantProposalError,
@@ -38,6 +40,7 @@ class Access:
             (),
             {
                 "role": self.role,
+                "user": type("User", (), {"is_active": True})(),
                 "can_use_warehouse_attendance": self.role
                 in {Role.SUPER_ADMIN, Role.ADMIN, Role.BARTENDER},
                 "can_manage_warehouse_attendance": self.role
@@ -62,10 +65,22 @@ def _service(path: Path, now: list[datetime], access: Access | None = None):
         )
         for capability_id in ("attendance.open_own", "attendance.force_close")
     })
+    policy = AssistantAccessPolicy(
+        access or Access(),  # type: ignore[arg-type]
+        registry,
+        Settings(
+            _env_file=None,
+            bot_token="test",
+            ai_assistant_enabled=True,
+            ai_access_mode="role_based",
+            warehouse_enabled=True,
+        ),
+    )
     return AssistantActionProposalService(
         AssistantActionDatabase(path),
         access or Access(),  # type: ignore[arg-type]
         registry,
+        policy,
         clock=lambda: now[0],
     )
 
@@ -173,6 +188,75 @@ def test_expiry_cancel_failure_and_role_change_are_safe(tmp_path: Path) -> None:
         service.confirm(changed.token, 1, 10, lambda _row: {"ok": True})
 
 
+def test_pilot_access_is_rechecked_before_confirm_and_cancel(tmp_path: Path) -> None:
+    now = [datetime(2026, 10, 12, tzinfo=UTC)]
+    access = Access(Role.SUPER_ADMIN)
+    path = tmp_path / "pilot-recheck.db"
+    UserDatabase(path).initialize()
+    registry = CapabilityRegistry()
+    marker = object()
+    registry.bind({
+        "attendance.open_own": CapabilityBinding(
+            "attendance.open_own", marker, marker, "route", "renderer", lambda: None
+        )
+    })
+    settings = Settings(
+        _env_file=None,
+        bot_token="test",
+        ai_assistant_enabled=True,
+        ai_access_mode="pilot_allowlist",
+        ai_pilot_user_ids="1",
+        warehouse_enabled=True,
+    )
+    policy = AssistantAccessPolicy(access, registry, settings)  # type: ignore[arg-type]
+    service = AssistantActionProposalService(
+        AssistantActionDatabase(path),
+        access,  # type: ignore[arg-type]
+        registry,
+        policy,
+        clock=lambda: now[0],
+    )
+    proposal = _proposal(service)
+    calls = []
+
+    settings.ai_pilot_user_ids = frozenset()
+    with pytest.raises(AccessDeniedError):
+        _proposal(service, actor_user_id=2, source_chat_id=20)
+    with pytest.raises(AccessDeniedError):
+        service.confirm(
+            proposal.token,
+            1,
+            10,
+            lambda _row: calls.append("mutation") or {"ok": True},
+        )
+    with pytest.raises(AccessDeniedError):
+        service.cancel(proposal.token, 1, 10)
+    assert calls == []
+
+    settings.ai_pilot_user_ids = frozenset({1})
+    settings.ai_assistant_enabled = False
+    with pytest.raises(AccessDeniedError):
+        service.confirm(proposal.token, 1, 10, lambda _row: {"ok": True})
+
+
+def test_access_mode_change_and_blocking_prevent_confirmation(tmp_path: Path) -> None:
+    now = [datetime(2026, 10, 12, tzinfo=UTC)]
+    access = Access(Role.ADMIN)
+    service = _service(tmp_path / "mode-recheck.db", now, access)
+    proposal = _proposal(service)
+    settings = service.access_policy.settings
+
+    settings.ai_access_mode = "pilot_allowlist"
+    settings.ai_pilot_user_ids = frozenset({1})
+    with pytest.raises(AccessDeniedError):
+        service.confirm(proposal.token, 1, 10, lambda _row: {"ok": True})
+
+    settings.ai_access_mode = "role_based"
+    access.role = Role.BLOCKED
+    with pytest.raises(AccessDeniedError):
+        service.confirm(proposal.token, 1, 10, lambda _row: {"ok": True})
+
+
 def test_high_risk_requires_reason_and_executor_rechecks_service_permission(tmp_path: Path) -> None:
     now = [datetime(2026, 10, 12, tzinfo=UTC)]
     service = _service(tmp_path / "proposal.db", now)
@@ -218,8 +302,13 @@ def test_business_mutation_audit_and_proposal_result_rollback_together(
             "attendance.open_own", marker, marker, "route", "renderer", executor
         )
     })
+    settings = Settings(
+        _env_file=None, bot_token="test", ai_assistant_enabled=True,
+        ai_access_mode="role_based", warehouse_enabled=True,
+    )
+    policy = AssistantAccessPolicy(access, registry, settings)
     proposals = AssistantActionProposalService(
-        AssistantActionDatabase(path), access, registry
+        AssistantActionDatabase(path), access, registry, policy
     )
     attendance = WarehouseAttendanceService(
         WarehouseAttendanceDatabase(path), access
@@ -293,8 +382,13 @@ def test_reminder_mutation_uses_the_same_proposal_transaction(tmp_path: Path) ->
             "reminders.update", marker, marker, "route", "renderer", executor
         )
     })
+    settings = Settings(
+        _env_file=None, bot_token="test", ai_assistant_enabled=True,
+        ai_access_mode="role_based", warehouse_enabled=True,
+    )
+    policy = AssistantAccessPolicy(access, registry, settings)
     proposals = AssistantActionProposalService(
-        AssistantActionDatabase(path), access, registry,
+        AssistantActionDatabase(path), access, registry, policy,
         flags={"ai_assistant_enabled": True, "warehouse_enabled": True},
     )
     reminders = WarehouseReminderSettingsService(

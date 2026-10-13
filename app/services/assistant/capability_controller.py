@@ -11,6 +11,7 @@ from app.models.assistant_capabilities import ActionProposal
 from app.models.user import Role
 from app.services.access_service import AccessDeniedError, AccessService
 from app.services.assistant.capabilities import CapabilityBinding, CapabilityRegistry
+from app.services.assistant.access_policy import AssistantAccessPolicy
 from app.services.assistant.proposals import (
     AssistantActionProposalService,
     AssistantProposalCollision,
@@ -88,6 +89,7 @@ class AssistantCapabilityController:
         registry: CapabilityRegistry,
         proposals: AssistantActionProposalService,
         access: AccessService,
+        access_policy: AssistantAccessPolicy,
         *,
         flags: dict[str, bool],
         users: UserService | None = None,
@@ -107,6 +109,7 @@ class AssistantCapabilityController:
         self.registry = registry
         self.proposals = proposals
         self.access = access
+        self.access_policy = access_policy
         self.flags = flags
         self.users = users
         self.attendance = attendance
@@ -192,20 +195,12 @@ class AssistantCapabilityController:
     def available_ids(self, actor_user_id: int) -> tuple[str, ...]:
         return tuple(
             item.id
-            for item in self.registry.available_for_actor(
-                self.access,
-                actor_user_id,
-                flags=self.flags,
-            )
+            for item in self.access_policy.available_capabilities(actor_user_id)
         )
 
     def _require(self, actor: int, capability_id: str) -> None:
         capability = self.registry.require(capability_id)
-        available = self.registry.available_for_actor(
-            self.access,
-            actor,
-            flags=self.flags,
-        )
+        available = self.access_policy.available_capabilities(actor)
         if capability not in available:
             raise AccessDeniedError("Capability is unavailable")
 
@@ -248,11 +243,7 @@ class AssistantCapabilityController:
         return CapabilityDispatch(capability_id, message, proposal)
 
     def _capabilities(self, actor: int, query: str) -> CapabilityDispatch:
-        available = self.registry.available_for_actor(
-            self.access,
-            actor,
-            flags=self.flags,
-        )
+        available = self.access_policy.available_capabilities(actor)
         groups: dict[str, tuple[Any, ...]] = {}
         for category in sorted({item.category for item in available}):
             groups[category] = tuple(
@@ -304,6 +295,7 @@ class AssistantCapabilityController:
                 "navigation.main", "Главное меню", ui_action="main_menu"
             )
         if _CAPABILITY_QUESTION.search(cleaned):
+            self._require(actor_user_id, "capabilities.list")
             return self._capabilities(actor_user_id, cleaned)
         if _CATALOG_MANAGE.search(cleaned):
             return flow("catalog.manage", "Откройте штатное управление каталогом.", "catalog_manage")
@@ -547,6 +539,7 @@ class AssistantCapabilityController:
         connection: sqlite3.Connection | None = None,
     ) -> dict[str, Any]:
         capability = str(row["capability_id"])
+        self._require(actor_user_id, capability)
         arguments = dict(row["arguments"])
         if capability == "attendance.open_own":
             if self.attendance is None:

@@ -31,6 +31,16 @@ Importance: High
 - Phase 3 adds an immutable `CapabilityRegistry` and schema-v14 persistent
   action proposals. Capability discovery is filtered by the current role,
   private-chat policy and feature flags; prompt text is never authority.
+- `AssistantAccessPolicy` is the single AI entry gate, separate from capability
+  authorization. Its safe default is `pilot_allowlist`: AI must be enabled and
+  the actor must be an active, non-blocked, explicitly allowlisted
+  `super_admin` in a private chat. Enabled pilot mode fails configuration when
+  the list is empty or invalid. The implemented future `role_based` mode still
+  delegates the concrete surface to `CapabilityRegistry` and `AccessService`.
+  Handlers, callbacks, controller dispatch and persistent proposal lifecycle
+  all recheck the policy; proposal execution rechecks again inside its atomic
+  transaction. Regular non-AI commands, FSM and warehouse routes remain
+  independent of this gate.
   Mutations use opaque ten-minute tokens, one active proposal per actor,
   explicit confirmation and service-owned revision/authorization checks.
 - Runtime discovery and the planner schema require a concrete binding from

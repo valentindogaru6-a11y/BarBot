@@ -15,6 +15,7 @@ from app.models.assistant_capabilities import (
 )
 from app.services.access_service import AccessDeniedError, AccessService
 from app.services.assistant.capabilities import CapabilityRegistry
+from app.services.assistant.access_policy import AssistantAccessPolicy
 from app.storage.assistant_action_database import AssistantActionDatabase
 from app.storage.assistant_action_database import AssistantActionActiveConflict
 
@@ -52,6 +53,7 @@ class AssistantActionProposalService:
         repository: AssistantActionDatabase,
         access: AccessService,
         registry: CapabilityRegistry,
+        access_policy: AssistantAccessPolicy,
         *,
         clock: Callable[[], datetime] | None = None,
         ttl_seconds: int = 600,
@@ -60,6 +62,7 @@ class AssistantActionProposalService:
         self.repository = repository
         self.access = access
         self.registry = registry
+        self.access_policy = access_policy
         self.clock = clock or (lambda: datetime.now(UTC))
         self.ttl_seconds = ttl_seconds
         self.flags = flags
@@ -93,12 +96,12 @@ class AssistantActionProposalService:
         )
 
     def _authorize(self, actor_user_id: int, capability_id: str) -> None:
-        capability = self.registry.require(capability_id)
-        available = self.registry.available_for_actor(
-            self.access,
+        self.access_policy.require_assistant_access(
             actor_user_id,
-            flags=self.flags,
+            chat_type="private",
         )
+        capability = self.registry.require(capability_id)
+        available = self.access_policy.available_capabilities(actor_user_id)
         if capability not in available:
             raise AssistantProposalPermissionDenied("Capability is no longer allowed")
 
@@ -162,6 +165,10 @@ class AssistantActionProposalService:
         return self._public(row) if row is not None else None
 
     def cancel(self, token: str, actor_user_id: int, source_chat_id: int) -> ActionProposal:
+        self.access_policy.require_assistant_access(
+            actor_user_id,
+            chat_type="private",
+        )
         current = self.get_owned(token, actor_user_id, source_chat_id)
         if current is None:
             raise AssistantProposalError("Proposal not found")
