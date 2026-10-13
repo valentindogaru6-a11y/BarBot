@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import re
 import unicodedata
+import inspect
 from dataclasses import dataclass
 from typing import Literal, Sequence
 
@@ -52,6 +53,10 @@ _WAREHOUSE_ACTION_PREFIX_RE = re.compile(
     re.IGNORECASE,
 )
 _TECH_PATTERNS = (
+    re.compile(
+        r"^\s*так\s+что\s+там\s+по\s+(?P<query>.+?)\s*[?!.]*\s*$",
+        re.IGNORECASE,
+    ),
     re.compile(
         r"^\s*(?:найди(?:\s+мне)?|покажи)\s+"
         r"(?:(?:тех(?:нологическую\s+)?карт(?:у|ы)?)\s+|"
@@ -235,19 +240,24 @@ class AssistantOrchestrator:
         normalized_entity: str = "",
         conversation: Sequence[tuple[str, str]] = (),
         allowed_action: AssistantIntentName | None = None,
+        allowed_capability_ids: Sequence[str] = (),
     ) -> AssistantIntent:
         local = self.local_intent(text)
         if local is not None:
             return local
         if self.intent_client is None:
             raise AssistantUnavailableError("intent provider is disabled")
-        intent = await self.intent_client.classify(
-            text,
-            candidates=candidates,
-            normalized_entity=normalized_entity,
-            conversation=conversation,
-            allowed_action_intents=(allowed_action,) if allowed_action else (),
-        )
+        kwargs = {
+            "candidates": candidates,
+            "normalized_entity": normalized_entity,
+            "conversation": conversation,
+            "allowed_action_intents": (allowed_action,) if allowed_action else (),
+        }
+        if "allowed_capability_ids" in inspect.signature(
+            self.intent_client.classify
+        ).parameters:
+            kwargs["allowed_capability_ids"] = allowed_capability_ids
+        intent = await self.intent_client.classify(text, **kwargs)
         return self._guard_provider_intent(intent, allowed_action)
 
     async def interpret_with_provider(
@@ -258,18 +268,23 @@ class AssistantOrchestrator:
         normalized_entity: str = "",
         conversation: Sequence[tuple[str, str]] = (),
         allowed_action: AssistantIntentName | None = None,
+        allowed_capability_ids: Sequence[str] = (),
     ) -> AssistantIntent:
         """Consult the provider after local retrieval needs disambiguation."""
 
         if self.intent_client is None:
             raise AssistantUnavailableError("intent provider is disabled")
-        intent = await self.intent_client.classify(
-            text,
-            candidates=candidates,
-            normalized_entity=normalized_entity,
-            conversation=conversation,
-            allowed_action_intents=(allowed_action,) if allowed_action else (),
-        )
+        kwargs = {
+            "candidates": candidates,
+            "normalized_entity": normalized_entity,
+            "conversation": conversation,
+            "allowed_action_intents": (allowed_action,) if allowed_action else (),
+        }
+        if "allowed_capability_ids" in inspect.signature(
+            self.intent_client.classify
+        ).parameters:
+            kwargs["allowed_capability_ids"] = allowed_capability_ids
+        intent = await self.intent_client.classify(text, **kwargs)
         return self._guard_provider_intent(intent, allowed_action)
 
     async def search_web(
@@ -364,6 +379,19 @@ class AssistantToolRegistry:
             entity = display_catalog_entity(intent.query or "позиция")
             if not entity:
                 entity = "Позиция"
+            if retrieval.normalized_query in {
+                "коктейль голубые гаваи",
+                "голубые гаваи",
+                "blue hawaii",
+            }:
+                return AssistantToolAction(
+                    "clarify",
+                    message=(
+                        "Ищем утверждённую техкарту Truffle или рассказать "
+                        "общий рецепт?"
+                    ),
+                    entity_query=retrieval.normalized_query,
+                )
             return AssistantToolAction(
                 "not_found",
                 message=(

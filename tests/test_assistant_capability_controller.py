@@ -2,12 +2,26 @@ from pathlib import Path
 
 from app.models.user import Role
 from app.services.auth_service import AuthService
-from app.services.assistant.capabilities import CapabilityRegistry
+from app.services.assistant.capabilities import CapabilityBinding, CapabilityRegistry
 from app.services.assistant.capability_controller import AssistantCapabilityController
 from app.services.assistant.proposals import AssistantActionProposalService
 from app.services.user_service import UserService
 from app.storage.assistant_action_database import AssistantActionDatabase
 from app.storage.user_database import UserDatabase
+
+
+class Attendance:
+    def status(self, _actor):
+        return None
+
+    def open_sessions(self, _actor):
+        return []
+
+
+class Reports:
+    def history(self, *, actor_user_id, page):
+        del actor_user_id, page
+        return [], 0
 
 
 def _controller(path: Path):
@@ -33,6 +47,8 @@ def _controller(path: Path):
         access,
         flags={"ai_assistant_enabled": True, "warehouse_enabled": True},
         users=users,
+        attendance=Attendance(),
+        reports=Reports(),
     )
 
 
@@ -89,3 +105,100 @@ def test_role_filtered_discovery_does_not_elevate_accountant(tmp_path: Path) -> 
     assert "Изменить роль" not in result.message
     assert "Принудительно закрыть" not in result.message
     assert "Показать историю отчётов" in result.message
+
+
+def test_full_runtime_binding_matrix_and_ui_routes_are_concrete(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "full-controller.db"
+    database = UserDatabase(path)
+    database.initialize()
+    users = UserService(database)
+    users.ensure_user(10, first_name="Admin")
+    users.set_role(10, Role.ADMIN, actor_user_id=10)
+    access = AuthService(frozenset(), users)
+    registry = CapabilityRegistry()
+    marker = object()
+    external = {
+        capability_id: CapabilityBinding(
+            capability_id,
+            marker,
+            marker,
+            "legacy route",
+            "legacy renderer",
+            (lambda: None) if capability_id in {"warehouse.commit_batch", "warehouse.cancel_batch"} else None,
+        )
+        for capability_id in (
+            "catalog.search",
+            "catalog.get",
+            "warehouse.prepare_writeoff",
+            "warehouse.prepare_transfer",
+            "warehouse.commit_batch",
+            "warehouse.cancel_batch",
+        )
+    }
+    proposals = AssistantActionProposalService(
+        AssistantActionDatabase(path), access, registry
+    )
+    controller = AssistantCapabilityController(
+        registry,
+        proposals,
+        access,
+        flags={"ai_assistant_enabled": True, "warehouse_enabled": True},
+        users=users,
+        attendance=marker,
+        operations=marker,
+        closing=marker,
+        reports=marker,
+        recipients=marker,
+        reminders=marker,
+        schedules=marker,
+        admin=marker,
+        correction=marker,
+        delivery=marker,
+        attendance_xlsx=marker,
+        external_bindings=external,
+    )
+    assert len(controller.bindings) == 41
+    assert all(
+        binding.executable
+        and binding.adapter is controller
+        and binding.service is not None
+        and binding.route
+        and binding.renderer
+        for capability_id, binding in controller.bindings.items()
+        if capability_id not in external
+    )
+    assert all(
+        callable(binding.executor)
+        for capability_id, binding in controller.bindings.items()
+        if registry.require(capability_id).risk_level.value >= 2
+    )
+    cases = {
+        "главное меню": ("navigation.main", "main_menu"),
+        "управлять каталогом": ("catalog.manage", "catalog_manage"),
+        "покажи сотрудника": ("users.get", "users_manage"),
+        "измени роль пользователя": ("users.change_role", "users_manage"),
+        "сделай табель за текущий месяц": ("attendance_reports.generate", "attendance_xlsx"),
+        "запусти опросник обязательных списаний": ("warehouse.start_required_flow", "required_writeoffs"),
+        "исправь операцию": ("warehouse.update_operation", "warehouse_operations"),
+        "удали операцию": ("warehouse.delete_operation", "warehouse_operations"),
+        "закрой общую складскую смену": ("warehouse.close_shift", "warehouse_close"),
+        "открой коррекцию закрытого отчёта": ("warehouse.open_correction", "warehouse_corrections"),
+        "сформируй сегодняшние списания": ("reports.generate", "report_generate"),
+        "статус отчёта": ("reports.status", "reports"),
+        "отправь сегодняшние списания в рабочую группу": ("reports.send", "reports"),
+        "добавь получателя": ("recipients.create_or_update", "recipients"),
+        "отключи получателя": ("recipients.disable", "recipients"),
+        "настрой расписание отправки": ("schedules.create_or_update", "schedules"),
+        "отключи расписание": ("schedules.disable", "schedules"),
+    }
+    for text, expected in cases.items():
+        dispatch = controller.dispatch(
+            text,
+            actor_user_id=10,
+            source_chat_id=10,
+            source_message_id=1,
+        )
+        assert dispatch is not None
+        assert (dispatch.capability_id, dispatch.ui_action) == expected

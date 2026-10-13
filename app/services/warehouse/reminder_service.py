@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sqlite3
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -145,17 +146,17 @@ class WarehouseReminderSettingsService:
         if values["enabled"] and (values["target_chat_id"] is None or not str(values["target_title"] or "").strip()):
             raise ValueError("Для включения нужен рабочий чат")
 
-    def get(self, source_location_id: int, actor_user_id: int) -> dict[str, Any]:
+    def get(self, source_location_id: int, actor_user_id: int, connection: sqlite3.Connection | None = None) -> dict[str, Any]:
         self.access.require_warehouse_reminder_management(actor_user_id)
-        return self.repository.settings(source_location_id) or WarehouseReminderService.defaults(source_location_id)
+        return self.repository.settings(source_location_id, connection) or WarehouseReminderService.defaults(source_location_id)
 
-    def save(self, source_location_id: int, values: dict[str, Any], expected_revision: int | None, actor_user_id: int) -> dict[str, Any]:
+    def save(self, source_location_id: int, values: dict[str, Any], expected_revision: int | None, actor_user_id: int, connection: sqlite3.Connection | None = None) -> dict[str, Any]:
         self.access.require_warehouse_reminder_management(actor_user_id)
         self._validate(values)
-        return self.repository.save_settings(source_location_id, values, expected_revision, self._now(), actor_user_id=actor_user_id)
+        return self.repository.save_settings(source_location_id, values, expected_revision, self._now(), actor_user_id=actor_user_id, connection=connection)
 
-    def update(self, source_location_id: int, patch: dict[str, Any], expected_revision: int, actor_user_id: int) -> dict[str, Any]:
-        current = self.get(source_location_id, actor_user_id)
+    def update(self, source_location_id: int, patch: dict[str, Any], expected_revision: int, actor_user_id: int, connection: sqlite3.Connection | None = None) -> dict[str, Any]:
+        current = self.get(source_location_id, actor_user_id, connection)
         values = self._write_values(current)
         values.update(patch)
-        return self.save(source_location_id, values, expected_revision, actor_user_id)
+        return self.save(source_location_id, values, expected_revision, actor_user_id, connection)

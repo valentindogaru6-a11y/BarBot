@@ -29,19 +29,50 @@ SCHEMA_STATEMENTS = (
         target_type TEXT NULL CHECK(target_type IS NULL OR length(target_type)<=100),
         target_id TEXT NULL CHECK(target_id IS NULL OR length(target_id)<=300),
         target_revision INTEGER NULL CHECK(target_revision IS NULL OR target_revision>=0),
-        arguments_json TEXT NOT NULL CHECK(length(arguments_json)<=12000),
-        preview_json TEXT NOT NULL CHECK(length(preview_json)<=12000),
+        arguments_json TEXT NOT NULL CHECK(
+            length(arguments_json)<=12000 AND json_valid(arguments_json)
+        ),
+        preview_json TEXT NULL CHECK(
+            preview_json IS NULL OR (
+                length(preview_json)<=12000 AND json_valid(preview_json)
+            )
+        ),
         reason_text TEXT NULL CHECK(reason_text IS NULL OR length(reason_text)<=500),
         created_at_utc TEXT NOT NULL,
         expires_at_utc TEXT NOT NULL,
         confirmed_at_utc TEXT NULL,
         executed_at_utc TEXT NULL,
         cancelled_at_utc TEXT NULL,
-        result_json TEXT NULL CHECK(result_json IS NULL OR length(result_json)<=12000),
+        result_json TEXT NULL CHECK(
+            result_json IS NULL OR (
+                length(result_json)<=12000 AND json_valid(result_json)
+            )
+        ),
         revision INTEGER NOT NULL DEFAULT 1 CHECK(revision>0),
         CHECK(expires_at_utc>created_at_utc),
-        CHECK(status!='executed' OR executed_at_utc IS NOT NULL),
-        CHECK(status!='cancelled' OR cancelled_at_utc IS NOT NULL)
+        CHECK(
+            (status IN ('collecting','ready')
+                AND confirmed_at_utc IS NULL
+                AND executed_at_utc IS NULL
+                AND cancelled_at_utc IS NULL)
+            OR (status='confirmed'
+                AND confirmed_at_utc IS NOT NULL
+                AND executed_at_utc IS NULL
+                AND cancelled_at_utc IS NULL)
+            OR (status='executed'
+                AND confirmed_at_utc IS NOT NULL
+                AND executed_at_utc IS NOT NULL
+                AND cancelled_at_utc IS NULL
+                AND result_json IS NOT NULL)
+            OR (status='cancelled'
+                AND cancelled_at_utc IS NOT NULL
+                AND executed_at_utc IS NULL)
+            OR (status='expired' AND executed_at_utc IS NULL)
+            OR (status IN ('failed','conflicted')
+                AND confirmed_at_utc IS NOT NULL
+                AND executed_at_utc IS NULL
+                AND result_json IS NOT NULL)
+        )
     )""",
     """CREATE UNIQUE INDEX ux_assistant_action_actor_active
        ON assistant_action_proposals(actor_user_id)
@@ -100,8 +131,12 @@ def validate_assistant_action_schema(connection: sqlite3.Connection) -> None:
         "risk_levelbetween1and3",
         "revision>0",
         "statusin('collecting','ready','confirmed','executed','cancelled','expired','failed','conflicted')",
-        "status!='executed'orexecuted_at_utcisnotnull",
-        "status!='cancelled'orcancelled_at_utcisnotnull",
+        "json_valid(arguments_json)",
+        "json_valid(preview_json)",
+        "json_valid(result_json)",
+        "status='executed'",
+        "result_jsonisnotnull",
+        "statusin('failed','conflicted')",
     ):
         if fragment not in compact:
             raise AssistantActionSchemaError("Assistant action CHECK constraints do not match v14")

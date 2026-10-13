@@ -207,8 +207,15 @@ The Phase 3 capability registry is filtered by the current server-side role,
 private-chat policy and feature flags. Read-only tools execute immediately;
 business mutations create a preview and can run only from a server-generated
 confirm callback. Roles are checked again at proposal creation and execution,
-and target revisions are checked by the existing application service. Gemini
-cannot select SQL, tables, database IDs, callbacks or service methods.
+and target revisions are checked by the existing application service. Runtime
+discovery and Gemini's capability enum contain only concrete bindings with an
+adapter, application service/FSM route and renderer. Existing Telegram flows
+remain the executor for catalog/user management, required writeoffs, reports,
+delivery, corrections, schedules and attendance XLSX. SQLite mutations owned
+by an AI proposal use one transaction for proposal CAS, business mutation,
+audit and result; rollback leaves none of them committed. A second mutation
+request never silently replaces an active proposal. Gemini cannot select SQL,
+tables, database IDs, callbacks or service methods.
 KOS remains developer/Codex project memory; the runtime system context defines
 the assistant role; conversation memory is temporary dialog state; local
 retrieval is the factual BarBot source; Google Search grounding is clearly

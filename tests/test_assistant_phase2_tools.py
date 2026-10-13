@@ -14,7 +14,7 @@ from app.services.access_service import AccessDeniedError, AccessService
 from app.services.assistant.context import AssistantConversationContext
 from app.services.assistant.retrieval import AssistantCatalogRetriever
 from app.services.assistant.tools import AssistantReadOnlyTools
-from app.services.assistant import AssistantOrchestrator, AssistantConversationMemory
+from app.services.assistant import AssistantOrchestrator, AssistantConversationMemory, AssistantToolRegistry
 from app.services.auth_service import AuthService
 from app.storage.json_storage import JsonCatalogStorage
 
@@ -65,6 +65,20 @@ def test_catalog_phase2_examples_and_stable_ranking() -> None:
     ingredients = retriever.retrieve("что у нас есть с яблочной кислотой")
     assert any(candidate.reason == "metadata_tokens" for candidate in ingredients.candidates)
     assert retriever.retrieve("кислотный раствр") == retriever.retrieve("кислотный раствр")
+    verbose = retriever.retrieve("найди в техкартах как делать кислоту")
+    assert verbose.candidates[0].result.item.name == "Кислотный раствор"
+
+    blue = AssistantOrchestrator.local_intent("найди коктейль голубые гаваи")
+    assert blue is not None
+    answer = AssistantToolRegistry(catalog).execute(blue)
+    assert answer.kind == "clarify"
+    assert answer.message == (
+        "Ищем утверждённую техкарту Truffle или рассказать общий рецепт?"
+    )
+
+    topic = AssistantOrchestrator.local_intent("так что там по голубой лагуне?")
+    assert topic is not None
+    assert topic.query == "голубой лагуне"
 
 
 def test_read_only_tools_recheck_super_admin_and_return_bounded_models() -> None:

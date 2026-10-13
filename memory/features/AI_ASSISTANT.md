@@ -33,6 +33,19 @@ Importance: High
   private-chat policy and feature flags; prompt text is never authority.
   Mutations use opaque ten-minute tokens, one active proposal per actor,
   explicit confirmation and service-owned revision/authorization checks.
+- Runtime discovery and the planner schema require a concrete binding from
+  capability to adapter, application service or existing Telegram FSM route,
+  renderer and (for mutations) callable executor. `AccessService` context
+  properties are the permission source; `user` and `blocked` receive no AI
+  capability surface. Existing typed callback/FSM flows remain authoritative
+  for reports, required writeoffs, corrections, catalog, users, schedules,
+  recipients and attendance XLSX.
+- Proposal-owned SQLite mutations use one `BEGIN IMMEDIATE` unit of work for
+  ready→confirmed CAS, permission/revision recheck, business write,
+  transactional audit and executed result. Any exception rolls all of these
+  back before the proposal is separately marked failed/conflicted. A new
+  mutation cannot silently cancel an unfinished proposal. External Telegram
+  delivery continues through its durable claim/send/sent-or-failed lifecycle.
 - Schema-v14 proposal DDL also contains no transaction control. Migration owns
   creation, `user_version=14`, validation and rollback as one atomic step.
 - Structured state keeps the current topic, last catalog query/entity,

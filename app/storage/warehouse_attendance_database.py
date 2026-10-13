@@ -39,15 +39,21 @@ class WarehouseAttendanceDatabase:
             connection.close()
 
     @contextmanager
-    def _transaction(self) -> Iterator[sqlite3.Connection]:
-        with self._connection() as connection:
+    def _transaction(
+        self,
+        connection: sqlite3.Connection | None = None,
+    ) -> Iterator[sqlite3.Connection]:
+        if connection is not None:
+            yield connection
+            return
+        with self._connection() as owned_connection:
             try:
-                connection.execute("BEGIN IMMEDIATE")
-                yield connection
-                connection.commit()
+                owned_connection.execute("BEGIN IMMEDIATE")
+                yield owned_connection
+                owned_connection.commit()
             except Exception:
-                if connection.in_transaction:
-                    connection.rollback()
+                if owned_connection.in_transaction:
+                    owned_connection.rollback()
                 raise
 
     @staticmethod
@@ -97,8 +103,10 @@ class WarehouseAttendanceDatabase:
              f"warehouse-attendance:{session_id}:{event_type}:{now}"),
         )
 
-    def runtime_settings(self) -> dict[str, Any]:
-        with self._connection() as connection:
+    def runtime_settings(
+        self, connection: sqlite3.Connection | None = None
+    ) -> dict[str, Any]:
+        if connection is not None:
             row = connection.execute(
                 """SELECT s.timezone,s.cutoff_local_time,
                           l.id source_location_id,l.name source_location_name
@@ -109,10 +117,33 @@ class WarehouseAttendanceDatabase:
             if row is None:
                 raise WarehouseAttendanceError("Active default source is missing")
             return self._dict(row)
+        with self._connection() as owned_connection:
+            row = owned_connection.execute(
+                """SELECT s.timezone,s.cutoff_local_time,
+                          l.id source_location_id,l.name source_location_name
+                   FROM warehouse_settings s JOIN warehouse_locations l
+                     ON l.id=s.default_source_location_id
+                   WHERE s.id=1 AND l.is_active=1 AND l.can_be_source=1"""
+            ).fetchone()
+            if row is None:
+                raise WarehouseAttendanceError("Active default source is missing")
+            return self._dict(row)
 
-    def active_for_user(self, user_id: int) -> dict[str, Any] | None:
-        with self._connection() as connection:
+    def active_for_user(
+        self,
+        user_id: int,
+        connection: sqlite3.Connection | None = None,
+    ) -> dict[str, Any] | None:
+        if connection is not None:
             row = connection.execute(
+                """SELECT a.*,l.name source_location_name
+                   FROM warehouse_shift_sessions a
+                   JOIN warehouse_locations l ON l.id=a.source_location_id
+                   WHERE a.user_id=? AND a.status='open'""", (user_id,)
+            ).fetchone()
+            return self._dict(row) if row else None
+        with self._connection() as owned_connection:
+            row = owned_connection.execute(
                 """SELECT a.*,l.name source_location_name
                    FROM warehouse_shift_sessions a
                    JOIN warehouse_locations l ON l.id=a.source_location_id
@@ -128,12 +159,16 @@ class WarehouseAttendanceDatabase:
                    ORDER BY opened_at_utc,id""", (shift_id,)
             )]
 
-    def open_session(self, payload: dict[str, Any]) -> tuple[dict[str, Any], bool]:
+    def open_session(
+        self,
+        payload: dict[str, Any],
+        connection: sqlite3.Connection | None = None,
+    ) -> tuple[dict[str, Any], bool]:
         self._business_date(payload["business_date"])
         self._timestamp(payload["now"], "opened_at_utc")
         self._timestamp(payload["started_at_utc"], "started_at_utc")
         self._timestamp(payload["scheduled_close_at_utc"], "scheduled_close_at_utc")
-        with self._transaction() as connection:
+        with self._transaction(connection) as connection:
             existing = connection.execute(
                 "SELECT * FROM warehouse_shift_sessions WHERE user_id=? AND status='open'",
                 (payload["user_id"],),
@@ -167,9 +202,14 @@ class WarehouseAttendanceDatabase:
                         before=None, after=result)
             return result, True
 
-    def close_own(self, user_id: int, now: str) -> tuple[dict[str, Any] | None, bool]:
+    def close_own(
+        self,
+        user_id: int,
+        now: str,
+        connection: sqlite3.Connection | None = None,
+    ) -> tuple[dict[str, Any] | None, bool]:
         closed = self._timestamp(now, "closed_at_utc")
-        with self._transaction() as connection:
+        with self._transaction(connection) as connection:
             row = connection.execute(
                 "SELECT * FROM warehouse_shift_sessions WHERE user_id=? AND status='open'",
                 (user_id,),
@@ -203,12 +243,13 @@ class WarehouseAttendanceDatabase:
             return result, True
 
     def force_close(self, session_id: int, actor_user_id: int, reason: str,
-                    now: str, expected_revision: int) -> dict[str, Any]:
+                    now: str, expected_revision: int,
+                    connection: sqlite3.Connection | None = None) -> dict[str, Any]:
         reason = reason.strip()
         if not reason or len(reason) > 500:
             raise ValueError("Причина должна содержать от 1 до 500 символов")
         closed = self._timestamp(now, "closed_at_utc")
-        with self._transaction() as connection:
+        with self._transaction(connection) as connection:
             row = connection.execute(
                 "SELECT * FROM warehouse_shift_sessions WHERE id=?", (session_id,)
             ).fetchone()

@@ -43,6 +43,7 @@ def gemini_response(payload: dict) -> HttpResponse:
         "query": None,
         "needs_web": False,
         "clarification": None,
+        "capability_id": None,
         **payload,
     }
     outer = {"candidates": [{"content": {"parts": [{"text": json.dumps(payload)}]}}]}
@@ -127,6 +128,7 @@ def test_gemini_accepts_only_allowed_structured_intents(payload) -> None:
         "normalized_entity",
         "catalog_candidates",
         "allowed_intents",
+            "allowed_capabilities",
         "system_prompt_version",
         "conversation",
     }
@@ -145,6 +147,7 @@ def test_gemini_accepts_only_allowed_structured_intents(payload) -> None:
         "query",
         "needs_web",
         "clarification",
+            "capability_id",
     ]
     expected_intents = [
         "find_tech_card",
@@ -173,6 +176,47 @@ def test_provider_schema_excludes_actions_without_local_evidence() -> None:
     for blocked in ("prepare_writeoff", "prepare_transfer"):
         assert blocked not in request["allowed_intents"]
         assert blocked not in schema["properties"]["intent"]["enum"]
+
+
+def test_provider_capability_schema_is_actor_filtered_and_post_validated() -> None:
+    transport = FakeTransport([
+        gemini_response({
+            "intent": "capability",
+            "capability_id": "attendance.status",
+        })
+    ])
+    client = GeminiIntentClient(
+        transport, api_key="secret", model="flash", timeout_seconds=5
+    )
+    result = asyncio.run(client.classify(
+        "проверь смену",
+        allowed_capability_ids=("attendance.status",),
+    ))
+    assert result.capability_id == "attendance.status"
+    _, call = transport.calls[0]
+    schema = call["payload"]["generationConfig"]["responseJsonSchema"]
+    assert schema["properties"]["capability_id"]["enum"] == [
+        None,
+        "attendance.status",
+    ]
+    request = json.loads(call["payload"]["contents"][0]["parts"][0]["text"])
+    assert request["allowed_capabilities"] == ["attendance.status"]
+
+    hostile = FakeTransport([
+        gemini_response({
+            "intent": "capability",
+            "capability_id": "users.change_role",
+        })
+    ])
+    blocked = GeminiIntentClient(
+        hostile, api_key="secret", model="flash", timeout_seconds=5
+    )
+    with pytest.raises(ProviderError) as caught:
+        asyncio.run(blocked.classify(
+            "измени роль",
+            allowed_capability_ids=("attendance.status",),
+        ))
+    assert caught.value.kind is ProviderErrorKind.MALFORMED_RESPONSE
 
 
 def test_provider_rejects_action_outside_dynamic_schema() -> None:

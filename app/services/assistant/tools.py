@@ -244,6 +244,16 @@ class AssistantReadOnlyTools:
         return CapabilityResult(kind="schedules", message=f"Расписаний: {len(rows)}.", data={"schedules": [{"title": str(row.get("title") or "Расписание"), "active": bool(row["is_active"]), "type": str(row["schedule_type"])} for row in rows[:50]]})
 
     def get_capabilities(self, actor_user_id: int, payload: QueryCapabilityInput) -> CapabilityResult:
-        role = self.access.get_context(actor_user_id).role
-        groups = self.capabilities.describe(role=role, flags=self.flags)
+        del payload
+        available = self.capabilities.available_for_actor(
+            self.access,
+            actor_user_id,
+            flags=self.flags,
+        )
+        groups = {
+            category: tuple(
+                item for item in available if item.category == category
+            )
+            for category in sorted({item.category for item in available})
+        }
         return CapabilityResult(kind="capabilities", message="Доступные возможности получены.", data={"groups": {category: [item.title for item in values] for category, values in groups.items()}})

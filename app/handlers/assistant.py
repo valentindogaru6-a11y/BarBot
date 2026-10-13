@@ -23,9 +23,11 @@ from app.handlers.common import answer_callback_safely, load_catalog
 from app.handlers.warehouse import prepare_intake_message
 from app.keyboards.assistant import (
     build_assistant_candidates_keyboard,
+    build_assistant_flow_keyboard,
     build_assistant_proposal_keyboard,
 )
 from app.keyboards.callbacks import AssistantCandidateCallback, AssistantProposalCallback
+from app.keyboards.main_menu import build_main_menu_keyboard
 from app.models.assistant import AssistantIntentName
 from app.models.user import Role
 from app.services.assistant import (
@@ -171,7 +173,8 @@ def _private_ai_actor(
     return bool(
         message.from_user is not None
         and message.chat.type == ChatType.PRIVATE
-        and auth_service.get_context(message.from_user.id).role is not Role.BLOCKED
+        and auth_service.get_context(message.from_user.id).role
+        in {Role.SUPER_ADMIN, Role.ADMIN, Role.BARTENDER, Role.ACCOUNTANT}
     )
 
 
@@ -230,6 +233,46 @@ async def _run_assistant(
     assistant_capability_controller: AssistantCapabilityController | None = None,
 ) -> None:
     user_id = message.from_user.id if message.from_user is not None else None
+
+    async def send_capability(dispatch: Any) -> None:
+        if conversation_memory is not None and user_id is not None:
+            conversation_memory.append_turn(
+                user_id,
+                chat_id=message.chat.id,
+                role="user",
+                text=text,
+                last_intent=dispatch.capability_id,
+                topic=dispatch.capability_id,
+            )
+            conversation_memory.append_turn(
+                user_id,
+                chat_id=message.chat.id,
+                role="assistant",
+                text=dispatch.message,
+                last_intent=dispatch.capability_id,
+            )
+        await message.answer(
+            escape(dispatch.message),
+            reply_markup=(
+                build_assistant_proposal_keyboard(dispatch.proposal.token)
+                if dispatch.proposal is not None
+                else build_main_menu_keyboard(
+                    can_view_catalog=auth_service.can_view_catalog(user_id),
+                    can_manage_catalog=auth_service.can_manage_catalog(user_id),
+                    can_view_warehouse=auth_service.can_view_warehouse(user_id),
+                    attendance_open=(
+                        warehouse_attendance_service.status(user_id) is not None
+                        if warehouse_attendance_service is not None
+                        and auth_service.can_use_warehouse_attendance(user_id)
+                        else None
+                    ),
+                ) if dispatch.ui_action == "main_menu"
+                else build_assistant_flow_keyboard(dispatch.ui_action, dispatch.data)
+                if dispatch.ui_action is not None
+                else None
+            ),
+        )
+
     if assistant_capability_controller is not None and user_id is not None:
         dispatch = assistant_capability_controller.dispatch(
             text,
@@ -238,30 +281,7 @@ async def _run_assistant(
             source_message_id=int(getattr(message, "message_id", 0)),
         )
         if dispatch is not None:
-            if conversation_memory is not None:
-                conversation_memory.append_turn(
-                    user_id,
-                    chat_id=message.chat.id,
-                    role="user",
-                    text=text,
-                    last_intent=dispatch.capability_id,
-                    topic=dispatch.capability_id,
-                )
-                conversation_memory.append_turn(
-                    user_id,
-                    chat_id=message.chat.id,
-                    role="assistant",
-                    text=dispatch.message,
-                    last_intent=dispatch.capability_id,
-                )
-            await message.answer(
-                escape(dispatch.message),
-                reply_markup=(
-                    build_assistant_proposal_keyboard(dispatch.proposal.token)
-                    if dispatch.proposal is not None
-                    else None
-                ),
-            )
+            await send_capability(dispatch)
             return
     try:
         catalog = load_catalog(catalog_path)
@@ -421,6 +441,11 @@ async def _run_assistant(
     provider_latency_bucket = "local"
     intent = None
     try:
+        allowed_capability_ids = (
+            assistant_capability_controller.available_ids(user_id)
+            if assistant_capability_controller is not None and user_id is not None
+            else ()
+        )
         local_intent = orchestrator.local_intent(request_text)
         retrieval = (
             CatalogRetrieval(normalized_query=context.last_query)
@@ -444,9 +469,29 @@ async def _run_assistant(
                 normalized_entity=retrieval.normalized_query,
                 conversation=provider_history,
                 allowed_action=allowed_action,
+                allowed_capability_ids=allowed_capability_ids,
             )
             if local_intent is None:
                 provider_latency_bucket = _latency_bucket(monotonic() - started)
+        if intent.intent is AssistantIntentName.CAPABILITY:
+            if (
+                assistant_capability_controller is None
+                or intent.capability_id not in allowed_capability_ids
+            ):
+                raise AccessDeniedError("Provider selected unavailable capability")
+            planned = assistant_capability_controller.dispatch(
+                text,
+                actor_user_id=user_id,
+                source_chat_id=message.chat.id,
+                source_message_id=int(getattr(message, "message_id", 0)),
+            )
+            if planned is None or planned.capability_id != intent.capability_id:
+                await message.answer(
+                    "Не хватает параметров для этого действия. Уточните запрос."
+                )
+                return
+            await send_capability(planned)
+            return
         action = registry.execute(intent)
 
         if (
@@ -500,6 +545,7 @@ async def _run_assistant(
                 normalized_entity=action.entity_query or retrieval.normalized_query,
                 conversation=provider_history,
                 allowed_action=allowed_action,
+                allowed_capability_ids=allowed_capability_ids,
             )
             provider_latency_bucket = _latency_bucket(monotonic() - started)
             refined_action = registry.execute(refined)
@@ -805,7 +851,8 @@ async def handle_assistant_proposal(
     if (
         not isinstance(callback.message, Message)
         or callback.message.chat.type != ChatType.PRIVATE
-        or auth_service.get_context(callback.from_user.id).role is Role.BLOCKED
+        or auth_service.get_context(callback.from_user.id).role
+        not in {Role.SUPER_ADMIN, Role.ADMIN, Role.BARTENDER, Role.ACCOUNTANT}
     ):
         await answer_callback_safely(callback, "Недостаточно прав.", show_alert=True)
         return
@@ -823,8 +870,8 @@ async def handle_assistant_proposal(
             callback_data.token,
             callback.from_user.id,
             callback.message.chat.id,
-            lambda row: assistant_capability_controller.execute(
-                row, callback.from_user.id
+            lambda row, connection: assistant_capability_controller.execute(
+                row, callback.from_user.id, connection
             ),
         )
     except AssistantProposalExpired:
@@ -864,7 +911,8 @@ async def handle_assistant_candidate(
     if (
         not isinstance(callback.message, Message)
         or callback.message.chat.type != ChatType.PRIVATE
-        or auth_service.get_context(callback.from_user.id).role is Role.BLOCKED
+        or auth_service.get_context(callback.from_user.id).role
+        not in {Role.SUPER_ADMIN, Role.ADMIN, Role.BARTENDER, Role.ACCOUNTANT}
         or not auth_service.can_view_catalog(callback.from_user.id)
     ):
         await answer_callback_safely(callback, "Недостаточно прав.", show_alert=True)

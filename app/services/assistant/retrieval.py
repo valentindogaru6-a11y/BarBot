@@ -15,7 +15,7 @@ from app.services.search_service import SearchResult
 MAX_CATALOG_CANDIDATES = 10
 _COMMAND_PHRASES = re.compile(
     r"\b(?:найди(?:\s+мне)?|покажи|тех(?:нологическ\w*\s+)?карт\w*|"
-    r"рецепт\w*|как\s+приготовить|как\s+делать|как\s+готовится)\b",
+    r"рецепт\w*|приготовлен\w*|как\s+приготовить|как\s+делать|как\s+готовится)\b",
     re.IGNORECASE,
 )
 _QUERY_FILLER_RE = re.compile(
@@ -24,7 +24,8 @@ _QUERY_FILLER_RE = re.compile(
 )
 _COMMAND_TOKENS = {
     "найди", "мне", "покажи", "техкарта", "технологическая", "карта",
-    "рецепт", "как", "приготовить", "делать", "готовится",
+    "рецепт", "как", "приготовить", "приготовление", "делать", "готовится",
+    "в", "техкартах",
 }
 _RUSSIAN_SUFFIXES = tuple(
     sorted(

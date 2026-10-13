@@ -33,15 +33,21 @@ class WarehouseReminderDatabase:
             connection.close()
 
     @contextmanager
-    def _transaction(self) -> Iterator[sqlite3.Connection]:
-        with self._connection() as connection:
+    def _transaction(
+        self,
+        connection: sqlite3.Connection | None = None,
+    ) -> Iterator[sqlite3.Connection]:
+        if connection is not None:
+            yield connection
+            return
+        with self._connection() as owned_connection:
             try:
-                connection.execute("BEGIN IMMEDIATE")
-                yield connection
-                connection.commit()
+                owned_connection.execute("BEGIN IMMEDIATE")
+                yield owned_connection
+                owned_connection.commit()
             except Exception:
-                if connection.in_transaction:
-                    connection.rollback()
+                if owned_connection.in_transaction:
+                    owned_connection.rollback()
                 raise
 
     @staticmethod
@@ -59,13 +65,23 @@ class WarehouseReminderDatabase:
              f"warehouse-reminder:{entity_id}:{event_type}:{now}"),
         )
 
-    def settings(self, source_location_id: int) -> dict[str, Any] | None:
-        with self._connection() as connection:
-            row = connection.execute("SELECT * FROM warehouse_reminder_settings WHERE source_location_id=?", (source_location_id,)).fetchone()
+    def settings(
+        self,
+        source_location_id: int,
+        connection: sqlite3.Connection | None = None,
+    ) -> dict[str, Any] | None:
+        if connection is not None:
+            row = connection.execute(
+                "SELECT * FROM warehouse_reminder_settings WHERE source_location_id=?",
+                (source_location_id,),
+            ).fetchone()
+            return dict(row) if row is not None else None
+        with self._connection() as owned_connection:
+            row = owned_connection.execute("SELECT * FROM warehouse_reminder_settings WHERE source_location_id=?", (source_location_id,)).fetchone()
             return dict(row) if row is not None else None
 
-    def save_settings(self, source_location_id: int, values: dict[str, Any], expected_revision: int | None, now: str, *, actor_user_id: int | None = None) -> dict[str, Any]:
-        with self._transaction() as connection:
+    def save_settings(self, source_location_id: int, values: dict[str, Any], expected_revision: int | None, now: str, *, actor_user_id: int | None = None, connection: sqlite3.Connection | None = None) -> dict[str, Any]:
+        with self._transaction(connection) as connection:
             old = connection.execute("SELECT * FROM warehouse_reminder_settings WHERE source_location_id=?", (source_location_id,)).fetchone()
             if old is None:
                 if expected_revision not in (None, 0):

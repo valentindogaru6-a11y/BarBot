@@ -37,6 +37,7 @@ from app.services.assistant import (
     GroqSpeechToTextClient,
     AssistantActionProposalService,
     AssistantCapabilityController,
+    CapabilityBinding,
     CapabilityRegistry,
 )
 from app.services.audio_service import AudioService
@@ -335,6 +336,40 @@ async def main() -> None:
         assistant_capability_registry,
         flags=assistant_flags,
     )
+    external_bindings: dict[str, CapabilityBinding] = {
+        "catalog.search": CapabilityBinding(
+            "catalog.search", assistant_orchestrator, admin_service,
+            "AssistantOrchestrator.local_intent", "assistant catalog renderer",
+        ),
+        "catalog.get": CapabilityBinding(
+            "catalog.get", assistant_orchestrator, admin_service,
+            "AssistantOrchestrator.local_intent", "assistant card renderer",
+        ),
+    }
+    if warehouse_service is not None:
+        for capability_id in (
+            "warehouse.prepare_writeoff",
+            "warehouse.prepare_transfer",
+        ):
+            external_bindings[capability_id] = CapabilityBinding(
+                capability_id,
+                assistant_orchestrator,
+                warehouse_service,
+                "AssistantOrchestrator.local_action_evidence",
+                "warehouse intake FSM renderer",
+            )
+        for capability_id, executor in (
+            ("warehouse.commit_batch", warehouse_service.commit_batch),
+            ("warehouse.cancel_batch", warehouse_service.cancel_batch),
+        ):
+            external_bindings[capability_id] = CapabilityBinding(
+                capability_id,
+                assistant_orchestrator,
+                warehouse_service,
+                "warehouse intake callback",
+                "warehouse intake result renderer",
+                executor,
+            )
     assistant_capability_controller = AssistantCapabilityController(
         assistant_capability_registry,
         assistant_action_proposals,
@@ -348,6 +383,11 @@ async def main() -> None:
         recipients=warehouse_recipient_service,
         reminders=warehouse_reminder_settings_service,
         schedules=warehouse_schedule_service,
+        admin=admin_service,
+        correction=warehouse_correction_service,
+        delivery=warehouse_delivery_service,
+        attendance_xlsx=warehouse_attendance_xlsx_service,
+        external_bindings=external_bindings,
     )
     dispatcher = build_dispatcher(
         user_service,

@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class AssistantIntentName(StrEnum):
+    CAPABILITY = "capability"
     FIND_TECH_CARD = "find_tech_card"
     PREPARE_WRITEOFF = "prepare_writeoff"
     PREPARE_TRANSFER = "prepare_transfer"
@@ -44,6 +45,7 @@ class AssistantIntent(BaseModel):
     clarification: str | None = Field(default=None, max_length=500)
     answer_text: str | None = Field(default=None, max_length=4_000)
     needs_web: bool = False
+    capability_id: str | None = Field(default=None, max_length=100)
 
     @model_validator(mode="after")
     def validate_shape(self) -> "AssistantIntent":
@@ -52,6 +54,14 @@ class AssistantIntent(BaseModel):
             AssistantIntentName.NOT_FOUND,
             AssistantIntentName.WEB_SEARCH,
         }
+        if self.intent is AssistantIntentName.CAPABILITY:
+            if not self.capability_id:
+                raise ValueError("capability intent requires capability_id")
+            if self.items or self.query or self.clarification or self.answer_text or self.needs_web:
+                raise ValueError("capability intent contains unsupported fields")
+            return self
+        if self.capability_id is not None:
+            raise ValueError("capability_id is only valid for capability intent")
         if self.intent not in query_intents and self.query is not None:
             raise ValueError("query is not valid for this intent")
         if (

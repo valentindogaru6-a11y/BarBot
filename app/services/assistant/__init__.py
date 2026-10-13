@@ -41,6 +41,7 @@ from app.services.assistant.system_prompt import (
     build_assistant_system_prompt,
 )
 from app.services.assistant.capabilities import (
+    CapabilityBinding,
     CapabilityDefinition,
     CapabilityRegistry,
     UI_CAPABILITY_COVERAGE,
@@ -83,6 +84,7 @@ __all__ = [
     "ASSISTANT_SYSTEM_PROMPT_VERSION",
     "build_assistant_system_prompt",
     "CapabilityDefinition",
+    "CapabilityBinding",
     "CapabilityRegistry",
     "UI_CAPABILITY_COVERAGE",
     "AssistantActionProposalService",

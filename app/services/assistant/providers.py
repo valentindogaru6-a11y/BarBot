@@ -63,6 +63,7 @@ GEMINI_INTENT_SCHEMA: Mapping[str, object] = {
         "clarification": {"type": ["string", "null"]},
         "answer_text": {"type": ["string", "null"]},
         "needs_web": {"type": "boolean"},
+        "capability_id": {"type": ["string", "null"]},
     },
     "required": [
         "intent",
@@ -70,6 +71,7 @@ GEMINI_INTENT_SCHEMA: Mapping[str, object] = {
         "query",
         "needs_web",
         "clarification",
+        "capability_id",
     ],
 }
 _NON_ACTION_INTENTS = (
@@ -213,6 +215,7 @@ class IntentModelClient(Protocol):
         normalized_entity: str = "",
         conversation: Sequence[tuple[str, str]] = (),
         allowed_action_intents: Sequence[AssistantIntentName] = (),
+        allowed_capability_ids: Sequence[str] = (),
     ) -> AssistantIntent: ...
 
 
@@ -388,6 +391,7 @@ class GeminiIntentClient(_RetryingProvider):
         normalized_entity: str = "",
         conversation: Sequence[tuple[str, str]] = (),
         allowed_action_intents: Sequence[AssistantIntentName] = (),
+        allowed_capability_ids: Sequence[str] = (),
     ) -> AssistantIntent:
         safe_candidates = [
             value.strip()[:200] for value in candidates[:5] if value.strip()
@@ -400,13 +404,22 @@ class GeminiIntentClient(_RetryingProvider):
                 AssistantIntentName.PREPARE_TRANSFER,
             }
         )
+        safe_capabilities = tuple(
+            value for value in allowed_capability_ids[:50]
+            if value and len(value) <= 100
+        )
         allowed_intents = [*_NON_ACTION_INTENTS, *allowed_actions]
+        if safe_capabilities:
+            allowed_intents.append(AssistantIntentName.CAPABILITY.value)
         intent_property = dict(
             GEMINI_INTENT_SCHEMA["properties"]["intent"]  # type: ignore[index]
         )
         intent_property["enum"] = allowed_intents
         schema_properties = dict(GEMINI_INTENT_SCHEMA["properties"])  # type: ignore[arg-type]
         schema_properties["intent"] = intent_property
+        capability_property = dict(schema_properties["capability_id"])
+        capability_property["enum"] = [None, *safe_capabilities]
+        schema_properties["capability_id"] = capability_property
         response_schema = dict(GEMINI_INTENT_SCHEMA)
         response_schema["properties"] = schema_properties
         request_data = {
@@ -414,6 +427,7 @@ class GeminiIntentClient(_RetryingProvider):
             "normalized_entity": normalized_entity[:200],
             "catalog_candidates": safe_candidates,
             "allowed_intents": allowed_intents,
+            "allowed_capabilities": list(safe_capabilities),
             "conversation": [
                 {"role": role, "text": value[:1_000]}
                 for role, value in conversation[-6:]
@@ -466,6 +480,11 @@ class GeminiIntentClient(_RetryingProvider):
             intent = AssistantIntent.model_validate(parsed)
             if intent.intent.value not in allowed_intents:
                 raise ValueError("provider returned a disallowed intent")
+            if (
+                intent.intent is AssistantIntentName.CAPABILITY
+                and intent.capability_id not in safe_capabilities
+            ):
+                raise ValueError("provider returned a disallowed capability")
             return intent
         except (
             json.JSONDecodeError,

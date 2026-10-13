@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import secrets
+import inspect
+import sqlite3
 from datetime import UTC, datetime, timedelta
 from typing import Any, Callable
 
@@ -14,6 +16,7 @@ from app.models.assistant_capabilities import (
 from app.services.access_service import AccessDeniedError, AccessService
 from app.services.assistant.capabilities import CapabilityRegistry
 from app.storage.assistant_action_database import AssistantActionDatabase
+from app.storage.assistant_action_database import AssistantActionActiveConflict
 
 
 class AssistantProposalError(RuntimeError):
@@ -32,7 +35,15 @@ class AssistantProposalTargetConflict(AssistantProposalError):
     pass
 
 
-Executor = Callable[[dict[str, Any]], dict[str, Any]]
+class AssistantProposalCollision(AssistantProposalError):
+    """A new mutation cannot replace an unfinished proposal implicitly."""
+
+    def __init__(self, active: ActionProposal) -> None:
+        super().__init__("An unfinished proposal already exists")
+        self.active = active
+
+
+Executor = Callable[..., dict[str, Any]]
 
 
 class AssistantActionProposalService:
@@ -83,11 +94,12 @@ class AssistantActionProposalService:
 
     def _authorize(self, actor_user_id: int, capability_id: str) -> None:
         capability = self.registry.require(capability_id)
-        role = self.access.get_context(actor_user_id).role
-        flags_allowed = self.flags is None or all(
-            self.flags.get(flag, False) for flag in capability.feature_flags
+        available = self.registry.available_for_actor(
+            self.access,
+            actor_user_id,
+            flags=self.flags,
         )
-        if role not in capability.allowed_roles or not flags_allowed:
+        if capability not in available:
             raise AssistantProposalPermissionDenied("Capability is no longer allowed")
 
     def create(
@@ -113,8 +125,9 @@ class AssistantActionProposalService:
         if capability.confirmation_policy.value == "reason_and_explicit" and not cleaned_reason:
             raise AssistantProposalError("A reason is required")
         now = self._now()
-        row = self.repository.create(
-            {
+        try:
+            row = self.repository.create(
+                {
                 "opaque_token": secrets.token_urlsafe(12),
                 "actor_user_id": actor_user_id,
                 "source_chat_id": source_chat_id,
@@ -129,10 +142,18 @@ class AssistantActionProposalService:
                 "reason_text": cleaned_reason,
                 "created_at_utc": self._stamp(now),
                 "expires_at_utc": self._stamp(now + timedelta(seconds=self.ttl_seconds)),
-            },
-            self._stamp(now),
-        )
+                },
+                self._stamp(now),
+            )
+        except AssistantActionActiveConflict as exc:
+            raise AssistantProposalCollision(self._public(exc.active)) from exc
         return self._public(row)
+
+    def active_for_actor(self, actor_user_id: int) -> ActionProposal | None:
+        row = self.repository.active_for_actor(
+            actor_user_id, self._stamp(self._now())
+        )
+        return self._public(row) if row is not None else None
 
     def get_owned(self, token: str, actor_user_id: int, source_chat_id: int) -> ActionProposal | None:
         row = self.repository.get_owned(
@@ -178,47 +199,60 @@ class AssistantActionProposalService:
         if current.status is not CapabilityStatus.READY:
             raise AssistantProposalError("Proposal is not ready")
         self._authorize(actor_user_id, current.capability_id)
-        confirmed = self.repository.transition(
-            token, actor_user_id, source_chat_id,
-            expected_status=CapabilityStatus.READY.value,
-            status=CapabilityStatus.CONFIRMED.value,
-            now=self._stamp(self._now()),
-        )
-        try:
+        now = self._stamp(self._now())
+
+        def run(
+            confirmed: dict[str, Any],
+            connection: sqlite3.Connection,
+        ) -> dict[str, Any]:
             self._authorize(actor_user_id, current.capability_id)
-            result = executor(confirmed)
+            parameters = inspect.signature(executor).parameters
+            if len(parameters) >= 2:
+                return executor(confirmed, connection)
+            return executor(confirmed)
+
+        try:
+            executed, result = self.repository.confirm_atomic(
+                token,
+                actor_user_id,
+                source_chat_id,
+                now=now,
+                executor=run,
+            )
         except AssistantProposalTargetConflict:
             self.repository.transition(
                 token, actor_user_id, source_chat_id,
-                expected_status=CapabilityStatus.CONFIRMED.value,
+                expected_status=CapabilityStatus.READY.value,
                 status=CapabilityStatus.CONFLICTED.value,
-                now=self._stamp(self._now()),
+                now=now,
                 result={"error": "target_conflict"},
             )
             raise
         except AccessDeniedError as exc:
             self.repository.transition(
                 token, actor_user_id, source_chat_id,
-                expected_status=CapabilityStatus.CONFIRMED.value,
+                expected_status=CapabilityStatus.READY.value,
                 status=CapabilityStatus.CONFLICTED.value,
-                now=self._stamp(self._now()),
+                now=now,
                 result={"error": "permission_denied"},
             )
             raise AssistantProposalPermissionDenied("Permission changed") from exc
+        except AssistantProposalPermissionDenied:
+            self.repository.transition(
+                token, actor_user_id, source_chat_id,
+                expected_status=CapabilityStatus.READY.value,
+                status=CapabilityStatus.CONFLICTED.value,
+                now=now,
+                result={"error": "permission_denied"},
+            )
+            raise
         except Exception:
             self.repository.transition(
                 token, actor_user_id, source_chat_id,
-                expected_status=CapabilityStatus.CONFIRMED.value,
+                expected_status=CapabilityStatus.READY.value,
                 status=CapabilityStatus.FAILED.value,
-                now=self._stamp(self._now()),
+                now=now,
                 result={"error": "execution_failed"},
             )
             raise
-        executed = self.repository.transition(
-            token, actor_user_id, source_chat_id,
-            expected_status=CapabilityStatus.CONFIRMED.value,
-            status=CapabilityStatus.EXECUTED.value,
-            now=self._stamp(self._now()),
-            result=result,
-        )
         return self._public(executed), result
