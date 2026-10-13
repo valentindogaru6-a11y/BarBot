@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import sqlite3
+import unicodedata
 from dataclasses import dataclass
 from typing import Any
 
@@ -40,11 +41,67 @@ class CapabilityDispatch:
     data: dict[str, Any] | None = None
 
 
-_CAPABILITY_QUESTION = re.compile(
-    r"\b(?:что\s+ты\s+умеешь|что\s+ты\s+можешь|какие\s+(?:действия|функции)|"
-    r"что\s+можешь\s+сделать)\b",
-    re.IGNORECASE,
+_CAPABILITY_FILLER_WORDS = frozenset(
+    {
+        "вообще",
+        "выполнять",
+        "делать",
+        "доступно",
+        "доступны",
+        "доступные",
+        "какие",
+        "мне",
+        "можешь",
+        "пожалуйста",
+        "расскажи",
+        "со",
+        "сейчас",
+        "тебе",
+        "теперь",
+        "ти",
+        "ты",
+        "у",
+        "умеешь",
+        "что",
+    }
 )
+
+
+def _normalize_capability_question(text: str) -> tuple[str, ...]:
+    normalized = unicodedata.normalize("NFKC", text).casefold()
+    normalized = normalized.replace("ё", "е").replace("і", "и")
+    normalized = re.sub(r"[^\w\s]+", " ", normalized, flags=re.UNICODE)
+    return tuple(normalized.split())
+
+
+def _is_capability_question(text: str) -> bool:
+    """Recognize general capability discovery without invoking a provider."""
+
+    tokens = _normalize_capability_question(text)
+    token_set = set(tokens)
+    has_subject = bool({"ты", "ти", "тебе"} & token_set) or any(
+        left == "у" and right == "тебя"
+        for left, right in zip(tokens, tokens[1:])
+    )
+    if not has_subject:
+        return False
+
+    marker_prefixes = ("уме", "мож", "возможност", "функц", "действ", "команд")
+    if not any(
+        token == "мочь" or token.startswith(marker_prefixes) for token in tokens
+    ):
+        return False
+
+    category_prefixes = ("смен", "отч", "сотруд", "напомин", "каталог")
+    return all(
+        token in _CAPABILITY_FILLER_WORDS
+        or token == "тебя"
+        or token == "мочь"
+        or token.startswith(marker_prefixes + category_prefixes)
+        for token in tokens
+    )
+
+
 _BARTENDERS = re.compile(r"\b(?:сколько|какие|покажи|список)\b.*\bбармен\w*\b", re.IGNORECASE)
 _USERS = re.compile(r"\b(?:покажи|список|какие)\b.*\b(?:сотрудник\w*|пользовател\w*)\b", re.IGNORECASE)
 _OPEN_OWN = re.compile(r"\bоткрой\w*\b.*\b(?:мою|мне)\b.*\bсмен\w*\b|\bоткрой\w*\s+смен\w*\s+(?:мне|сегодня)\b", re.IGNORECASE)
@@ -294,7 +351,7 @@ class AssistantCapabilityController:
             return CapabilityDispatch(
                 "navigation.main", "Главное меню", ui_action="main_menu"
             )
-        if _CAPABILITY_QUESTION.search(cleaned):
+        if _is_capability_question(cleaned):
             self._require(actor_user_id, "capabilities.list")
             return self._capabilities(actor_user_id, cleaned)
         if _CATALOG_MANAGE.search(cleaned):

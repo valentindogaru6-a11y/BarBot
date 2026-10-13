@@ -1,7 +1,11 @@
+import asyncio
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
+from app.handlers import assistant
 from app.models.user import Role
 from app.config import Settings
 from app.services.auth_service import AuthService
@@ -63,7 +67,84 @@ def _controller(path: Path):
     )
 
 
-def test_capability_question_does_not_run_open_sessions(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "phrase",
+    (
+        "что ты умеешь делать?",
+        "Что ты теперь умеешь делать?",
+        "что ты умеешь?",
+        "что ты можешь делать?",
+        "какие у тебя возможности?",
+        "какие функции тебе доступны?",
+        "какие команды тебе доступны?",
+        "что ті умеешь делать?",
+        "расскажи, что ты вообще умеешь",
+    ),
+)
+def test_capability_questions_are_local_and_do_not_call_provider(
+    tmp_path: Path,
+    phrase: str,
+) -> None:
+    controller = _controller(tmp_path / "controller.db")
+    result = controller.dispatch(
+        phrase,
+        actor_user_id=10,
+        source_chat_id=10,
+        source_message_id=1,
+    )
+    assert result is not None
+    assert result.capability_id == "capabilities.list"
+    assert "Открыть мою смену" in result.message
+
+    provider = SimpleNamespace(interpret=AsyncMock())
+    message = SimpleNamespace(
+        from_user=SimpleNamespace(id=10),
+        chat=SimpleNamespace(id=10, type="private"),
+        message_id=1,
+        answer=AsyncMock(),
+    )
+    asyncio.run(
+        assistant._run_assistant(
+            message,
+            SimpleNamespace(),
+            text=phrase,
+            catalog_path=tmp_path / "unused-catalog.json",
+            auth_service=controller.access,
+            orchestrator=provider,
+            warehouse_service=None,
+            assistant_capability_controller=controller,
+            assistant_access_policy=controller.access_policy,
+        )
+    )
+    provider.interpret.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    "phrase",
+    (
+        "что умеет бармен?",
+        "какие функции у отчёта?",
+        "можешь закрыть смену Дмитро?",
+        "что можно сделать с кокосовым молоком?",
+        "какие действия были выполнены вчера?",
+    ),
+)
+def test_non_capability_questions_do_not_select_capability_list(
+    tmp_path: Path,
+    phrase: str,
+) -> None:
+    result = _controller(tmp_path / "controller.db").dispatch(
+        phrase,
+        actor_user_id=10,
+        source_chat_id=10,
+        source_message_id=1,
+    )
+    assert result is None or result.capability_id != "capabilities.list"
+
+
+def test_capability_question_can_filter_runtime_registry_by_category(
+    tmp_path: Path,
+) -> None:
     controller = _controller(tmp_path / "controller.db")
     result = controller.dispatch(
         "какие действия ты можешь делать со сменами?",
