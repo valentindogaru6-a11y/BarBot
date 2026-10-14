@@ -17,6 +17,7 @@ HEAD `f66e402976e6e037ab483744536a52cadb21ded8`.
 | `01-canonical/reference/EVIDENCE_MAP.md` | routing | medium | verified | active | 2026-09-29 | repository paths | file move or ownership change |
 | `features/FEATURE_INDEX.md` | feature routing | medium | verified | active | 2026-10-14 | repository paths | feature/package change |
 | `features/AI_ASSISTANT.md` | AI contract | high | verified | active | 2026-10-14 | assistant source/tests including follow-up/local-action regressions | assistant routing, context, capability or schema change |
+| `features/BAR_JARVIS_ROADMAP.md` | AI product goal/roadmap | critical | owner-approved | planned | 2026-10-14 | owner-approved Definition of Done; implementation evidence is separate | owner changes goal, threshold, phase order or safety boundary |
 | `features/AI_CAPABILITY_LANGUAGE.md` | AI language coverage | high | mixed | active | 2026-10-14 | `CAPABILITIES`; verified tests; explicit pending cells | capability inventory or verified-language change |
 | `symbols/SYMBOL_INDEX.md` | symbol routing | medium | verified | active | 2026-09-29 | repository symbols | rename or package change |
 | `02-working/MEMORY_UTILITY_LOG.md` | utility pilot | medium | verified | active | 2026-09-29 | local event contract | after 10 eligible tasks |

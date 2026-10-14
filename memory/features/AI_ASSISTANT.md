@@ -8,6 +8,12 @@ Evidence: `app/services/assistant/`, `app/handlers/assistant.py`, assistant test
 Depends on: catalog services, centralized access, warehouse draft confirmation
 Importance: High
 
+The owner-approved end state and phased measurable plan are maintained in
+`BAR_JARVIS_ROADMAP.md`. It is a target contract, not evidence that voice,
+multi-step planning, full 41-capability language coverage, web, image or video
+acceptance thresholds have already been met. Unmeasured surfaces remain
+`pending`.
+
 - The runtime system role is the short versioned builder in
   `app/services/assistant/system_prompt.py`. It is shared by text and voice and
   contains no catalog dump, KOS content, IDs, or secrets.

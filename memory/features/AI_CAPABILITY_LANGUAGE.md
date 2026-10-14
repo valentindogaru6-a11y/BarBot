@@ -19,6 +19,12 @@ required parameters, allowed clarifications, confirmation requirement, local
 fallback and regression tests. Unverified language is always `pending live
 coverage`; never infer examples merely from a title or adapter name.
 
+The owner-approved completion target is 10–15 approved natural formulations
+per capability and at least 90% aggregate correct routing/argument extraction
+on a versioned corpus, with 100% applicable security-boundary cases. These are
+future acceptance thresholds, not current results. Until corpus version, sample
+size, scoring rules and reproducible results exist, coverage remains `pending`.
+
 | Capability ID | Roles | Risk | Domain | Parameters | Confirmation | Language / fallback / regression coverage |
 |---|---|---:|---|---|---|---|
 | `navigation.main` | SA,A,B,Acc | 0 | navigation | none | none | pending live coverage |

@@ -24,3 +24,4 @@ Read [BarBot decisions](BARBOT_DECISIONS.md) for the compact decision set:
 12. Future AI can call services only, never SQL/shell/systemd directly.
 13. Persistent AI context is bounded state, never mutation authority.
 14. Preserve typed local-first relation semantics across every AI layer.
+15. Measure the owner-approved Bar Jarvis end state on versioned corpora before claiming completion.

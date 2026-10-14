@@ -21,7 +21,7 @@ Read this file first, then open only the smallest route needed by the task.
 | Production/release | `01-canonical/summary/PRODUCTION_SAFETY.md`; live revalidation is mandatory |
 | Architecture/impact | `01-canonical/summary/ARCHITECTURE.md`, symbol index, then targeted source |
 | Risks/regressions | lessons index |
-| Bar Jarvis/AI | `features/AI_ASSISTANT.md`, [capability language coverage](features/AI_CAPABILITY_LANGUAGE.md) |
+| Bar Jarvis/AI | `features/AI_ASSISTANT.md`, [product goal and roadmap](features/BAR_JARVIS_ROADMAP.md), [capability language coverage](features/AI_CAPABILITY_LANGUAGE.md) |
 | Active Standard/Full task | relevant summary plus `02-working/CURRENT_CONTEXT.md` |
 
 ## Indexes

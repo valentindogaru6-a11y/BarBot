@@ -105,3 +105,16 @@ contract end to end; no layer may infer discarded fields from rebuilt text.
 Provider planning receives only the capabilities of the selected domain.
 Consequential actions remain inside the existing persistent
 draft/proposal/explicit-confirmation and server-side authorization boundaries.
+
+## D15 — Measure the Bar Jarvis end state before claiming it
+
+The owner-approved target is a text and voice natural-language pilot over all
+actor-authorized BarBot capabilities, with persistent multi-step context and
+bounded local, Gemini, web, image and video sources. Completion claims require
+versioned owner-approved corpora and reproducible scoring. Target thresholds
+are at least 90% for catalog/context retrieval, warehouse draft preparation,
+all-capability routing/arguments and voice end-to-end success; permission,
+confirmation, idempotency, rollback and unsafe-false-positive security cases
+must pass 100%. Unmeasured capabilities stay `pending`. This direction never
+authorizes production access or weakens local-first, preview/confirmation,
+stable-ID, server-side authorization or no-silent-mutation rules.
