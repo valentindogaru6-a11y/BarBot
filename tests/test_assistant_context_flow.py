@@ -104,7 +104,8 @@ def test_catalog_clarification_continues_with_same_user_and_clears_context(
             conversation_memory=memory,
         )
     )
-    assert first.answer.await_args.args[0] == "Какой вариант?"
+    assert first.answer.await_args.args[0] == "Возможно, вы имели в виду:"
+    assert client.calls == []
     assert memory.get(1) is not None
 
     followup = _message(1, "безалкогольный")

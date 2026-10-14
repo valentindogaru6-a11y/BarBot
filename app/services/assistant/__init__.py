@@ -56,6 +56,14 @@ from app.services.assistant.access_policy import (
     AssistantAccessPolicy,
     PILOT_DENIED_TEXT,
 )
+from app.services.assistant.bar_language import (
+    BAR_LEXICON,
+    BarLexicon,
+    ParsedBarRequest,
+    capability_ids_for_domain,
+    normalize_bar_text,
+    parse_bar_request,
+)
 
 __all__ = [
     "AssistantOrchestrator",
@@ -98,4 +106,10 @@ __all__ = [
     "AssistantAccessDenied",
     "AssistantAccessPolicy",
     "PILOT_DENIED_TEXT",
+    "BAR_LEXICON",
+    "BarLexicon",
+    "ParsedBarRequest",
+    "capability_ids_for_domain",
+    "normalize_bar_text",
+    "parse_bar_request",
 ]

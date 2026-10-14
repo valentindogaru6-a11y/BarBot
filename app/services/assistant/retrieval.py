@@ -11,6 +11,7 @@ from typing import Iterable
 from app.models.catalog import Catalog
 from app.services.catalog_service import CatalogService
 from app.services.search_service import SearchResult
+from app.services.assistant.bar_language import parse_bar_request
 
 MAX_CATALOG_CANDIDATES = 10
 _COMMAND_PHRASES = re.compile(
@@ -52,6 +53,10 @@ def normalize_assistant_text(value: str) -> str:
 
 def extract_catalog_entity(value: str) -> str:
     """Remove command language while retaining category/style modifiers."""
+
+    parsed = parse_bar_request(value)
+    if parsed.domain == "catalog" and parsed.entity:
+        return parsed.entity
 
     without_phrases = _QUERY_FILLER_RE.sub("", value)
     without_phrases = _COMMAND_PHRASES.sub(" ", without_phrases)
@@ -127,9 +132,17 @@ class AssistantCatalogRetriever:
         self.catalog_service = CatalogService(catalog)
 
     def retrieve(self, query: str, *, limit: int = 5) -> CatalogRetrieval:
+        parsed_request = parse_bar_request(query)
         normalized_query = extract_catalog_entity(query)
         if not normalized_query:
             return CatalogRetrieval(normalized_query="")
+        if parsed_request.requested_kind == "preparation":
+            related = self._related_preparations(normalized_query)
+            if related:
+                return CatalogRetrieval(
+                    normalized_query=normalized_query,
+                    exact=related,
+                )
         query_tokens = _token_key(normalized_query)
         exact: list[SearchResult] = []
         ranked: list[RankedCatalogCandidate] = []
@@ -140,8 +153,20 @@ class AssistantCatalogRetriever:
                 for alias in result.item.voice_aliases
                 if normalize_assistant_text(alias)
             )
+            tags = tuple(
+                normalize_assistant_text(tag)
+                for tag in result.item.tags
+                if normalize_assistant_text(tag)
+            )
             title_tokens = _token_key(title)
-            if normalized_query == title or normalized_query in aliases:
+            if (
+                normalized_query == title
+                or normalized_query in aliases
+                or (
+                    len(normalized_query.split()) >= 2
+                    and normalized_query in tags
+                )
+            ):
                 exact.append(result)
                 continue
             if query_tokens and query_tokens == title_tokens:
@@ -155,6 +180,21 @@ class AssistantCatalogRetriever:
                 title_tokens,
                 aliases,
             )
+            if parsed_request.requested_kind == "preparation":
+                preparation_fields = (
+                    normalize_assistant_text(result.category.name),
+                    normalize_assistant_text(
+                        result.subcategory.name if result.subcategory else ""
+                    ),
+                    *(normalize_assistant_text(tag) for tag in result.item.tags),
+                )
+                if any(
+                    marker in field
+                    for field in preparation_fields
+                    for marker in ("п ф", "пф", "полуфабрикат", "заготовк")
+                ):
+                    score += 180
+                    reason = "preparation_" + reason
             if score >= 580:
                 ranked.append(RankedCatalogCandidate(result, score, reason))
         if exact:
@@ -167,6 +207,53 @@ class AssistantCatalogRetriever:
             normalized_query=normalized_query,
             candidates=tuple(ranked[: max(1, min(limit, MAX_CATALOG_CANDIDATES))]),
         )
+
+    def _related_preparations(self, query: str) -> tuple[SearchResult, ...]:
+        """Resolve a requested preparation through tags or a card ingredient."""
+
+        results = tuple(self._active_results())
+        query_tokens = _token_key(query)
+        direct: list[SearchResult] = []
+        parents: list[SearchResult] = []
+        for result in results:
+            title = normalize_assistant_text(result.item.name)
+            aliases = tuple(normalize_assistant_text(value) for value in result.item.voice_aliases)
+            tags = tuple(normalize_assistant_text(value) for value in result.item.tags)
+            container = " ".join(
+                filter(None, (
+                    normalize_assistant_text(result.category.name),
+                    normalize_assistant_text(result.subcategory.name if result.subcategory else ""),
+                ))
+            )
+            is_preparation = "полуфабрикат" in container or any(
+                marker in tag
+                for tag in tags
+                for marker in ("п ф", "пф", "полуфабрикат", "заготовк")
+            )
+            if is_preparation and query in tags:
+                direct.append(result)
+            if query == title or query in aliases or (
+                query_tokens and query_tokens == _token_key(title)
+            ) or (
+                query_tokens and set(query_tokens).issubset(_token_key(title))
+            ):
+                parents.append(result)
+        if direct:
+            return tuple(sorted(direct, key=lambda value: value.item.name.casefold()))
+
+        related_names: set[str] = set()
+        for parent in parents:
+            for ingredient in parent.item.ingredients:
+                name = normalize_assistant_text(ingredient.name)
+                if re.search(r"\b(?:п\s*ф|пф|полуфабрикат)\b", name):
+                    cleaned = re.sub(r"\b(?:п\s*ф|пф|полуфабрикат)\b", " ", name)
+                    related_names.add(" ".join(cleaned.split()))
+        related = [
+            result
+            for result in results
+            if normalize_assistant_text(result.item.name) in related_names
+        ]
+        return tuple(sorted(related, key=lambda value: value.item.name.casefold()))
 
     def by_key(self, key: str) -> SearchResult | None:
         return next(

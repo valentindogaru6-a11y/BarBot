@@ -28,7 +28,7 @@ from app.keyboards.assistant import (
 )
 from app.keyboards.callbacks import AssistantCandidateCallback, AssistantProposalCallback
 from app.keyboards.main_menu import build_main_menu_keyboard
-from app.models.assistant import AssistantIntentName
+from app.models.assistant import AssistantIntent, AssistantIntentName
 from app.services.assistant import (
     AssistantAccessDenied,
     AssistantAccessPolicy,
@@ -43,6 +43,8 @@ from app.services.assistant import (
     AssistantActionProposalService,
     AssistantCapabilityController,
     extract_catalog_entity,
+    capability_ids_for_domain,
+    parse_bar_request,
 )
 from app.services.assistant.proposals import (
     AssistantProposalError,
@@ -91,7 +93,15 @@ _OPEN_SESSIONS_RE = re.compile(
 _SIMILAR_FOLLOWUP_RE = re.compile(r"\b(?:что[- ]?то\s+)?похож\w*\b", re.IGNORECASE)
 _IMAGE_FOLLOWUP_RE = re.compile(r"\b(?:картинк\w*|изображени\w*|фото)\b", re.IGNORECASE)
 _OFFLINE_FOLLOWUP_RE = re.compile(r"\b(?:без\s+интернет\w*|выдай\s+что\s+знаешь)\b", re.IGNORECASE)
-_REFERENCE_RE = re.compile(r"\b(?:его|ее|её|это|похож\w*)\b", re.IGNORECASE)
+_REFERENCE_RE = re.compile(r"\b(?:его|ее|её|нее|неё|это|похож\w*)\b", re.IGNORECASE)
+_CANDIDATE_ORDINAL_RE = re.compile(
+    r"^\s*(?:покажи\s+)?(?P<ordinal>перв\w*|втор\w*|трет\w*|четверт\w*|пят\w*)\s*[?!.]*\s*$",
+    re.IGNORECASE,
+)
+_CARD_CONTENT_RE = re.compile(
+    r"\b(?:что\s+входит|состав|ингредиент\w*|как\s+(?:делать|готовить))\b",
+    re.IGNORECASE,
+)
 _MARKDOWN_LINK_RE = re.compile(r"\[([^\]]+)\]\(https?://[^)\s]+\)", re.IGNORECASE)
 _BARE_URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
 
@@ -448,14 +458,43 @@ async def _run_assistant(
             await message.answer("Уточните, пожалуйста, о какой позиции или теме речь.")
             return
 
+    ordinal_match = _CANDIDATE_ORDINAL_RE.fullmatch(text)
+    if context is not None and ordinal_match is not None and context.candidate_ids:
+        ordinal = ordinal_match.group("ordinal").casefold()
+        ordinal_index = next(
+            (index for prefix, index in (("перв", 0), ("втор", 1), ("трет", 2), ("четверт", 3), ("пят", 4)) if ordinal.startswith(prefix)),
+            -1,
+        )
+        if 0 <= ordinal_index < len(context.candidate_ids):
+            selected = registry.retriever.by_key(context.candidate_ids[ordinal_index])
+            if selected is not None:
+                request_text = f"покажи техкарту {selected.item.name}"
+    elif (
+        context is not None
+        and context.last_entity_type == "tech_card"
+        and context.last_entity_label
+        and _REFERENCE_RE.search(text)
+        and _CARD_CONTENT_RE.search(text)
+    ):
+        request_text = f"покажи техкарту {context.last_entity_label}"
+
     local_exact_hit = False
     provider_latency_bucket = "local"
     intent = None
+    fallback_intent = None
+    fallback_action = None
+    fallback_used = False
+    provider_started: float | None = None
+    parsed_request = parse_bar_request(request_text)
     try:
         allowed_capability_ids = (
             assistant_capability_controller.available_ids(user_id)
             if assistant_capability_controller is not None and user_id is not None
             else ()
+        )
+        allowed_capability_ids = capability_ids_for_domain(
+            allowed_capability_ids,
+            parsed_request.domain,
         )
         local_intent = orchestrator.local_intent(request_text)
         retrieval = (
@@ -464,6 +503,17 @@ async def _run_assistant(
             and context.last_entity_type == "warehouse_product"
             else registry.retriever.retrieve(request_text)
         )
+        if (
+            local_intent is None
+            and allowed_action is None
+            and retrieval.candidates
+        ):
+            fallback_intent = AssistantIntent(
+                intent="find_tech_card",
+                confidence=10_000,
+                query=retrieval.normalized_query,
+            )
+            fallback_action = registry.execute(fallback_intent)
         if local_intent is None and retrieval.exact:
             local_exact_hit = True
             intent = await orchestrator.interpret(
@@ -473,7 +523,7 @@ async def _run_assistant(
             provider_candidates = tuple(
                 candidate.provider_label for candidate in retrieval.candidates
             )
-            started = monotonic()
+            provider_started = monotonic()
             intent = await orchestrator.interpret(
                 request_text,
                 candidates=provider_candidates,
@@ -483,7 +533,9 @@ async def _run_assistant(
                 allowed_capability_ids=allowed_capability_ids,
             )
             if local_intent is None:
-                provider_latency_bucket = _latency_bucket(monotonic() - started)
+                provider_latency_bucket = _latency_bucket(
+                    monotonic() - provider_started
+                )
         if intent.intent is AssistantIntentName.CAPABILITY:
             if (
                 assistant_capability_controller is None
@@ -539,65 +591,46 @@ async def _run_assistant(
                     )
                 )
 
-        if (
-            intent.intent.value == "find_tech_card"
-            and not action.catalog_exact
-            and action.search_results
-            and local_intent is not None
-        ):
-            original_action = action
-            provider_candidates = tuple(
-                candidate.provider_label for candidate in retrieval.candidates
-            )
-            started = monotonic()
-            refined = await orchestrator.interpret_with_provider(
-                text,
-                candidates=provider_candidates,
-                normalized_entity=action.entity_query or retrieval.normalized_query,
-                conversation=provider_history,
-                allowed_action=allowed_action,
-                allowed_capability_ids=allowed_capability_ids,
-            )
-            provider_latency_bucket = _latency_bucket(monotonic() - started)
-            refined_action = registry.execute(refined)
-            if refined.intent.value == "clarify":
-                intent = refined
-                action = replace(original_action, message=refined_action.message)
-            elif refined.intent.value == "not_found":
-                intent, action = refined, refined_action
-            elif (
-                refined.intent.value == "find_tech_card"
-                and refined_action.catalog_exact
-                and len(original_action.candidate_ids) == 1
-                and refined_action.candidate_ids[0]
-                in original_action.candidate_ids
-            ):
-                intent, action = refined, refined_action
+        # A deterministic read-only catalog route keeps its bounded local
+        # candidates. Provider refinement previously discarded this useful
+        # result whenever Gemini timed out or returned malformed JSON.
     except AssistantUnavailableError:
         await message.answer(AI_UNAVAILABLE_TEXT)
         return
     except ProviderError as exc:
+        if provider_started is not None:
+            provider_latency_bucket = _latency_bucket(
+                monotonic() - provider_started
+            )
         logger.warning(
             "Assistant intent provider failed: provider=%s kind=%s",
             exc.provider,
             exc.kind.value,
         )
-        await message.answer(_provider_error_text(exc))
-        return
+        if fallback_intent is None or fallback_action is None:
+            await message.answer(_provider_error_text(exc))
+            return
+        intent, action = fallback_intent, fallback_action
+        fallback_used = True
     except asyncio.CancelledError:
         raise
     except Exception:
         raise
 
     logger.info(
-        "Assistant decision intent=%s local_exact_hit=%s candidate_count=%d "
-        "clarification_required=%s tool_result=%s provider_latency_bucket=%s",
+        "Assistant decision intent=%s domain=%s local_exact_hit=%s "
+        "candidate_count=%d clarification_required=%s tool_result=%s "
+        "provider_latency_bucket=%s fallback_used=%s mutation=%s evidence_count=%d",
         intent.intent.value,
+        parsed_request.domain,
         local_exact_hit,
         len(action.search_results),
         action.kind == "clarify",
         action.kind,
         provider_latency_bucket,
+        fallback_used,
+        parsed_request.mutation,
+        len(parsed_request.evidence),
     )
 
     if action.kind == "list_open_attendance_sessions":

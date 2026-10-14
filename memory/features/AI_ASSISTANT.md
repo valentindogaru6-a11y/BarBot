@@ -14,6 +14,12 @@ Importance: High
 - `AssistantCatalogRetriever` is the factual boundary. It normalizes commands,
   Unicode, `ё/е`, punctuation, Russian endings and token order; exact/token
   matches precede aliases/searchable fields and bounded fuzzy candidates.
+- `BarLexicon` and its structured local parser normalize everyday bar terms
+  (`пф`, `п/ф`, `пфка`, `полуфабрикат`, `заготовка`) into an action, domain,
+  entity and relation before retrieval. Confident read-only catalog routes keep
+  local results without provider refinement; stable candidate/entity IDs back
+  ordinal and card-content follow-ups. Known-domain provider planning receives
+  only the actor-authorized capabilities for that domain.
 - Gemini receives the request, normalized entity and only bounded local
   candidate labels. Its output remains strict schema/Pydantic data and cannot
   supply database IDs, callbacks, SQL, or service methods.

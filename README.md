@@ -200,6 +200,12 @@ Unicode, punctuation, case, `ё/е`, common Russian endings and token order, the
 checks exact titles, token matches, existing aliases/searchable fields and only
 then bounded fuzzy candidates. Ambiguous candidates are shown as inline
 buttons containing stable local catalog IDs; no model-generated ID is trusted.
+An expandable bar lexicon also recognizes everyday forms such as `пф`, `п/ф`,
+`пфка`, `полуфабрикат` and `заготовка`, separating the requested preparation
+from the related drink before catalog retrieval. A confident read-only local
+route does not call Gemini; provider planning receives only the capabilities
+for the detected domain. Provider failure therefore cannot hide an already
+validated local card or candidate list.
 If no real card or relevant candidate exists, the assistant says so without
 inventing a recipe. In particular, the committed catalog currently contains no
 card whose searchable fields mention `мохито`.

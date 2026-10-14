@@ -20,6 +20,7 @@ from app.services.assistant.providers import (
     GroundedSearchResult,
     IntentModelClient,
 )
+from app.services.assistant.bar_language import parse_bar_request
 from app.services.assistant.retrieval import (
     AssistantCatalogRetriever,
     display_catalog_entity,
@@ -198,6 +199,18 @@ class AssistantOrchestrator:
             return AssistantIntent(intent=AssistantIntentName.GET_CURRENT_SHIFT_SUMMARY)
         if _UNSUPPORTED_RE.search(cleaned):
             return AssistantIntent(intent=AssistantIntentName.UNSUPPORTED)
+        parsed = parse_bar_request(cleaned)
+        if (
+            parsed.action == "search"
+            and parsed.domain == "catalog"
+            and parsed.requested_kind == "preparation"
+            and parsed.entity
+        ):
+            return AssistantIntent(
+                intent=AssistantIntentName.FIND_TECH_CARD,
+                confidence=parsed.confidence,
+                query=parsed.entity,
+            )
         for pattern in _TECH_PATTERNS:
             match = pattern.fullmatch(cleaned)
             if match is not None:
@@ -208,6 +221,12 @@ class AssistantOrchestrator:
                         confidence=10_000,
                         query=query,
                     )
+        if parsed.action == "search" and parsed.domain == "catalog" and parsed.entity:
+            return AssistantIntent(
+                intent=AssistantIntentName.FIND_TECH_CARD,
+                confidence=parsed.confidence,
+                query=parsed.entity,
+            )
         for pattern, intent_name in (
             (_WRITEOFF_PARTIAL_RE, AssistantIntentName.PREPARE_WRITEOFF),
             (_TRANSFER_PARTIAL_RE, AssistantIntentName.PREPARE_TRANSFER),

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
@@ -18,6 +19,8 @@ from app.services.assistant.system_prompt import (
     ASSISTANT_SYSTEM_PROMPT_VERSION,
     build_assistant_system_prompt,
 )
+
+logger = logging.getLogger(__name__)
 
 MAX_PROVIDER_RESPONSE_BYTES = 256 * 1024
 GROQ_TRANSCRIPTION_URL = (
@@ -84,6 +87,16 @@ _NON_ACTION_INTENTS = (
     "list_open_attendance_sessions",
     "get_current_shift_summary",
 )
+
+
+def _request_size_bucket(size: int) -> str:
+    if size < 2_000:
+        return "lt_2kb"
+    if size < 8_000:
+        return "lt_8kb"
+    if size < 32_000:
+        return "lt_32kb"
+    return "gte_32kb"
 
 
 class ProviderErrorKind(StrEnum):
@@ -449,6 +462,16 @@ class GeminiIntentClient(_RetryingProvider):
                 "maxOutputTokens": 1024,
             },
         }
+        payload_size = len(
+            json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode()
+        )
+        logger.info(
+            "Assistant provider request provider_stage=intent "
+            "request_size_bucket=%s capability_count=%d candidate_count=%d",
+            _request_size_bucket(payload_size),
+            len(safe_capabilities),
+            len(safe_candidates),
+        )
         url = f"{GEMINI_API_ROOT}/{self.model}:generateContent"
 
         async def request() -> HttpResponse:
