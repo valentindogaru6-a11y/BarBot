@@ -35,6 +35,7 @@ def test_context_survives_repository_reopen_and_persists_structure(tmp_path: Pat
         parent_entity_id="tea/_/berry",
         related_entity_ids=("prep/_/base",),
         selected_entity_id="a/_/b",
+        last_attempt="ягодная основа",
     )
     restored = _memory(path, now).get(1, 10)
     assert restored is not None
@@ -47,6 +48,7 @@ def test_context_survives_repository_reopen_and_persists_structure(tmp_path: Pat
     assert restored.parent_entity_id == "tea/_/berry"
     assert restored.related_entity_ids == ("prep/_/base",)
     assert restored.selected_entity_id == "a/_/b"
+    assert restored.last_attempt == "ягодная основа"
     assert restored.turns[0].text == "кислота"
 
     first.clear_structured(1, chat_id=10)
@@ -54,6 +56,7 @@ def test_context_survives_repository_reopen_and_persists_structure(tmp_path: Pat
     assert cleared is not None
     assert cleared.relation is AssistantRelation.UNSPECIFIED
     assert cleared.related_entity_ids == ()
+    assert cleared.last_successful_entity_id == "a/_/b"
 
 
 def test_ttl_reset_and_user_chat_isolation(tmp_path: Path) -> None:

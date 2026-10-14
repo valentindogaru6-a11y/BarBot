@@ -4,7 +4,7 @@ Scope: bounded role-aware intent, conversation, retrieval, capabilities and prop
 Trust: Confirmed from code and tests
 Lifecycle: Fresh
 Last verified: 2026-10-14
-Evidence: `app/services/assistant/`, `app/handlers/assistant.py`, assistant tests, commit `c2ce9fd2ae46509b8ed47aa6d44e1cc1b3ccf80f`
+Evidence: `app/services/assistant/`, `app/handlers/assistant.py`, assistant tests, follow-up/local-action regressions
 Depends on: catalog services, centralized access, warehouse draft confirmation
 Importance: High
 
@@ -83,10 +83,25 @@ Importance: High
   delivery continues through its durable claim/send/sent-or-failed lifecycle.
 - Schema-v14 proposal DDL also contains no transaction control. Migration owns
   creation, `user_version=14`, validation and rollback as one atomic step.
-- Structured state keeps the current topic, last catalog query/entity,
-  candidates, requested action, tool and one pending clarification. High-
-  confidence follow-ups are resolved locally; ambiguous references ask one
-  question rather than guessing.
+- Structured state separates `last_successful_entity`, `current_candidates`,
+  `pending_clarification` and `last_attempt`. A failed lookup, provider error or
+  malformed response may update the attempt but must not erase the last
+  successfully selected stable entity. A successful selection replaces that
+  entity; reset clears all AI context. State remains isolated by user and
+  private chat and survives process restart through persistent memory.
+- The local reference resolver recognizes pronouns and descriptive references
+  without requiring grammatical-gender agreement. With one selected entity it
+  resolves `ingredients_of` and `similar_to` by stable ID; with multiple viable
+  candidates it asks for clarification. A pronoun is never sent as a literal
+  catalog query. Similarity is deterministic, excludes the source card and
+  never auto-selects a fuzzy candidate.
+- Explicit natural-language writeoff and transfer commands are parsed locally
+  into action, product, decimal quantity, unit, destination and optional
+  comment before provider fallback. Complete commands enter the existing
+  warehouse draft/preview/confirmation flow with zero immediate operations;
+  incomplete commands request only missing fields. Informational questions are
+  not mutation evidence, and catalog context cannot replace an explicitly
+  named warehouse product.
 - `AssistantReadOnlyTools` exposes only typed, bounded catalog, employee,
   attendance, shift, report, recipient, reminder, schedule and capability
   views. Every call rechecks centralized authority server-side and delegates

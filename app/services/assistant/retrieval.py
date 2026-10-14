@@ -168,6 +168,18 @@ class AssistantCatalogRetriever:
                 else None
             ),
         }
+        if relation is AssistantRelation.SIMILAR_TO and selected_entity_id:
+            selected = self.by_key(selected_entity_id)
+            if selected is None:
+                return CatalogRetrieval(normalized_query=normalized_query, **metadata)
+            ranked_similar = self._similar_candidates(selected, limit=limit)
+            return CatalogRetrieval(
+                normalized_query=normalize_assistant_text(selected.item.name),
+                candidates=ranked_similar,
+                parent_entity_ids=(selected_entity_id,),
+                related_entity_ids=tuple(item.key for item in ranked_similar),
+                **{**metadata, "relation_target": normalize_assistant_text(selected.item.name)},
+            )
         if selected_entity_id:
             selected = self.by_key(selected_entity_id)
             return CatalogRetrieval(
@@ -353,6 +365,63 @@ class AssistantCatalogRetriever:
             tuple(sorted(parents, key=lambda value: value.item.name.casefold())),
             tuple(sorted(related, key=lambda value: value.item.name.casefold())),
         )
+
+    def _similar_candidates(
+        self,
+        selected: SearchResult,
+        *,
+        limit: int,
+    ) -> tuple[RankedCatalogCandidate, ...]:
+        """Rank bounded related cards without silently selecting a fuzzy hit."""
+
+        source_key = candidate_key(selected)
+        source_tags = {
+            normalize_assistant_text(value)
+            for value in selected.item.tags
+            if normalize_assistant_text(value)
+        }
+        source_ingredients = {
+            normalize_assistant_text(value.name)
+            for value in selected.item.ingredients
+            if normalize_assistant_text(value.name)
+        }
+        ranked: list[RankedCatalogCandidate] = []
+        for result in self._active_results():
+            if candidate_key(result) == source_key:
+                continue
+            score = 0
+            if result.category.id == selected.category.id:
+                score += 300
+            if (
+                result.subcategory is not None
+                and selected.subcategory is not None
+                and result.subcategory.id == selected.subcategory.id
+            ):
+                score += 500
+            tags = {
+                normalize_assistant_text(value)
+                for value in result.item.tags
+                if normalize_assistant_text(value)
+            }
+            ingredients = {
+                normalize_assistant_text(value.name)
+                for value in result.item.ingredients
+                if normalize_assistant_text(value.name)
+            }
+            score += 120 * len(source_tags & tags)
+            score += 40 * len(source_ingredients & ingredients)
+            if score:
+                ranked.append(
+                    RankedCatalogCandidate(result, score, "similar_relation")
+                )
+        ranked.sort(
+            key=lambda value: (
+                -value.score,
+                value.result.item.name.casefold(),
+                candidate_key(value.result),
+            )
+        )
+        return tuple(ranked[: max(1, min(limit, MAX_CATALOG_CANDIDATES))])
 
     def by_key(self, key: str) -> SearchResult | None:
         return next(

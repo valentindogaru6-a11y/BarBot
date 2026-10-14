@@ -1,4 +1,5 @@
 import asyncio
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -6,6 +7,7 @@ import pytest
 from app.handlers.common import load_catalog
 from app.models.assistant import AssistantIntent, AssistantIntentName
 from app.services.assistant.orchestrator import AssistantOrchestrator, AssistantToolRegistry
+from app.services.assistant.bar_language import parse_bar_request
 from app.services.warehouse.intake_parser import parse_intake_message
 
 
@@ -30,6 +32,8 @@ class NeverGemini:
         ("сделай списание моркови", AssistantIntentName.PREPARE_WRITEOFF),
         ("добавь в списание морковь", AssistantIntentName.PREPARE_WRITEOFF),
         ("оформи списание: морковь", AssistantIntentName.PREPARE_WRITEOFF),
+        ("нужно списать 0,2 кг апельсина", AssistantIntentName.PREPARE_WRITEOFF),
+        ("убери в списание апельсин 200 г", AssistantIntentName.PREPARE_WRITEOFF),
         ("списание: морковь", AssistantIntentName.PREPARE_WRITEOFF),
         ("перемести молоко", AssistantIntentName.PREPARE_TRANSFER),
         ("перенеси молоко", AssistantIntentName.PREPARE_TRANSFER),
@@ -37,6 +41,7 @@ class NeverGemini:
         ("сделай перемещение молока", AssistantIntentName.PREPARE_TRANSFER),
         ("оформи перемещение молока", AssistantIntentName.PREPARE_TRANSFER),
         ("перемещение: молоко", AssistantIntentName.PREPARE_TRANSFER),
+        ("перенеси 500 мл сиропа в кондитерку", AssistantIntentName.PREPARE_TRANSFER),
     ],
 )
 def test_local_action_gate_accepts_only_explicit_commands(text, expected) -> None:
@@ -52,6 +57,12 @@ def test_local_action_gate_accepts_only_explicit_commands(text, expected) -> Non
         "можно ли перемещать молоко",
         "почему списывают морковь",
         "покажи операции перемещения",
+        "как правильно списывать продукты",
+        "можно ли списать апельсин",
+        "расскажи про перемещение",
+        "сколько апельсина обычно списывают",
+        "покажи списания за сегодня",
+        "почему вчера списали апельсин",
     ],
 )
 def test_local_action_gate_rejects_informational_phrases(text) -> None:
@@ -110,6 +121,37 @@ def test_partial_warehouse_commands_preserve_product_for_followup() -> None:
     assert transfer.items[0].product_text == "кокосовое молоко"
 
 
+@pytest.mark.parametrize(
+    ("text", "intent_name", "product", "quantity", "unit", "destination"),
+    [
+        ("спиши апельсин 200 грамм", AssistantIntentName.PREPARE_WRITEOFF, "апельсин", "200", "грамм", None),
+        ("списать апельсин 200 г", AssistantIntentName.PREPARE_WRITEOFF, "апельсин", "200", "г", None),
+        ("перемести сахар 1 кг на кухню", AssistantIntentName.PREPARE_TRANSFER, "сахар", "1", "кг", "кухня"),
+        ("перенеси 500 мл сиропа в кондитерку", AssistantIntentName.PREPARE_TRANSFER, "сиропа", "500", "мл", "кондитерка"),
+    ],
+)
+def test_complete_natural_mutations_are_local_and_typed(
+    text, intent_name, product, quantity, unit, destination
+) -> None:
+    parsed = parse_bar_request(text)
+    assert parsed.quantity == Decimal(quantity)
+    intent = asyncio.run(AssistantOrchestrator(NeverGemini()).interpret(text))
+    assert intent.intent is intent_name
+    assert intent.items[0].product_text == product
+    assert intent.items[0].quantity_text == quantity
+    assert intent.items[0].unit_text == unit
+    assert intent.items[0].destination_text == destination
+
+
+def test_local_mutation_comment_is_preserved_without_provider() -> None:
+    intent = asyncio.run(
+        AssistantOrchestrator(NeverGemini()).interpret(
+            "спиши апельсин 200 г, испортился"
+        )
+    )
+    assert intent.items[0].comment_text == "испортился"
+
+
 def test_real_missing_mojito_card_returns_honest_normalized_message() -> None:
     catalog = load_catalog(Path("data/catalog.json"))
     action = AssistantToolRegistry(catalog).execute(
@@ -137,6 +179,8 @@ def test_explicit_web_routes_to_search_but_action_keeps_priority() -> None:
         "найди в интернете свежую рецептуру настойки"
     )
     assert web is not None and web.intent is AssistantIntentName.WEB_SEARCH
-    assert AssistantOrchestrator.local_intent(
+    local = AssistantOrchestrator.local_intent(
         "перемести кокосовое молоко сейчас 1 л на кухню"
-    ) is None
+    )
+    assert local is not None
+    assert local.intent is AssistantIntentName.PREPARE_TRANSFER

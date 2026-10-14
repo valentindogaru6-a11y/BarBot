@@ -184,7 +184,7 @@ class VoiceOnlyTransport:
         raise AssertionError("STT network is not needed for this composition test")
 
 
-def test_voice_only_builds_both_adapters_and_transcript_reaches_gemini() -> None:
+def test_voice_only_builds_both_adapters_and_general_transcript_reaches_gemini() -> None:
     settings = Settings(
         _env_file=None,
         bot_token="test",
@@ -199,7 +199,7 @@ def test_voice_only_builds_both_adapters_and_transcript_reaches_gemini() -> None
     )
     assert isinstance(speech, GroqSpeechToTextClient)
     assert isinstance(orchestrator.intent_client, GeminiIntentClient)
-    result = asyncio.run(orchestrator.interpret("спиши 500 грамм моркови"))
+    result = asyncio.run(orchestrator.interpret("расскажи что-нибудь о баре"))
     assert result.intent is AssistantIntentName.UNSUPPORTED
 
 

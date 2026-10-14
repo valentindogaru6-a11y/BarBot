@@ -37,6 +37,7 @@ def _context(**changes) -> AssistantConversationContext:
         last_intent="find_tech_card", last_entity_type="tech_card",
         last_query="кислота", candidate_ids=(), pending_slots=(),
         topic="Кислотный раствор", turns=(), created_at=1, expires_at=2,
+        last_entity_id="item/_/acid", selected_entity_id="item/_/acid",
         last_entity_label="Кислотный раствор",
     )
     data.update(changes)
@@ -45,8 +46,13 @@ def _context(**changes) -> AssistantConversationContext:
 
 def test_contextual_similar_and_offline_followups() -> None:
     similar, ambiguous = resolve_contextual_request("найди что-то похожее", _context())
-    assert similar == "покажи техкарту кислота"
+    assert similar == "найди что-то похожее"
     assert not ambiguous
+    _, ambiguous = resolve_contextual_request(
+        "что входит в нее?",
+        _context(candidate_ids=("item/_/one", "item/_/two"), pending_slots=("candidate",)),
+    )
+    assert ambiguous
     offline, ambiguous = resolve_contextual_request("ну выдай что знаешь без интернета", _context(topic="неклассические варианты Голубой лагуны"))
     assert "неклассические варианты Голубой лагуны" in offline
     assert not ambiguous

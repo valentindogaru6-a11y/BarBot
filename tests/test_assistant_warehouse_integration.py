@@ -6,7 +6,7 @@ from app.models.assistant import AssistantIntent
 from app.models.catalog import Catalog
 from app.models.user import Role
 from app.services.access_service import AccessDeniedError
-from app.services.assistant import AssistantToolRegistry
+from app.services.assistant import AssistantOrchestrator, AssistantToolRegistry
 from app.services.auth_service import AuthService
 from app.services.user_service import UserService
 from app.services.warehouse.operations_service import WarehouseOperationsService
@@ -111,3 +111,59 @@ def test_ai_draft_role_change_before_confirmation_blocks_operation(
     with pytest.raises(AccessDeniedError):
         service.commit_batch(batch["id"], actor_user_id=20)
     assert repository.list_operations(batch["shift_id"]) == []
+
+
+class _NeverProvider:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def classify(self, *args, **kwargs):
+        self.calls += 1
+        raise AssertionError("deterministic warehouse command reached provider")
+
+
+def test_natural_writeoff_is_local_draft_and_operation_waits_for_confirmation(
+    warehouse,
+) -> None:
+    import asyncio
+
+    _, repository, service = warehouse
+    provider = _NeverProvider()
+    intent = asyncio.run(
+        AssistantOrchestrator(provider).interpret("спиши апельсин 200 грамм")
+    )
+    action = AssistantToolRegistry(Catalog(version=1)).execute(intent)
+    batch = service.prepare_batch(
+        actor_user_id=20,
+        source_chat_id=710,
+        source_message_id=810,
+        raw_text=action.raw_intake,
+    )
+    assert provider.calls == 0
+    assert repository.list_operations(batch["shift_id"]) == []
+    operations = service.commit_batch(batch["id"], actor_user_id=20)
+    assert len(operations) == 1
+
+
+def test_natural_writeoff_cancel_creates_no_operation(warehouse) -> None:
+    _, repository, service = warehouse
+    intent = AssistantOrchestrator.local_intent("спиши апельсин 200 г")
+    assert intent is not None
+    action = AssistantToolRegistry(Catalog(version=1)).execute(intent)
+    batch = service.prepare_batch(
+        actor_user_id=20,
+        source_chat_id=711,
+        source_message_id=811,
+        raw_text=action.raw_intake,
+    )
+    service.cancel_batch(batch["id"], actor_user_id=20)
+    assert repository.list_operations(batch["shift_id"]) == []
+
+
+def test_natural_transfer_missing_destination_clarifies_locally() -> None:
+    intent = AssistantOrchestrator.local_intent("перемести сахар 1 кг")
+    assert intent is not None
+    action = AssistantToolRegistry(Catalog(version=1)).execute(intent)
+    assert action.kind == "clarify"
+    assert action.pending_slots == ("destination",)
+    assert action.raw_intake is None

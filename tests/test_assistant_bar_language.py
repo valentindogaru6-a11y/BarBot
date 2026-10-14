@@ -1,6 +1,7 @@
 """Local-first regressions for practical bar vocabulary and routing."""
 
 import asyncio
+from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -17,6 +18,7 @@ from app.services.assistant import (
     ProviderError,
     ProviderErrorKind,
     capability_ids_for_domain,
+    context_reference_relation,
     parse_bar_request,
 )
 from app.services.auth_service import AuthService
@@ -89,7 +91,7 @@ def test_structured_mutation_fields_do_not_weaken_explicit_action_gate() -> None
     parsed = parse_bar_request("перемести молоко 0,25 л -> кухня")
     assert parsed.action == "transfer"
     assert parsed.entity == "молоко"
-    assert parsed.quantity == "0.25"
+    assert parsed.quantity == Decimal("0.25")
     assert parsed.unit == "л"
     assert parsed.destination == "кухня"
     assert parsed.mutation is True
@@ -390,3 +392,142 @@ def test_card_contents_followup_reuses_stable_entity_without_provider(
     assert shown.await_count == 2
     assert shown.await_args.args[3] == "berry-one"
     assert provider.calls == 0
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "что входит в него?",
+        "что входит в нее?",
+        "его состав",
+        "в нем какие ингредиенты?",
+        "эта карточка: что входит?",
+    ],
+)
+def test_reference_gender_variants_resolve_to_selected_stable_id_without_provider(
+    text, tmp_path, monkeypatch
+) -> None:
+    provider = NeverProvider()
+    memory = AssistantConversationMemory()
+    shown = AsyncMock()
+    monkeypatch.setattr(assistant, "_show_item", shown)
+    path = _followup_catalog(tmp_path)
+    first = _message("покажи техкарту ягодный чай первый")
+    asyncio.run(assistant._run_assistant(
+        first, SimpleNamespace(), text=first.text, catalog_path=path,
+        auth_service=AuthService(frozenset({1})),
+        orchestrator=AssistantOrchestrator(provider), warehouse_service=None,
+        conversation_memory=memory,
+    ))
+    followup = _message(text)
+    asyncio.run(assistant._run_assistant(
+        followup, SimpleNamespace(), text=text, catalog_path=path,
+        auth_service=AuthService(frozenset({1})),
+        orchestrator=AssistantOrchestrator(provider), warehouse_service=None,
+        conversation_memory=memory,
+    ))
+    assert shown.await_args.args[3] == "berry-one"
+    assert memory.get(1).last_successful_entity_id.endswith("/berry-one")
+    assert provider.calls == 0
+
+
+def test_failed_followup_and_provider_failure_keep_last_successful_entity(
+    tmp_path, monkeypatch
+) -> None:
+    provider = NeverProvider()
+    memory = AssistantConversationMemory()
+    shown = AsyncMock()
+    monkeypatch.setattr(assistant, "_show_item", shown)
+    path = _followup_catalog(tmp_path)
+    first = _message("покажи техкарту ягодный чай первый")
+    asyncio.run(assistant._run_assistant(
+        first, SimpleNamespace(), text=first.text, catalog_path=path,
+        auth_service=AuthService(frozenset({1})),
+        orchestrator=AssistantOrchestrator(provider), warehouse_service=None,
+        conversation_memory=memory,
+    ))
+    selected = memory.get(1).last_successful_entity_id
+    missing = _message("найди техкарту точно несуществующей позиции")
+    asyncio.run(assistant._run_assistant(
+        missing, SimpleNamespace(), text=missing.text, catalog_path=path,
+        auth_service=AuthService(frozenset({1})),
+        orchestrator=AssistantOrchestrator(provider), warehouse_service=None,
+        conversation_memory=memory,
+    ))
+    assert memory.get(1).last_successful_entity_id == selected
+    assert memory.get(1).last_attempt
+
+    failing = NeverProvider(ProviderError("gemini", ProviderErrorKind.TIMEOUT))
+    detail = _message("расскажи подробнее")
+    asyncio.run(assistant._run_assistant(
+        detail, SimpleNamespace(), text=detail.text, catalog_path=path,
+        auth_service=AuthService(frozenset({1})),
+        orchestrator=AssistantOrchestrator(failing), warehouse_service=None,
+        conversation_memory=memory,
+    ))
+    assert memory.get(1).last_successful_entity_id == selected
+
+
+def test_similarity_followup_returns_local_candidates_and_excludes_source(
+    tmp_path, monkeypatch
+) -> None:
+    provider = NeverProvider()
+    memory = AssistantConversationMemory()
+    shown = AsyncMock()
+    monkeypatch.setattr(assistant, "_show_item", shown)
+    path = _followup_catalog(tmp_path)
+    first = _message("покажи техкарту ягодный чай первый")
+    asyncio.run(assistant._run_assistant(
+        first, SimpleNamespace(), text=first.text, catalog_path=path,
+        auth_service=AuthService(frozenset({1})),
+        orchestrator=AssistantOrchestrator(provider), warehouse_service=None,
+        conversation_memory=memory,
+    ))
+    similar = _message("покажи что-то похожее")
+    asyncio.run(assistant._run_assistant(
+        similar, SimpleNamespace(), text=similar.text, catalog_path=path,
+        auth_service=AuthService(frozenset({1})),
+        orchestrator=AssistantOrchestrator(provider), warehouse_service=None,
+        conversation_memory=memory,
+    ))
+    context = memory.get(1)
+    assert context.relation is AssistantRelation.SIMILAR_TO
+    assert context.candidate_ids
+    assert all(not key.endswith("/berry-one") for key in context.candidate_ids)
+    assert provider.calls == 0
+
+
+def test_reference_without_selected_entity_asks_once_without_provider(tmp_path) -> None:
+    provider = NeverProvider()
+    memory = AssistantConversationMemory()
+    memory.remember(
+        1,
+        last_intent="find_tech_card",
+        last_entity_type="tech_card",
+        last_query="ягодный чай",
+        candidate_ids=("tea/_/berry-one", "tea/_/berry-two"),
+        pending_slots=("candidate",),
+    )
+    message = _message("что входит в него?")
+    asyncio.run(assistant._run_assistant(
+        message, SimpleNamespace(), text=message.text,
+        catalog_path=_followup_catalog(tmp_path),
+        auth_service=AuthService(frozenset({1})),
+        orchestrator=AssistantOrchestrator(provider), warehouse_service=None,
+        conversation_memory=memory,
+    ))
+    assert message.answer.await_args.args[0].startswith("Уточните")
+    assert memory.get(1).pending_slots == ("reference",)
+    assert provider.calls == 0
+
+
+@pytest.mark.parametrize(
+    ("text", "relation"),
+    [
+        ("что входит в него", AssistantRelation.INGREDIENTS_OF),
+        ("покажи что-то похожее", AssistantRelation.SIMILAR_TO),
+        ("эта карточка", AssistantRelation.DIRECT_LOOKUP),
+    ],
+)
+def test_context_reference_relation_is_structured(text, relation) -> None:
+    assert context_reference_relation(text) is relation

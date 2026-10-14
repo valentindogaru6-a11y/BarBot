@@ -156,15 +156,10 @@ class AssistantOrchestrator:
     @staticmethod
     def local_action_evidence(text: str) -> AssistantIntentName | None:
         """Return an action only for an explicit, deterministic command form."""
-
-        normalized = (
-            unicodedata.normalize("NFKC", text).casefold().replace("ё", "е")
-        )
-        normalized = re.sub(r"[^\w\s:]+", " ", normalized)
-        normalized = " ".join(normalized.split())
-        if _WRITEOFF_EVIDENCE_RE.search(normalized):
+        parsed = parse_bar_request(text)
+        if parsed.action == "writeoff" and parsed.mutation:
             return AssistantIntentName.PREPARE_WRITEOFF
-        if _TRANSFER_EVIDENCE_RE.search(normalized):
+        if parsed.action == "transfer" and parsed.mutation:
             return AssistantIntentName.PREPARE_TRANSFER
         return None
 
@@ -210,6 +205,29 @@ class AssistantOrchestrator:
         if _UNSUPPORTED_RE.search(cleaned):
             return AssistantIntent(intent=AssistantIntentName.UNSUPPORTED)
         parsed = parse_bar_request(cleaned)
+        if parsed.mutation and parsed.action in {"writeoff", "transfer"}:
+            return AssistantIntent(
+                intent=(
+                    AssistantIntentName.PREPARE_WRITEOFF
+                    if parsed.action == "writeoff"
+                    else AssistantIntentName.PREPARE_TRANSFER
+                ),
+                confidence=parsed.confidence,
+                items=[
+                    AssistantIntentItem(
+                        product_text=parsed.entity or None,
+                        quantity_text=(
+                            format(parsed.quantity, "f")
+                            if parsed.quantity is not None
+                            else None
+                        ),
+                        unit_text=parsed.unit or None,
+                        destination_text=parsed.destination or None,
+                        comment_text=parsed.comment or None,
+                    )
+                ],
+                evidence=parsed.evidence,
+            )
         if parsed.action == "search" and parsed.domain is AssistantDomain.CATALOG and parsed.entity:
             query = parsed.entity
             if parsed.relation is AssistantRelation.DIRECT_LOOKUP:

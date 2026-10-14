@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from typing import Literal, Sequence
 
 from app.models.assistant import (
@@ -92,6 +93,40 @@ class BarLexicon:
 
 BAR_LEXICON = BarLexicon()
 
+_CONTEXT_REFERENCE_RE = re.compile(
+    r"\b(?:он|она|оно|его|ее|него|нее|нем|ней|"
+    r"этот|эта|это|эту|данная\s+позиция|"
+    r"эта\s+карточка|эта\s+заготовка|этот\s+рецепт)\b"
+)
+_SIMILAR_REFERENCE_RE = re.compile(
+    r"\b(?:покажи|найди)?\s*(?:что\s*то|чтонибудь)?\s*"
+    r"похож\w*\b|\bа\s+есть\s+похож\w*\b|"
+    r"\bеще\s+вариант\w*\b|\bпокажи\s+друг\w*\b"
+)
+_REFERENCE_CONTENT_RE = re.compile(
+    r"\b(?:что\s+входит|состав|ингредиент\w*|как\s+(?:делать|готовить))\b"
+)
+
+
+def has_context_reference(value: str) -> bool:
+    """Return whether text refers to prior structured catalog context."""
+
+    text = normalize_bar_text(value)
+    return bool(_CONTEXT_REFERENCE_RE.search(text) or _SIMILAR_REFERENCE_RE.search(text))
+
+
+def context_reference_relation(value: str) -> AssistantRelation | None:
+    """Classify a follow-up relation without inventing a catalog entity."""
+
+    text = normalize_bar_text(value)
+    if _SIMILAR_REFERENCE_RE.search(text):
+        return AssistantRelation.SIMILAR_TO
+    if _CONTEXT_REFERENCE_RE.search(text) and _REFERENCE_CONTENT_RE.search(text):
+        return AssistantRelation.INGREDIENTS_OF
+    if _CONTEXT_REFERENCE_RE.search(text):
+        return AssistantRelation.DIRECT_LOOKUP
+    return None
+
 
 @dataclass(frozen=True, slots=True)
 class ParsedBarRequest:
@@ -103,9 +138,10 @@ class ParsedBarRequest:
     relation: AssistantRelation = AssistantRelation.UNSPECIFIED
     requested_kind: AssistantRequestedKind = AssistantRequestedKind.UNSPECIFIED
     relation_target: str = ""
-    quantity: str = ""
+    quantity: Decimal | None = None
     unit: str = ""
     destination: str = ""
+    comment: str = ""
     period: str = ""
     person: str = ""
     confidence: int = 0
@@ -114,11 +150,15 @@ class ParsedBarRequest:
 
 
 _WRITEOFF_RE = re.compile(
-    r"^(?:спиши(?:те)?|списать|(?:сделай|оформи)\s+списани\w*|списание\s*:)",
+    r"^(?:спиши(?:те)?|списать|нужно\s+списать|"
+    r"(?:убери(?:те)?|добавь(?:те)?)\s+в\s+списание|"
+    r"(?:сделай|оформи)\s+списани\w*|списание\s*:?)",
 )
 _TRANSFER_RE = re.compile(
     r"^(?:перемести(?:те)?|переместить|перенеси(?:те)?|перенести|"
-    r"(?:сделай|оформи)\s+перемещени\w*|перемещение\s*:)",
+    r"отправь(?:те)?|(?:сделай|оформи)\s+перемещени\w*|"
+    r"перемещение(?:\s*:)? )",
+    re.VERBOSE,
 )
 _CATALOG_HINT_RE = re.compile(
     r"\b(?:ингредиент\w*|состав\w*|напит\w*|коктейл\w*|чай\w*|сироп\w*)\b"
@@ -132,32 +172,76 @@ _UNIT_RE = re.compile(
     r"\b(?P<unit>кг|килограмм\w*|г|гр|грамм\w*|л|литр\w*|мл|миллилитр\w*|шт|штук\w*)\b"
 )
 _DESTINATION_RE = re.compile(
-    r"(?:->|→|\b(?:в|на)\b)\s*(?P<destination>бар\w*|кухн\w*|склад\w*)",
+    r"(?:->|→|\b(?:в|на)\b)\s*(?P<destination>[\w][\w\s-]{0,199})\s*$",
     re.IGNORECASE,
 )
 
 
-def _mutation_details(value: str, normalized: str) -> tuple[str, str, str, str]:
-    numeric_text = unicodedata.normalize("NFKC", value).casefold().replace(",", ".")
+def _mutation_details(
+    value: str,
+    *,
+    transfer: bool,
+) -> tuple[str, Decimal | None, str, str, str]:
+    raw_text = unicodedata.normalize("NFKC", value).casefold().strip()
+    comment = ""
+    comment_match = re.search(r"\(([^()]*)\)\s*$", raw_text)
+    if comment_match is not None:
+        comment = " ".join(comment_match.group(1).split())[:500]
+        raw_text = raw_text[: comment_match.start()].rstrip()
+    elif "," in raw_text:
+        possible_core, possible_comment = raw_text.rsplit(",", 1)
+        if _QUANTITY_RE.search(possible_core) and _UNIT_RE.search(
+            normalize_bar_text(possible_core)
+        ):
+            comment = " ".join(possible_comment.split())[:500]
+            raw_text = possible_core.rstrip()
+
+    normalized = normalize_bar_text(raw_text)
+    numeric_text = raw_text.replace(",", ".")
     quantity_match = _QUANTITY_RE.search(numeric_text)
     unit_match = _UNIT_RE.search(normalized)
-    destination_match = _DESTINATION_RE.search(
-        unicodedata.normalize("NFKC", value).casefold().replace("ё", "е")
-    )
+    destination_match = _DESTINATION_RE.search(raw_text.replace("ё", "е")) if transfer else None
     entity = _WRITEOFF_RE.sub(" ", normalized)
     entity = _TRANSFER_RE.sub(" ", entity)
     entity = re.sub(r"\b\d+\s+\d+\b", " ", entity)
     entity = _QUANTITY_RE.sub(" ", entity)
     entity = _UNIT_RE.sub(" ", entity)
     if destination_match is not None:
-        destination_words = normalize_bar_text(destination_match.group(0)).split()
-        for word in destination_words:
+        normalized_destination = normalize_bar_text(destination_match.group("destination"))
+        entity = re.sub(
+            rf"\b(?:в|на)\s+{re.escape(normalized_destination)}\s*$",
+            " ",
+            entity,
+        )
+        for word in normalized_destination.split():
             entity = re.sub(rf"\b{re.escape(word)}\b", " ", entity)
+    quantity: Decimal | None = None
+    if quantity_match is not None:
+        try:
+            quantity = Decimal(quantity_match.group("quantity").replace(",", "."))
+        except InvalidOperation:
+            quantity = None
+    elif unit_match is not None and unit_match.group("unit") in {
+        "килограмм",
+        "литр",
+        "штука",
+    }:
+        quantity = Decimal("1")
+    destination = (
+        normalize_bar_text(destination_match.group("destination"))
+        if destination_match
+        else ""
+    )
+    if destination.endswith("ю"):
+        destination = destination[:-1] + "я"
+    elif destination.endswith("у"):
+        destination = destination[:-1] + "а"
     return (
         " ".join(entity.split()),
-        quantity_match.group("quantity").replace(",", ".") if quantity_match else "",
+        quantity,
         unit_match.group("unit") if unit_match else "",
-        normalize_bar_text(destination_match.group("destination")) if destination_match else "",
+        destination,
+        comment,
     )
 
 
@@ -184,18 +268,24 @@ def parse_bar_request(value: str, *, lexicon: BarLexicon = BAR_LEXICON) -> Parse
         return ParsedBarRequest(action="unknown", domain=AssistantDomain.GENERAL)
 
     if _WRITEOFF_RE.search(text):
-        entity, quantity, unit, destination = _mutation_details(value, text)
+        entity, quantity, unit, destination, comment = _mutation_details(
+            value, transfer=False
+        )
         return ParsedBarRequest(
             action="writeoff", domain=AssistantDomain.WAREHOUSE, entity=entity,
             quantity=quantity, unit=unit, destination=destination,
+            comment=comment,
             confidence=10_000,
             evidence=("explicit_writeoff",), mutation=True,
         )
     if _TRANSFER_RE.search(text):
-        entity, quantity, unit, destination = _mutation_details(value, text)
+        entity, quantity, unit, destination, comment = _mutation_details(
+            value, transfer=True
+        )
         return ParsedBarRequest(
             action="transfer", domain=AssistantDomain.WAREHOUSE, entity=entity,
             quantity=quantity, unit=unit, destination=destination,
+            comment=comment,
             confidence=10_000,
             evidence=("explicit_transfer",), mutation=True,
         )

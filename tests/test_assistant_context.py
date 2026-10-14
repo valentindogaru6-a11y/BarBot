@@ -91,3 +91,31 @@ def test_completing_structured_context_revokes_callbacks_but_keeps_turns() -> No
     assert context.pending_slots == ()
     assert context.authorized_action == ""
     assert memory.provider_history(1) == (("user", "покажи карту"),)
+
+
+def test_failed_attempt_does_not_replace_successful_entity_and_chats_are_isolated() -> None:
+    memory = AssistantConversationMemory()
+    memory.remember(
+        1, chat_id=10, last_intent="find_tech_card",
+        last_entity_type="tech_card", last_query="ягодное пюре",
+        last_entity_id="prep/_/berry", last_entity_label="Ягодное пюре",
+        selected_entity_id="prep/_/berry",
+    )
+    memory.remember(
+        1, chat_id=10, last_intent="not_found",
+        last_entity_type="catalog_attempt", last_query="неизвестно",
+        last_attempt="неизвестно",
+    )
+    assert memory.get(1, 10).last_successful_entity_id == "prep/_/berry"
+    assert memory.get(1, 11) is None
+
+
+def test_reset_clears_last_successful_entity() -> None:
+    memory = AssistantConversationMemory()
+    memory.remember(
+        1, last_intent="find_tech_card", last_entity_type="tech_card",
+        last_query="ягодное пюре", last_entity_id="prep/_/berry",
+        last_entity_label="Ягодное пюре", selected_entity_id="prep/_/berry",
+    )
+    memory.clear(1)
+    assert memory.get(1) is None

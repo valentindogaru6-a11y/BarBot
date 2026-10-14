@@ -4,7 +4,7 @@ Scope: regressions and operational lessons worth checking before related work
 Trust: Confirmed unless marked Owner-confirmed
 Lifecycle: Fresh
 Last verified: 2026-10-14
-Evidence: regression tests, Git history through `c2ce9fd2ae46509b8ed47aa6d44e1cc1b3ccf80f`, rollout docs, owner observations
+Evidence: regression tests, Git history, rollout docs, owner observations
 Depends on: callbacks, SQLite/WAL, workers, XLSX, imports, VPS environment
 Importance: High
 
@@ -53,6 +53,18 @@ Importance: High
   enums, forbidden unknown intent fields, end-to-end contract regressions and
   backward-compatible persistent context. Re-test parser → intent → tool →
   callback/context whenever one of these boundaries changes.
+- **Failed follow-ups must not erase successful context:** literal pronoun
+  extraction, clearing structured state after `not_found`, and rebuilding a
+  similarity query from display text can turn stable relation follow-ups into
+  fuzzy lookup or needless clarification. Keep successful entity, candidates,
+  clarification and last attempt distinct; resolve references by stable ID and
+  test provider failure, restart, reset and actor/chat isolation.
+- **Explicit warehouse commands need a deterministic pre-provider route:** a
+  fully parseable imperative that falls through to provider planning can end in
+  a provider error instead of the existing safe draft flow. Require imperative
+  evidence, typed Decimal quantity/unit/destination parsing and the existing
+  draft/preview/confirmation boundary; keep informational language negative
+  tests alongside mutation tests.
 
 Revalidate runtime-dependent lessons before production action. Do not turn an
 owner observation into a measured infrastructure claim without evidence.

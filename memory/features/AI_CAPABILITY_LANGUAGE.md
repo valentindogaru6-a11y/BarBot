@@ -22,8 +22,8 @@ coverage`; never infer examples merely from a title or adapter name.
 | Capability ID | Roles | Risk | Domain | Parameters | Confirmation | Language / fallback / regression coverage |
 |---|---|---:|---|---|---|---|
 | `navigation.main` | SA,A,B,Acc | 0 | navigation | none | none | pending live coverage |
-| `catalog.search` | SA,A,B | 0 | catalog | query | none | verified relation phrases below; local retrieval; assistant bar-language/retrieval tests |
-| `catalog.get` | SA,A,B | 0 | catalog | stable entity | none | verified relation phrases below; stable-ID callback/context tests |
+| `catalog.search` | SA,A,B | 0 | catalog | query/relation/selected stable entity | none | tested direct/relation lookup and similarity follow-up below; deterministic local retrieval; fuzzy results remain candidates |
+| `catalog.get` | SA,A,B | 0 | catalog | stable entity | none | tested pronoun/card-content follow-ups below; stable-ID callback/context tests |
 | `catalog.manage` | SA,A | 2 | catalog | mutation fields | explicit | pending live coverage |
 | `users.list` | SA,A | 0 | employees | none | none | pending live coverage |
 | `users.list_bartenders` | SA,A | 0 | employees | none | none | pending live coverage |
@@ -39,8 +39,8 @@ coverage`; never infer examples merely from a title or adapter name.
 | `warehouse.shift_summary` | SA,A,B,Acc | 0 | warehouse | none | none | pending live coverage |
 | `warehouse.list_operations` | SA,A,B,Acc | 0 | warehouse | none | none | pending live coverage |
 | `warehouse.required_status` | SA,A,B,Acc | 0 | warehouse | none | none | pending live coverage |
-| `warehouse.prepare_writeoff` | SA,A,B | 1 | warehouse | warehouse lines | none before existing draft flow | pending live coverage |
-| `warehouse.prepare_transfer` | SA,A,B | 1 | warehouse | warehouse lines | none before existing draft flow | pending live coverage |
+| `warehouse.prepare_writeoff` | SA,A,B | 1 | warehouse | product, Decimal quantity, unit; optional comment | existing draft confirmation | tested imperative forms below; local draft fallback; missing quantity/unit uses clarification; remaining colloquial forms pending live coverage |
+| `warehouse.prepare_transfer` | SA,A,B | 1 | warehouse | product, Decimal quantity, unit, destination; optional comment | existing draft confirmation | tested imperative forms below; local draft fallback; missing destination uses clarification; remaining colloquial forms pending live coverage |
 | `warehouse.commit_batch` | SA,A,B | 2 | warehouse | stable entity | explicit | pending live coverage |
 | `warehouse.cancel_batch` | SA,A,B | 2 | warehouse | stable entity | explicit | pending live coverage |
 | `warehouse.start_required_flow` | SA,A,B | 1 | warehouse | none | existing flow rules | pending live coverage |
@@ -69,6 +69,25 @@ coverage`; never infer examples merely from a title or adapter name.
 - `найди мне пфку для ягодного чая` → `Ягодная основа для чая`.
 - `покажи что входит в ягодный чай` → `ingredients_of` →
   `Ягодная основа для чая`.
+- A selected card followed by a pronoun-based ingredients question resolves
+  against the same stable entity even when grammatical gender differs.
+- A selected card followed by a request for something similar uses
+  `similar_to`, excludes the source and returns local candidates without a
+  provider call.
+
+## Verified warehouse language
+
+- Writeoff imperatives equivalent to `спиши`, `списать`, `сделай/оформи
+  списание`, `нужно списать` and `убери в списание`, with product, quantity and
+  unit, create only the existing persistent draft/preview.
+- Transfer imperatives equivalent to `перемести`, `перенеси` and `сделай
+  перемещение`, with product, quantity, unit and destination, create only the
+  existing persistent draft/preview.
+- Missing quantity or destination produces a local clarification; informational
+  questions about writeoffs/transfers do not create drafts.
+- Confirmation, cancellation, duplicate-confirm and role-change behavior stays
+  owned by the existing warehouse flow. Additional natural synonyms remain
+  `pending live coverage` until tests or controlled acceptance confirm them.
 
 All other natural-command, synonym, clarification and fallback cells remain
 pending live coverage until a test or controlled owner observation confirms

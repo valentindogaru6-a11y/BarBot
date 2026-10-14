@@ -179,11 +179,14 @@ def test_writeoff_followup_combines_only_structured_product_context(
             conversation_memory=memory,
         )
     )
-    assert client.calls[0][0] == "спиши морковь 500 грамм, сгнила"
+    assert client.calls == []
     raw_intake = prepare.await_args.args[3]
     assert "морковь 500 грамм" in raw_intake
     assert "сгнила" in raw_intake
-    assert memory.get(1) is None
+    completed = memory.get(1)
+    assert completed is not None
+    assert completed.pending_slots == ()
+    assert completed.authorized_action == ""
 
 
 def test_transfer_followup_preserves_product_and_requires_existing_preview(
@@ -234,7 +237,7 @@ def test_transfer_followup_preserves_product_and_requires_existing_preview(
             conversation_memory=memory,
         )
     )
-    assert client.calls[0][0] == "перемести кокосовое молоко литр на кухню"
+    assert client.calls == []
     assert "-> кухня" in prepare.await_args.args[3]
 
 

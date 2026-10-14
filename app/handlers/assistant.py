@@ -50,6 +50,8 @@ from app.services.assistant import (
     AssistantCapabilityController,
     extract_catalog_entity,
     capability_ids_for_domain,
+    context_reference_relation,
+    has_context_reference,
     parse_bar_request,
 )
 from app.services.assistant.proposals import (
@@ -96,10 +98,8 @@ _OPEN_SESSIONS_RE = re.compile(
     r"\b(?:смен\w*|сесси\w*)\b.*\b(?:открыт\w*|до сих пор)\b",
     re.IGNORECASE,
 )
-_SIMILAR_FOLLOWUP_RE = re.compile(r"\b(?:что[- ]?то\s+)?похож\w*\b", re.IGNORECASE)
 _IMAGE_FOLLOWUP_RE = re.compile(r"\b(?:картинк\w*|изображени\w*|фото)\b", re.IGNORECASE)
 _OFFLINE_FOLLOWUP_RE = re.compile(r"\b(?:без\s+интернет\w*|выдай\s+что\s+знаешь)\b", re.IGNORECASE)
-_REFERENCE_RE = re.compile(r"\b(?:его|ее|её|нее|неё|это|похож\w*)\b", re.IGNORECASE)
 _CANDIDATE_ORDINAL_RE = re.compile(
     r"^\s*(?:покажи\s+)?(?P<ordinal>перв\w*|втор\w*|трет\w*|четверт\w*|пят\w*)\s*[?!.]*\s*$",
     re.IGNORECASE,
@@ -126,17 +126,17 @@ def resolve_contextual_request(
     """Resolve only high-confidence references; otherwise request clarification."""
 
     if context is None:
-        return text, bool(_REFERENCE_RE.search(text))
-    anchor = context.last_query or context.last_entity_label or context.topic
-    if _SIMILAR_FOLLOWUP_RE.search(text):
-        return (f"покажи техкарту {anchor}", False) if anchor else (text, True)
+        return text, has_context_reference(text)
     if _OFFLINE_FOLLOWUP_RE.search(text) and context.topic:
         return (
             f"Расскажи по общим знаниям без поиска в интернете: {context.topic}. {text}",
             False,
         )
-    if _REFERENCE_RE.search(text) and not anchor:
-        return text, True
+    if has_context_reference(text):
+        if context.current_candidates and context.pending_clarification == "candidate":
+            return text, True
+        if not context.last_successful_entity_id:
+            return text, True
     return text, False
 
 
@@ -314,7 +314,7 @@ async def _run_assistant(
         catalog = load_catalog(catalog_path)
     except CatalogStorageError:
         if conversation_memory is not None and message.from_user is not None:
-            conversation_memory.clear(message.from_user.id)
+            conversation_memory.clear(message.from_user.id, message.chat.id)
         logger.exception("Assistant catalog load failed")
         await message.answer("Каталог временно недоступен.")
         return
@@ -322,16 +322,16 @@ async def _run_assistant(
     normalized_command = " ".join(text.casefold().split())
     if normalized_command in _CONVERSATION_RESET_PHRASES:
         if conversation_memory is not None and user_id is not None:
-            conversation_memory.clear(user_id)
+            conversation_memory.clear(user_id, message.chat.id)
         await message.answer(AI_CONTEXT_RESET_TEXT)
         return
     if normalized_command in {"отмена", "отмени", "cancel"}:
         if conversation_memory is not None and user_id is not None:
-            conversation_memory.clear(user_id)
+            conversation_memory.clear(user_id, message.chat.id)
         await message.answer(AI_CONTEXT_CANCELLED_TEXT)
         return
     context = (
-        conversation_memory.get(user_id)
+        conversation_memory.get(user_id, message.chat.id)
         if conversation_memory is not None and user_id is not None
         else None
     )
@@ -342,9 +342,10 @@ async def _run_assistant(
         and user_id is not None
     ):
         conversation_memory.clear_structured(
-            user_id, last_intent="clarification_answer", topic=text
+            user_id, chat_id=message.chat.id,
+            last_intent="clarification_answer", topic=text
         )
-        context = conversation_memory.get(user_id)
+        context = conversation_memory.get(user_id, message.chat.id)
     if user_id is not None and _OPEN_SESSIONS_RE.search(text):
         tools = AssistantReadOnlyTools(
             catalog,
@@ -376,10 +377,11 @@ async def _run_assistant(
         else:
             answer = "Открытых персональных смен сейчас нет."
         if conversation_memory is not None:
-            conversation_memory.append_turn(user_id, role="user", text=text, last_intent="list_open_attendance_sessions", topic="открытые смены")
-            conversation_memory.append_turn(user_id, role="assistant", text=answer, last_intent="list_open_attendance_sessions")
+            conversation_memory.append_turn(user_id, chat_id=message.chat.id, role="user", text=text, last_intent="list_open_attendance_sessions", topic="открытые смены")
+            conversation_memory.append_turn(user_id, chat_id=message.chat.id, role="assistant", text=answer, last_intent="list_open_attendance_sessions")
             conversation_memory.remember(
-                user_id, last_intent="list_open_attendance_sessions",
+                user_id, chat_id=message.chat.id,
+                last_intent="list_open_attendance_sessions",
                 last_entity_type="attendance", last_query="открытые смены",
                 topic="открытые смены", last_tool_name="list_open_attendance_sessions",
             )
@@ -391,8 +393,8 @@ async def _run_assistant(
             f"Могу продолжить по теме «{context.topic or context.last_query}» текстом."
         )
         if conversation_memory is not None and user_id is not None:
-            conversation_memory.append_turn(user_id, role="user", text=text, last_intent="unsupported")
-            conversation_memory.append_turn(user_id, role="assistant", text=answer, last_intent="unsupported")
+            conversation_memory.append_turn(user_id, chat_id=message.chat.id, role="user", text=text, last_intent="unsupported")
+            conversation_memory.append_turn(user_id, chat_id=message.chat.id, role="assistant", text=answer, last_intent="unsupported")
         await _answer_safe_text(message, answer)
         return
     allowed_action = orchestrator.local_action_evidence(text)
@@ -408,7 +410,7 @@ async def _run_assistant(
         allowed_action = AssistantIntentName(context.authorized_action)
     request_text = text
     provider_history = (
-        conversation_memory.provider_history(user_id)
+        conversation_memory.provider_history(user_id, message.chat.id)
         if conversation_memory is not None and user_id is not None
         else ()
     )
@@ -423,48 +425,51 @@ async def _run_assistant(
         )[:1000]
         if compact_context:
             provider_history = (("user", f"[Рабочий контекст: {compact_context}]"), *provider_history)
-    if context is not None:
+    if context is not None and allowed_action is None:
         request_text, ambiguous_reference = resolve_contextual_request(text, context)
         if ambiguous_reference:
             if conversation_memory is not None and user_id is not None:
                 conversation_memory.remember(
-                    user_id, last_intent="clarify", last_entity_type="conversation",
+                    user_id, chat_id=message.chat.id,
+                    last_intent="clarify", last_entity_type="conversation",
                     last_query="", pending_slots=("reference",),
-                    topic=context.topic,
+                    topic=context.topic, last_attempt=text,
                 )
             await message.answer("Уточните, пожалуйста, о какой позиции или теме речь.")
             return
-        if (
-            request_text == text
-            and context.last_entity_type == "tech_card"
-            and (
-                _REFERENCE_RE.search(text)
-                or context.pending_slots == ("candidate",)
-            )
-        ):
-            request_text = f"покажи техкарту {context.last_query} {text}"
-        elif (
-            context.last_entity_type == "warehouse_product"
-            and allowed_action is not None
-        ):
-            verb = (
-                "спиши"
-                if context.last_intent == "prepare_writeoff"
-                else "перемести"
-            )
-            request_text = f"{verb} {context.last_query} {text}"
-    else:
+    elif context is None and allowed_action is None:
         request_text, ambiguous_reference = resolve_contextual_request(text, None)
         if ambiguous_reference:
             if conversation_memory is not None and user_id is not None:
                 conversation_memory.remember(
-                    user_id, last_intent="clarify", last_entity_type="conversation",
+                    user_id, chat_id=message.chat.id,
+                    last_intent="clarify", last_entity_type="conversation",
                     last_query="", pending_slots=("reference",), topic="",
+                    last_attempt=text,
                 )
             await message.answer("Уточните, пожалуйста, о какой позиции или теме речь.")
             return
+    elif (
+        context is not None
+        and context.last_entity_type == "warehouse_product"
+        and context.authorized_action
+        in {
+            AssistantIntentName.PREPARE_WRITEOFF.value,
+            AssistantIntentName.PREPARE_TRANSFER.value,
+        }
+    ):
+        allowed_action = AssistantIntentName(context.authorized_action)
+        verb = (
+            "спиши"
+            if allowed_action is AssistantIntentName.PREPARE_WRITEOFF
+            else "перемести"
+        )
+        request_text = f"{verb} {context.last_query} {text}"
 
     contextual_intent: AssistantIntent | None = None
+    reference_relation = (
+        None if allowed_action is not None else context_reference_relation(text)
+    )
     ordinal_match = _CANDIDATE_ORDINAL_RE.fullmatch(text)
     if context is not None and ordinal_match is not None and context.candidate_ids:
         ordinal = ordinal_match.group("ordinal").casefold()
@@ -491,22 +496,37 @@ async def _run_assistant(
                     selected_entity_id=context.candidate_ids[ordinal_index],
                     evidence=("stable_candidate_selection",),
                 )
-    elif (
-        context is not None
-        and context.last_entity_type == "tech_card"
-        and context.last_entity_label
-        and _REFERENCE_RE.search(text)
-        and _CARD_CONTENT_RE.search(text)
-    ):
+    elif context is not None and reference_relation is not None:
+        selected_id = context.last_successful_entity_id
+        selected_label = context.last_successful_entity_label
+        if not selected_id:
+            if conversation_memory is not None:
+                conversation_memory.remember(
+                    user_id,
+                    chat_id=message.chat.id,
+                    last_intent="clarify",
+                    last_entity_type="conversation",
+                    last_query="",
+                    candidate_ids=context.current_candidates,
+                    pending_slots=("reference",),
+                    topic=context.topic,
+                    last_attempt=text,
+                )
+            await message.answer("Уточните, пожалуйста, о какой позиции или теме речь.")
+            return
         contextual_intent = AssistantIntent(
             intent=AssistantIntentName.FIND_TECH_CARD,
             confidence=10_000,
-            query=context.last_query or context.last_entity_label,
+            query=selected_label or context.last_query,
             domain=AssistantDomain.CATALOG,
-            requested_kind=AssistantRequestedKind.INGREDIENT,
-            relation=AssistantRelation.INGREDIENTS_OF,
-            relation_target=context.last_entity_label,
-            selected_entity_id=context.last_entity_id,
+            requested_kind=(
+                AssistantRequestedKind.INGREDIENT
+                if reference_relation is AssistantRelation.INGREDIENTS_OF
+                else AssistantRequestedKind.TECH_CARD
+            ),
+            relation=reference_relation,
+            relation_target=selected_label or context.last_query,
+            selected_entity_id=selected_id,
             evidence=("stable_entity_followup",),
         )
 
@@ -746,8 +766,8 @@ async def _run_assistant(
             f"Для {shift.location} на {shift.business_date} складская смена ещё не создана."
         )
         if conversation_memory is not None and user_id is not None:
-            conversation_memory.append_turn(user_id, role="user", text=text, last_intent=action.kind, topic="текущая смена")
-            conversation_memory.append_turn(user_id, role="assistant", text=answer, last_intent=action.kind)
+            conversation_memory.append_turn(user_id, chat_id=message.chat.id, role="user", text=text, last_intent=action.kind, topic="текущая смена")
+            conversation_memory.append_turn(user_id, chat_id=message.chat.id, role="assistant", text=answer, last_intent=action.kind)
         await _answer_safe_text(message, answer)
         return
 
@@ -761,6 +781,7 @@ async def _run_assistant(
         if conversation_memory is not None and user_id is not None:
             conversation_memory.append_turn(
                 user_id,
+                chat_id=message.chat.id,
                 role="user",
                 text=text,
                 last_intent="general_chat",
@@ -768,6 +789,7 @@ async def _run_assistant(
             )
             conversation_memory.append_turn(
                 user_id,
+                chat_id=message.chat.id,
                 role="assistant",
                 text=answer,
                 last_intent="general_chat",
@@ -778,11 +800,13 @@ async def _run_assistant(
         if not orchestrator.web_search_enabled:
             if conversation_memory is not None and user_id is not None:
                 conversation_memory.append_turn(
-                    user_id, role="user", text=text, last_intent="web_search",
+                    user_id, chat_id=message.chat.id,
+                    role="user", text=text, last_intent="web_search",
                     topic=action.entity_query or (context.topic if context else ""),
                 )
                 conversation_memory.remember(
-                    user_id, last_intent="web_search", last_entity_type="conversation",
+                    user_id, chat_id=message.chat.id,
+                    last_intent="web_search", last_entity_type="conversation",
                     last_query=context.last_query if context else "",
                     topic=action.entity_query or (context.topic if context else text),
                     last_requested_action="web_search",
@@ -814,6 +838,7 @@ async def _run_assistant(
         if conversation_memory is not None and user_id is not None:
             conversation_memory.append_turn(
                 user_id,
+                chat_id=message.chat.id,
                 role="user",
                 text=text,
                 last_intent="web_search",
@@ -821,6 +846,7 @@ async def _run_assistant(
             )
             conversation_memory.append_turn(
                 user_id,
+                chat_id=message.chat.id,
                 role="assistant",
                 text=answer,
                 last_intent="web_search",
@@ -845,11 +871,13 @@ async def _run_assistant(
             if conversation_memory is not None and user_id is not None:
                 conversation_memory.clear_structured(
                     user_id,
+                    chat_id=message.chat.id,
                     last_intent="find_tech_card",
                     topic=result.item.name,
                 )
                 conversation_memory.remember(
                     user_id,
+                    chat_id=message.chat.id,
                     last_intent="find_tech_card",
                     last_entity_type="tech_card",
                     last_query=result.item.name,
@@ -869,12 +897,14 @@ async def _run_assistant(
                 )
                 conversation_memory.append_turn(
                     user_id,
+                    chat_id=message.chat.id,
                     role="user",
                     text=text,
                     last_intent="find_tech_card",
                 )
                 conversation_memory.append_turn(
                     user_id,
+                    chat_id=message.chat.id,
                     role="assistant",
                     text=f"Открыта техкарта: {result.item.name}",
                     last_intent="find_tech_card",
@@ -894,6 +924,7 @@ async def _run_assistant(
             if conversation_memory is not None and user_id is not None:
                 conversation_memory.append_turn(
                     user_id,
+                    chat_id=message.chat.id,
                     role="user",
                     text=text,
                     last_intent="find_tech_card",
@@ -901,6 +932,7 @@ async def _run_assistant(
                 )
                 conversation_memory.remember(
                     user_id,
+                    chat_id=message.chat.id,
                     last_intent="find_tech_card",
                     last_entity_type="tech_card",
                     last_query=action.entity_query
@@ -912,6 +944,7 @@ async def _run_assistant(
                     relation_target=action.relation_target or "",
                     parent_entity_id=action.parent_entity_id or "",
                     related_entity_ids=action.related_entity_ids,
+                    last_attempt=action.entity_query or request_text,
                 )
             await message.answer(
                 action.message or "Возможно, вы имели в виду:",
@@ -920,14 +953,30 @@ async def _run_assistant(
                 ),
             )
         return
+    if action.kind == "not_found":
+        if conversation_memory is not None and user_id is not None:
+            conversation_memory.remember(
+                user_id,
+                chat_id=message.chat.id,
+                last_intent="not_found",
+                last_entity_type="catalog_attempt",
+                last_query=action.entity_query or extract_catalog_entity(request_text),
+                topic=context.topic if context is not None else "",
+                last_attempt=action.entity_query or request_text,
+            )
+        await message.answer(escape(action.message or AI_UNAVAILABLE_TEXT))
+        return
     if action.kind in {"prepare_writeoff", "prepare_transfer"}:
         if warehouse_service is None or action.raw_intake is None:
-            if conversation_memory is not None and user_id is not None:
-                conversation_memory.clear(user_id)
             await message.answer("Складской модуль сейчас недоступен.")
             return
         if conversation_memory is not None and user_id is not None:
-            conversation_memory.clear(user_id)
+            conversation_memory.clear_structured(
+                user_id,
+                chat_id=message.chat.id,
+                last_intent=action.kind,
+                topic=context.topic if context is not None else "",
+            )
         await prepare_intake_message(
             message,
             state,
@@ -945,6 +994,7 @@ async def _run_assistant(
     ):
         conversation_memory.remember(
             user_id,
+            chat_id=message.chat.id,
             last_intent=intent.intent.value,
             last_entity_type="warehouse_product",
             last_query=action.entity_query,
@@ -953,9 +1003,9 @@ async def _run_assistant(
         )
     elif action.kind == "clarify" and context is not None:
         if conversation_memory is not None and user_id is not None:
-            conversation_memory.refresh(user_id)
+            conversation_memory.refresh(user_id, message.chat.id)
     elif conversation_memory is not None and user_id is not None:
-        conversation_memory.clear(user_id)
+        conversation_memory.refresh(user_id, message.chat.id)
     await message.answer(escape(action.message or AI_UNAVAILABLE_TEXT))
 
 
@@ -1056,7 +1106,9 @@ async def handle_assistant_candidate(
     key = "/".join(
         (callback_data.category_id, subcategory_id, callback_data.item_id)
     )
-    context = assistant_conversation_memory.get(callback.from_user.id)
+    context = assistant_conversation_memory.get(
+        callback.from_user.id, callback.message.chat.id
+    )
     if context is None or key not in context.candidate_ids:
         await answer_callback_safely(
             callback, "Этот выбор устарел. Повторите запрос.", show_alert=True
@@ -1065,14 +1117,18 @@ async def handle_assistant_candidate(
     try:
         catalog = load_catalog(catalog_path)
     except CatalogStorageError:
-        assistant_conversation_memory.clear(callback.from_user.id)
+        assistant_conversation_memory.clear(
+            callback.from_user.id, callback.message.chat.id
+        )
         await answer_callback_safely(
             callback, "Каталог временно недоступен.", show_alert=True
         )
         return
     result = AssistantToolRegistry(catalog).retriever.by_key(key)
     if result is None:
-        assistant_conversation_memory.clear(callback.from_user.id)
+        assistant_conversation_memory.clear(
+            callback.from_user.id, callback.message.chat.id
+        )
         await answer_callback_safely(
             callback, "Карточка больше недоступна.", show_alert=True
         )
@@ -1081,6 +1137,7 @@ async def handle_assistant_candidate(
         return
     assistant_conversation_memory.remember(
         callback.from_user.id,
+        chat_id=callback.message.chat.id,
         last_intent="find_tech_card",
         last_entity_type="tech_card",
         last_query=context.last_query or result.item.name,
@@ -1097,12 +1154,14 @@ async def handle_assistant_candidate(
     )
     assistant_conversation_memory.append_turn(
         callback.from_user.id,
+        chat_id=callback.message.chat.id,
         role="user",
         text=result.item.name,
         last_intent="find_tech_card",
     )
     assistant_conversation_memory.append_turn(
         callback.from_user.id,
+        chat_id=callback.message.chat.id,
         role="assistant",
         text=f"Открыта техкарта: {result.item.name}",
         last_intent="find_tech_card",
@@ -1233,7 +1292,9 @@ async def _handle_assistant_voice_claimed(
     await message.answer(f"🎙 <b>Распознано:</b>\n«{escape(transcript)}»")
     if len(transcript) < 2:
         if assistant_conversation_memory is not None and message.from_user is not None:
-            assistant_conversation_memory.clear(message.from_user.id)
+            assistant_conversation_memory.clear(
+                message.from_user.id, message.chat.id
+            )
         await message.answer("Не удалось понять запрос. Повторите голосовое или отправьте текст.")
         return
     await _run_assistant(

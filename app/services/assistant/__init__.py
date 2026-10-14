@@ -63,6 +63,8 @@ from app.services.assistant.bar_language import (
     capability_ids_for_domain,
     normalize_bar_text,
     parse_bar_request,
+    context_reference_relation,
+    has_context_reference,
 )
 
 __all__ = [
@@ -112,4 +114,6 @@ __all__ = [
     "capability_ids_for_domain",
     "normalize_bar_text",
     "parse_bar_request",
+    "context_reference_relation",
+    "has_context_reference",
 ]
