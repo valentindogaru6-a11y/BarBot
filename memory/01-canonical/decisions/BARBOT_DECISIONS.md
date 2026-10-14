@@ -3,8 +3,8 @@
 Scope: compact durable decision record
 Trust: Confirmed, except the future-AI boundary which is owner-approved direction
 Lifecycle: Fresh
-Last verified: 2026-09-29
-Evidence: application code, tests, rollout documents, Git history, owner direction
+Last verified: 2026-10-14
+Evidence: application code, tests, rollout documents, Git history, owner direction, commit `c2ce9fd2ae46509b8ed47aa6d44e1cc1b3ccf80f`
 Depends on: current architecture and production policy
 Importance: Critical
 
@@ -94,3 +94,14 @@ Structured topic/entity/tool fields may resolve follow-ups but never authorize
 warehouse mutations. Read-only operational tools use fixed Pydantic contracts,
 centralized server-side role checks and existing read services; Gemini cannot
 choose SQL, tables, database identifiers or mutation methods.
+
+## D14 — Preserve typed local-first relation semantics
+
+Confident read-only catalog requests execute locally without Gemini. A local
+result cannot be replaced by a generic provider error, and a fuzzy candidate
+is never selected automatically. Parser, intent, orchestration, retrieval,
+persistent context and renderer/callback must preserve the typed request
+contract end to end; no layer may infer discarded fields from rebuilt text.
+Provider planning receives only the capabilities of the selected domain.
+Consequential actions remain inside the existing persistent
+draft/proposal/explicit-confirmation and server-side authorization boundaries.

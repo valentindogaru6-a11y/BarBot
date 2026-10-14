@@ -3,8 +3,8 @@
 Scope: durable BarBot architecture and safety decisions
 Trust: Confirmed
 Lifecycle: Fresh
-Last verified: 2026-09-29
-Evidence: `app/`, `tests/`, `docs/production_*.md`, Git history
+Last verified: 2026-10-14
+Evidence: `app/`, `tests/`, `docs/production_*.md`, Git history through `c2ce9fd2ae46509b8ed47aa6d44e1cc1b3ccf80f`
 Depends on: current application architecture
 Importance: Critical
 
@@ -22,3 +22,5 @@ Read [BarBot decisions](BARBOT_DECISIONS.md) for the compact decision set:
 10. Confirmation before mutations.
 11. Preserve production-added products during seed reconciliation.
 12. Future AI can call services only, never SQL/shell/systemd directly.
+13. Persistent AI context is bounded state, never mutation authority.
+14. Preserve typed local-first relation semantics across every AI layer.

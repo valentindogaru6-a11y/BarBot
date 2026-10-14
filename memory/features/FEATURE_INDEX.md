@@ -3,8 +3,8 @@
 Scope: feature-to-source routing
 Trust: Confirmed
 Lifecycle: Fresh
-Last verified: 2026-09-29
-Evidence: `app/`, tests, README
+Last verified: 2026-10-14
+Evidence: `app/`, tests, README, commit `c2ce9fd2ae46509b8ed47aa6d44e1cc1b3ccf80f`
 Depends on: current file layout
 Importance: High
 
@@ -22,5 +22,6 @@ Importance: High
 | Release safety | `app/release_preflight.py`, `app/storage/release_inspection.py`, production docs | release inspection/preflight/readiness tests |
 | Spreadsheet import | `source/import_bar_xls.py`, catalog JSON | imported-catalog/storage tests |
 | [AI assistant pilot](AI_ASSISTANT.md) | `app/handlers/assistant.py`, `app/services/assistant/`, `app/storage/assistant_conversation_*`, strict assistant/tool models | assistant retrieval/context/provider/orchestrator/routing/tool/migration tests |
+| [AI capability language coverage](AI_CAPABILITY_LANGUAGE.md) | authoritative `CAPABILITIES`, verified phrases and pending coverage | capability/controller and per-domain regression tests |
 
 Use this table to localize; read exact code when changing behavior.

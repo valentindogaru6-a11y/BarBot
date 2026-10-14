@@ -3,8 +3,8 @@
 Scope: application boundaries and runtime control flow
 Trust: Confirmed
 Lifecycle: Fresh
-Last verified: 2026-09-29
-Evidence: `app/bot.py`, `app/handlers/`, `app/services/`, `app/storage/`, `app/keyboards/`, tests
+Last verified: 2026-10-14
+Evidence: `app/bot.py`, `app/handlers/`, `app/services/`, `app/storage/`, `app/keyboards/`, tests, commit `c2ce9fd2ae46509b8ed47aa6d44e1cc1b3ccf80f`
 Depends on: current Python application structure
 Importance: Critical
 
@@ -42,6 +42,15 @@ Importance: Critical
   `CapabilityRegistry` filters actions by role, private-chat policy and flags.
   General chat returns escaped text only; the separate grounded-search adapter
   returns text plus metadata-backed links and has no registry access.
+- Bar Jarvis catalog requests follow one typed contract across `Local parser →
+  AssistantIntent → Orchestrator → Catalog retrieval/tool → Persistent
+  context → Renderer/callback`. The contract carries `domain`, action,
+  entity/query, `requested_kind`, relation, `relation_target`, stable candidate
+  and selected catalog IDs, plus confidence/evidence when applicable. No
+  intermediate layer may reconstruct these values only from newly assembled
+  text or silently discard fields it does not understand. Callback/context
+  continuation uses stable catalog IDs rather than environment-specific
+  numeric identifiers.
 
 Exact control flow or data shape must be re-read from source; this summary is a
 router, not a substitute for code review.

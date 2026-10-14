@@ -3,8 +3,8 @@
 Scope: routing entrypoint for BarBot project memory
 Trust: Confirmed
 Lifecycle: Fresh
-Last verified: 2026-09-29
-Evidence: repository at `a57cc389c4aafcf5e840b67b0481a168c032fe3b`
+Last verified: 2026-10-14
+Evidence: repository at `c2ce9fd2ae46509b8ed47aa6d44e1cc1b3ccf80f`
 Depends on: `AGENTS.md`, `memory/00-governing/WORKFLOW.md`
 Importance: Critical
 
@@ -21,6 +21,7 @@ Read this file first, then open only the smallest route needed by the task.
 | Production/release | `01-canonical/summary/PRODUCTION_SAFETY.md`; live revalidation is mandatory |
 | Architecture/impact | `01-canonical/summary/ARCHITECTURE.md`, symbol index, then targeted source |
 | Risks/regressions | lessons index |
+| Bar Jarvis/AI | `features/AI_ASSISTANT.md`, [capability language coverage](features/AI_CAPABILITY_LANGUAGE.md) |
 | Active Standard/Full task | relevant summary plus `02-working/CURRENT_CONTEXT.md` |
 
 ## Indexes

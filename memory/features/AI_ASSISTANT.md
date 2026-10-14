@@ -3,8 +3,8 @@
 Scope: bounded role-aware intent, conversation, retrieval, capabilities and proposals
 Trust: Confirmed from code and tests
 Lifecycle: Fresh
-Last verified: 2026-10-12
-Evidence: `app/services/assistant/`, `app/handlers/assistant.py`, assistant tests
+Last verified: 2026-10-14
+Evidence: `app/services/assistant/`, `app/handlers/assistant.py`, assistant tests, commit `c2ce9fd2ae46509b8ed47aa6d44e1cc1b3ccf80f`
 Depends on: catalog services, centralized access, warehouse draft confirmation
 Importance: High
 
@@ -25,6 +25,20 @@ Importance: High
   retrieval and are retained across process restart in the existing bounded
   conversation JSON field. Old list-only context rows remain readable; no
   schema migration or catalog-specific recipe alias is required.
+- Supported relations are `preparation_for`, `ingredients_of`, `similar_to`,
+  `direct_lookup` and `unspecified`. Supported requested kinds are
+  `preparation`, `tech_card`, `ingredient`, `category` and `unspecified`.
+  The end-to-end fields are `domain`, action, entity/query, requested kind,
+  relation, relation target, stable candidate IDs, stable selected ID and,
+  where applicable, confidence/evidence. No intermediate layer may rebuild
+  them only from synthesized text or silently discard fields it does not
+  understand.
+- Confirmed catalog examples:
+  - `найди пф для Berry radiance` resolves parent `Berry radiance
+    (ягідний)`, relation `preparation_for`, child `Ягодное пюре`;
+  - `найди мне пфку для ягодного чая` resolves `Ягодная основа для чая`;
+  - `покажи что входит в ягодный чай` uses `ingredients_of` and
+    resolves `Ягодная основа для чая`.
 - Gemini receives the request, normalized entity and only bounded local
   candidate labels. Its output remains strict schema/Pydantic data and cannot
   supply database IDs, callbacks, SQL, or service methods.

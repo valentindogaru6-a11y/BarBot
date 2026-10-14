@@ -3,8 +3,8 @@
 Scope: regressions and operational lessons worth checking before related work
 Trust: Confirmed unless marked Owner-confirmed
 Lifecycle: Fresh
-Last verified: 2026-09-29
-Evidence: regression tests, Git history, rollout docs, owner observations
+Last verified: 2026-10-14
+Evidence: regression tests, Git history through `c2ce9fd2ae46509b8ed47aa6d44e1cc1b3ccf80f`, rollout docs, owner observations
 Depends on: callbacks, SQLite/WAL, workers, XLSX, imports, VPS environment
 Importance: High
 
@@ -46,6 +46,13 @@ Importance: High
   explicit local command evidence or a live pending context created from that
   evidence. Keep both the dynamic provider enum and local post-validation;
   prompt instructions alone are not a security boundary.
+- **Relation metadata can be lost between AI layers:** dropping
+  `requested_kind` or relation between the local parser, `AssistantIntent` and
+  orchestration degraded a related-card lookup into ordinary fuzzy search.
+  Commit `c2ce9fd2ae46509b8ed47aa6d44e1cc1b3ccf80f` protects the route with strict
+  enums, forbidden unknown intent fields, end-to-end contract regressions and
+  backward-compatible persistent context. Re-test parser → intent → tool →
+  callback/context whenever one of these boundaries changes.
 
 Revalidate runtime-dependent lessons before production action. Do not turn an
 owner observation into a measured infrastructure claim without evidence.
