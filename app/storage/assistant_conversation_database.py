@@ -77,7 +77,11 @@ class AssistantConversationDatabase:
                 data.get("current_intent", ""), data.get("last_requested_action", ""),
                 data.get("last_catalog_query", ""), data.get("last_entity_type", ""),
                 data.get("last_entity_id", ""), data.get("last_entity_label", ""),
-                json.dumps(data.get("candidate_ids", ()), ensure_ascii=False),
+                json.dumps(
+                    data.get("candidate_context", data.get("candidate_ids", ())),
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ),
                 data.get("last_tool_name", ""), data.get("pending_clarification", ""),
                 data.get("authorized_action", ""),
             )

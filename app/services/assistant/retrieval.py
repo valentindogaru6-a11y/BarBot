@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from difflib import SequenceMatcher
 from typing import Iterable
 
+from app.models.assistant import AssistantRelation, AssistantRequestedKind
 from app.models.catalog import Catalog
 from app.services.catalog_service import CatalogService
 from app.services.search_service import SearchResult
@@ -83,6 +84,10 @@ def display_catalog_entity(value: str) -> str:
 
 
 def _stem(token: str) -> str:
+    # Common short words such as "чая"/"края" carry a mobile й in
+    # oblique cases.  Normalize the pattern generically, not per recipe.
+    if token.endswith("ая") and len(token) <= 5:
+        token = token[:-1] + "й"
     for suffix in _RUSSIAN_SUFFIXES:
         if token.endswith(suffix) and len(token) - len(suffix) >= 4:
             return token[: -len(suffix)]
@@ -123,6 +128,11 @@ class CatalogRetrieval:
     normalized_query: str
     exact: tuple[SearchResult, ...] = ()
     candidates: tuple[RankedCatalogCandidate, ...] = ()
+    requested_kind: AssistantRequestedKind = AssistantRequestedKind.UNSPECIFIED
+    relation: AssistantRelation = AssistantRelation.UNSPECIFIED
+    relation_target: str | None = None
+    parent_entity_ids: tuple[str, ...] = ()
+    related_entity_ids: tuple[str, ...] = ()
 
 
 class AssistantCatalogRetriever:
@@ -131,17 +141,61 @@ class AssistantCatalogRetriever:
     def __init__(self, catalog: Catalog) -> None:
         self.catalog_service = CatalogService(catalog)
 
-    def retrieve(self, query: str, *, limit: int = 5) -> CatalogRetrieval:
+    def retrieve(
+        self,
+        query: str,
+        *,
+        limit: int = 5,
+        requested_kind: AssistantRequestedKind = AssistantRequestedKind.UNSPECIFIED,
+        relation: AssistantRelation = AssistantRelation.UNSPECIFIED,
+        relation_target: str | None = None,
+        parent_entity_id: str | None = None,
+        selected_entity_id: str | None = None,
+    ) -> CatalogRetrieval:
         parsed_request = parse_bar_request(query)
-        normalized_query = extract_catalog_entity(query)
+        if requested_kind is AssistantRequestedKind.UNSPECIFIED:
+            requested_kind = parsed_request.requested_kind
+        if relation is AssistantRelation.UNSPECIFIED:
+            relation = parsed_request.relation
+        raw_target = relation_target or parsed_request.relation_target or query
+        normalized_query = extract_catalog_entity(raw_target)
+        metadata = {
+            "requested_kind": requested_kind,
+            "relation": relation,
+            "relation_target": (
+                normalized_query
+                if relation is not AssistantRelation.UNSPECIFIED
+                else None
+            ),
+        }
+        if selected_entity_id:
+            selected = self.by_key(selected_entity_id)
+            return CatalogRetrieval(
+                normalized_query=normalized_query,
+                exact=(selected,) if selected is not None else (),
+                related_entity_ids=(selected_entity_id,) if selected is not None else (),
+                **metadata,
+            )
         if not normalized_query:
-            return CatalogRetrieval(normalized_query="")
-        if parsed_request.requested_kind == "preparation":
-            related = self._related_preparations(normalized_query)
+            return CatalogRetrieval(normalized_query="", **metadata)
+        if relation is AssistantRelation.PREPARATION_FOR:
+            parents, related = self._related_preparations(
+                normalized_query,
+                parent_entity_id=parent_entity_id,
+            )
             if related:
                 return CatalogRetrieval(
                     normalized_query=normalized_query,
                     exact=related,
+                    parent_entity_ids=tuple(candidate_key(item) for item in parents),
+                    related_entity_ids=tuple(candidate_key(item) for item in related),
+                    **metadata,
+                )
+            if parents:
+                return CatalogRetrieval(
+                    normalized_query=normalized_query,
+                    parent_entity_ids=tuple(candidate_key(item) for item in parents),
+                    **metadata,
                 )
         query_tokens = _token_key(normalized_query)
         exact: list[SearchResult] = []
@@ -164,7 +218,11 @@ class AssistantCatalogRetriever:
                 or normalized_query in aliases
                 or (
                     len(normalized_query.split()) >= 2
-                    and normalized_query in tags
+                    and any(
+                        normalized_query == tag
+                        or query_tokens == _token_key(tag)
+                        for tag in tags
+                    )
                 )
             ):
                 exact.append(result)
@@ -180,7 +238,7 @@ class AssistantCatalogRetriever:
                 title_tokens,
                 aliases,
             )
-            if parsed_request.requested_kind == "preparation":
+            if requested_kind is AssistantRequestedKind.PREPARATION:
                 preparation_fields = (
                     normalize_assistant_text(result.category.name),
                     normalize_assistant_text(
@@ -201,14 +259,39 @@ class AssistantCatalogRetriever:
             return CatalogRetrieval(
                 normalized_query=normalized_query,
                 exact=tuple(exact),
+                related_entity_ids=tuple(candidate_key(item) for item in exact),
+                **metadata,
             )
         ranked.sort(key=lambda value: (-value.score, value.result.item.name.casefold()))
+        bounded = tuple(ranked[: max(1, min(limit, MAX_CATALOG_CANDIDATES))])
+        # A complete title-token containment is deterministic lexical evidence,
+        # unlike fuzzy similarity.  Promote only one unambiguous result.
+        if (
+            bounded
+            and bounded[0].reason.endswith("title_tokens")
+            and bounded[0].score >= 850
+            and all(item.score < bounded[0].score for item in bounded[1:])
+        ):
+            result = bounded[0].result
+            return CatalogRetrieval(
+                normalized_query=normalized_query,
+                exact=(result,),
+                related_entity_ids=(candidate_key(result),),
+                **metadata,
+            )
         return CatalogRetrieval(
             normalized_query=normalized_query,
-            candidates=tuple(ranked[: max(1, min(limit, MAX_CATALOG_CANDIDATES))]),
+            candidates=bounded,
+            related_entity_ids=tuple(candidate.key for candidate in bounded),
+            **metadata,
         )
 
-    def _related_preparations(self, query: str) -> tuple[SearchResult, ...]:
+    def _related_preparations(
+        self,
+        query: str,
+        *,
+        parent_entity_id: str | None = None,
+    ) -> tuple[tuple[SearchResult, ...], tuple[SearchResult, ...]]:
         """Resolve a requested preparation through tags or a card ingredient."""
 
         results = tuple(self._active_results())
@@ -230,16 +313,29 @@ class AssistantCatalogRetriever:
                 for tag in tags
                 for marker in ("п ф", "пф", "полуфабрикат", "заготовк")
             )
-            if is_preparation and query in tags:
+            if is_preparation and (
+                query in tags
+                or (
+                    len(query_tokens) >= 2
+                    and any(query_tokens == _token_key(tag) for tag in tags)
+                )
+                or query == title
+                or query in aliases
+                or (query_tokens and query_tokens == _token_key(title))
+            ):
                 direct.append(result)
-            if query == title or query in aliases or (
+            if parent_entity_id and candidate_key(result) == parent_entity_id:
+                parents.append(result)
+            elif not parent_entity_id and (query == title or query in aliases or (
                 query_tokens and query_tokens == _token_key(title)
             ) or (
-                query_tokens and set(query_tokens).issubset(_token_key(title))
-            ):
+                len(query_tokens) >= 2
+                and set(query_tokens).issubset(_token_key(title))
+            )):
                 parents.append(result)
         if direct:
-            return tuple(sorted(direct, key=lambda value: value.item.name.casefold()))
+            ordered = tuple(sorted(direct, key=lambda value: value.item.name.casefold()))
+            return (), ordered
 
         related_names: set[str] = set()
         for parent in parents:
@@ -253,7 +349,10 @@ class AssistantCatalogRetriever:
             for result in results
             if normalize_assistant_text(result.item.name) in related_names
         ]
-        return tuple(sorted(related, key=lambda value: value.item.name.casefold()))
+        return (
+            tuple(sorted(parents, key=lambda value: value.item.name.casefold())),
+            tuple(sorted(related, key=lambda value: value.item.name.casefold())),
+        )
 
     def by_key(self, key: str) -> SearchResult | None:
         return next(

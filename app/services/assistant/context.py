@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from dataclasses import dataclass, replace
+import json
 from time import monotonic
 from datetime import UTC, datetime, timedelta
 from typing import Callable, Literal
 
+from app.models.assistant import AssistantRelation, AssistantRequestedKind
 from app.storage.assistant_conversation_database import (
     AssistantConversationConflict,
     AssistantConversationDatabase,
@@ -42,6 +44,12 @@ class AssistantConversationContext:
     last_entity_id: str = ""
     last_entity_label: str = ""
     last_tool_name: str = ""
+    requested_kind: AssistantRequestedKind = AssistantRequestedKind.UNSPECIFIED
+    relation: AssistantRelation = AssistantRelation.UNSPECIFIED
+    relation_target: str = ""
+    parent_entity_id: str = ""
+    related_entity_ids: tuple[str, ...] = ()
+    selected_entity_id: str = ""
     revision: int = 1
 
 
@@ -94,6 +102,12 @@ class AssistantConversationMemory:
         last_entity_id: str = "",
         last_entity_label: str = "",
         last_tool_name: str = "",
+        requested_kind: AssistantRequestedKind = AssistantRequestedKind.UNSPECIFIED,
+        relation: AssistantRelation = AssistantRelation.UNSPECIFIED,
+        relation_target: str = "",
+        parent_entity_id: str = "",
+        related_entity_ids: tuple[str, ...] = (),
+        selected_entity_id: str = "",
     ) -> AssistantConversationContext:
         now = self._clock()
         previous = self.get(user_id, chat_id)
@@ -113,6 +127,12 @@ class AssistantConversationMemory:
             last_entity_id=last_entity_id[:300],
             last_entity_label=last_entity_label[:500],
             last_tool_name=last_tool_name[:100],
+            requested_kind=requested_kind,
+            relation=relation,
+            relation_target=relation_target[:300],
+            parent_entity_id=parent_entity_id[:300],
+            related_entity_ids=tuple(related_entity_ids[:5]),
+            selected_entity_id=selected_entity_id[:300],
             revision=(previous.revision + 1) if previous else 1,
         )
         return self._store(self._key(user_id, chat_id), context)
@@ -155,6 +175,12 @@ class AssistantConversationMemory:
             last_entity_id=previous.last_entity_id if previous else "",
             last_entity_label=previous.last_entity_label if previous else "",
             last_tool_name=previous.last_tool_name if previous else "",
+            requested_kind=previous.requested_kind if previous else AssistantRequestedKind.UNSPECIFIED,
+            relation=previous.relation if previous else AssistantRelation.UNSPECIFIED,
+            relation_target=previous.relation_target if previous else "",
+            parent_entity_id=previous.parent_entity_id if previous else "",
+            related_entity_ids=previous.related_entity_ids if previous else (),
+            selected_entity_id=previous.selected_entity_id if previous else "",
             revision=(previous.revision + 1) if previous else 1,
         )
         return self._store(self._key(user_id, chat_id), context)
@@ -211,6 +237,12 @@ class AssistantConversationMemory:
                 last_entity_id="",
                 last_entity_label="",
                 last_tool_name="",
+                requested_kind=AssistantRequestedKind.UNSPECIFIED,
+                relation=AssistantRelation.UNSPECIFIED,
+                relation_target="",
+                parent_entity_id="",
+                related_entity_ids=(),
+                selected_entity_id="",
                 revision=previous.revision + 1,
             ),
         )
@@ -275,14 +307,25 @@ class PersistentAssistantConversationMemory:
     def _parse(value: str) -> float:
         return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
 
+    @staticmethod
+    def _decode_candidate_context(raw: object) -> dict[str, object]:
+        decoded = json.loads(str(raw))
+        if isinstance(decoded, list):
+            return {"candidate_ids": decoded}
+        if not isinstance(decoded, dict):
+            raise ValueError("Invalid assistant candidate context")
+        return decoded
+
     def get(self, user_id: int, chat_id: int | None = None) -> AssistantConversationContext | None:
         actual_chat_id = user_id if chat_id is None else chat_id
         loaded = self.database.load(user_id, actual_chat_id, self._stamp(self._now()))
         if loaded is None:
             return None
         row, raw_turns = loaded
-        import json
-        candidates = tuple(json.loads(str(row["last_candidate_ids_json"])))
+        candidate_context = self._decode_candidate_context(
+            row["last_candidate_ids_json"]
+        )
+        candidates = tuple(candidate_context.get("candidate_ids", ()))
         turns = tuple(
             AssistantConversationTurn(
                 role=turn["role"],
@@ -307,6 +350,20 @@ class PersistentAssistantConversationMemory:
             last_entity_id=str(row["last_entity_id"]),
             last_entity_label=str(row["last_entity_label"]),
             last_tool_name=str(row["last_tool_name"]),
+            requested_kind=AssistantRequestedKind(
+                candidate_context.get("requested_kind", "unspecified")
+            ),
+            relation=AssistantRelation(
+                candidate_context.get("relation", "unspecified")
+            ),
+            relation_target=str(candidate_context.get("relation_target", "")),
+            parent_entity_id=str(candidate_context.get("parent_entity_id", "")),
+            related_entity_ids=tuple(
+                candidate_context.get("related_entity_ids", candidates)
+            )[:5],
+            selected_entity_id=str(
+                candidate_context.get("selected_entity_id", row["last_entity_id"])
+            ),
             revision=int(row["revision"]),
         )
 
@@ -326,6 +383,23 @@ class PersistentAssistantConversationMemory:
             "last_entity_id": context.last_entity_id[:300],
             "last_entity_label": context.last_entity_label[:500],
             "candidate_ids": context.candidate_ids[:5],
+            "candidate_context": {
+                "candidate_ids": context.candidate_ids[:5],
+                "requested_kind": context.requested_kind.value,
+                "relation": context.relation.value,
+                "relation_target": context.relation_target[:300],
+                "parent_entity_id": context.parent_entity_id[:300],
+                **(
+                    {"related_entity_ids": context.related_entity_ids[:5]}
+                    if context.related_entity_ids != context.candidate_ids
+                    else {}
+                ),
+                **(
+                    {"selected_entity_id": context.selected_entity_id[:300]}
+                    if context.selected_entity_id != context.last_entity_id
+                    else {}
+                ),
+            },
             "last_tool_name": context.last_tool_name[:100],
             "pending_clarification": context.pending_slots[0][:500] if context.pending_slots else "",
             "authorized_action": context.authorized_action[:100],
@@ -337,7 +411,7 @@ class PersistentAssistantConversationMemory:
         revision = self.database.save(user_id, chat_id, data, turns, expected_revision=expected, now=self._stamp(now))
         return replace(context, revision=revision, expires_at=(now + timedelta(seconds=self.ttl_seconds)).timestamp())
 
-    def remember(self, user_id: int, *, last_intent: str, last_entity_type: str, last_query: str, candidate_ids: tuple[str, ...] = (), pending_slots: tuple[str, ...] = (), topic: str | None = None, authorized_action: str = "", chat_id: int | None = None, summary_text: str | None = None, last_requested_action: str = "", last_entity_id: str = "", last_entity_label: str = "", last_tool_name: str = "") -> AssistantConversationContext:
+    def remember(self, user_id: int, *, last_intent: str, last_entity_type: str, last_query: str, candidate_ids: tuple[str, ...] = (), pending_slots: tuple[str, ...] = (), topic: str | None = None, authorized_action: str = "", chat_id: int | None = None, summary_text: str | None = None, last_requested_action: str = "", last_entity_id: str = "", last_entity_label: str = "", last_tool_name: str = "", requested_kind: AssistantRequestedKind = AssistantRequestedKind.UNSPECIFIED, relation: AssistantRelation = AssistantRelation.UNSPECIFIED, relation_target: str = "", parent_entity_id: str = "", related_entity_ids: tuple[str, ...] = (), selected_entity_id: str = "") -> AssistantConversationContext:
         actual_chat_id = user_id if chat_id is None else chat_id
         previous = self.get(user_id, actual_chat_id)
         now = self._now().timestamp()
@@ -350,6 +424,9 @@ class PersistentAssistantConversationMemory:
             summary_text=(summary_text if summary_text is not None else (previous.summary_text if previous else ""))[:2000],
             last_requested_action=last_requested_action[:100], last_entity_id=last_entity_id[:300],
             last_entity_label=last_entity_label[:500], last_tool_name=last_tool_name[:100],
+            requested_kind=requested_kind, relation=relation,
+            relation_target=relation_target[:300], parent_entity_id=parent_entity_id[:300],
+            related_entity_ids=tuple(related_entity_ids[:5]), selected_entity_id=selected_entity_id[:300],
             revision=previous.revision if previous else 0,
         )
         return self._save(user_id, actual_chat_id, context, previous.revision if previous else None)

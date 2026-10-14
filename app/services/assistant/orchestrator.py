@@ -10,9 +10,12 @@ from dataclasses import dataclass
 from typing import Literal, Sequence
 
 from app.models.assistant import (
+    AssistantDomain,
     AssistantIntent,
     AssistantIntentItem,
     AssistantIntentName,
+    AssistantRelation,
+    AssistantRequestedKind,
 )
 from app.models.catalog import Catalog
 from app.services.assistant.providers import (
@@ -125,6 +128,13 @@ class AssistantToolAction:
     pending_slots: tuple[str, ...] = ()
     entity_query: str | None = None
     catalog_exact: bool = False
+    domain: AssistantDomain = AssistantDomain.UNSPECIFIED
+    requested_kind: AssistantRequestedKind = AssistantRequestedKind.UNSPECIFIED
+    relation: AssistantRelation = AssistantRelation.UNSPECIFIED
+    relation_target: str | None = None
+    parent_entity_id: str | None = None
+    related_entity_ids: tuple[str, ...] = ()
+    selected_entity_id: str | None = None
 
 
 class AssistantOrchestrator:
@@ -200,16 +210,24 @@ class AssistantOrchestrator:
         if _UNSUPPORTED_RE.search(cleaned):
             return AssistantIntent(intent=AssistantIntentName.UNSUPPORTED)
         parsed = parse_bar_request(cleaned)
-        if (
-            parsed.action == "search"
-            and parsed.domain == "catalog"
-            and parsed.requested_kind == "preparation"
-            and parsed.entity
-        ):
+        if parsed.action == "search" and parsed.domain is AssistantDomain.CATALOG and parsed.entity:
+            query = parsed.entity
+            if parsed.relation is AssistantRelation.DIRECT_LOOKUP:
+                legacy_match = next(
+                    (match for pattern in _TECH_PATTERNS if (match := pattern.fullmatch(cleaned))),
+                    None,
+                )
+                if legacy_match is not None:
+                    query = legacy_match.group("query").strip(" «»\"'.")
             return AssistantIntent(
                 intent=AssistantIntentName.FIND_TECH_CARD,
                 confidence=parsed.confidence,
-                query=parsed.entity,
+                query=query,
+                domain=parsed.domain,
+                requested_kind=parsed.requested_kind,
+                relation=parsed.relation,
+                relation_target=query,
+                evidence=parsed.evidence,
             )
         for pattern in _TECH_PATTERNS:
             match = pattern.fullmatch(cleaned)
@@ -220,13 +238,12 @@ class AssistantOrchestrator:
                         intent=AssistantIntentName.FIND_TECH_CARD,
                         confidence=10_000,
                         query=query,
+                        domain=AssistantDomain.CATALOG,
+                        requested_kind=AssistantRequestedKind.TECH_CARD,
+                        relation=AssistantRelation.DIRECT_LOOKUP,
+                        relation_target=query,
+                        evidence=("legacy_tech_pattern",),
                     )
-        if parsed.action == "search" and parsed.domain == "catalog" and parsed.entity:
-            return AssistantIntent(
-                intent=AssistantIntentName.FIND_TECH_CARD,
-                confidence=parsed.confidence,
-                query=parsed.entity,
-            )
         for pattern, intent_name in (
             (_WRITEOFF_PARTIAL_RE, AssistantIntentName.PREPARE_WRITEOFF),
             (_TRANSFER_PARTIAL_RE, AssistantIntentName.PREPARE_TRANSFER),
@@ -371,7 +388,24 @@ class AssistantToolRegistry:
                 entity_query=intent.query,
             )
         if intent.intent is AssistantIntentName.FIND_TECH_CARD:
-            retrieval = self.retriever.retrieve(intent.query or "")
+            retrieval = self.retriever.retrieve(
+                intent.query or "",
+                requested_kind=intent.requested_kind,
+                relation=intent.relation,
+                relation_target=intent.relation_target,
+                parent_entity_id=intent.parent_entity_id,
+                selected_entity_id=intent.selected_entity_id,
+            )
+            metadata = {
+                "domain": intent.domain,
+                "requested_kind": retrieval.requested_kind,
+                "relation": retrieval.relation,
+                "relation_target": retrieval.relation_target,
+                "parent_entity_id": retrieval.parent_entity_ids[0]
+                if len(retrieval.parent_entity_ids) == 1
+                else None,
+                "related_entity_ids": retrieval.related_entity_ids,
+            }
             if retrieval.exact:
                 return AssistantToolAction(
                     "find_tech_card",
@@ -381,6 +415,12 @@ class AssistantToolRegistry:
                     ),
                     entity_query=retrieval.normalized_query,
                     catalog_exact=True,
+                    selected_entity_id=(
+                        self._candidate_key(retrieval.exact[0])
+                        if len(retrieval.exact) == 1
+                        else None
+                    ),
+                    **metadata,
                 )
             if retrieval.candidates:
                 return AssistantToolAction(
@@ -394,6 +434,7 @@ class AssistantToolRegistry:
                     ),
                     entity_query=retrieval.normalized_query,
                     catalog_exact=False,
+                    **metadata,
                 )
             entity = display_catalog_entity(intent.query or "позиция")
             if not entity:
@@ -418,6 +459,7 @@ class AssistantToolRegistry:
                     "Попробуйте другое название или часть названия."
                 ),
                 entity_query=retrieval.normalized_query,
+                **metadata,
             )
         if intent.confidence < 5_000:
             return AssistantToolAction(

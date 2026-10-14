@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from app.services.assistant.context import PersistentAssistantConversationMemory
+from app.models.assistant import AssistantRelation, AssistantRequestedKind
 from app.storage.assistant_conversation_database import AssistantConversationDatabase
 from app.storage.assistant_conversation_database import AssistantConversationConflict
 from app.storage.user_database import UserDatabase
@@ -28,13 +29,31 @@ def test_context_survives_repository_reopen_and_persists_structure(tmp_path: Pat
         last_query="кислота", candidate_ids=("a/_/b",), topic="Кислотный раствор",
         summary_text="Ищем кислоту", last_entity_id="a/_/b",
         last_entity_label="Кислотный раствор",
+        requested_kind=AssistantRequestedKind.PREPARATION,
+        relation=AssistantRelation.PREPARATION_FOR,
+        relation_target="ягодный чай",
+        parent_entity_id="tea/_/berry",
+        related_entity_ids=("prep/_/base",),
+        selected_entity_id="a/_/b",
     )
     restored = _memory(path, now).get(1, 10)
     assert restored is not None
     assert restored.topic == "Кислотный раствор"
     assert restored.summary_text == "Ищем кислоту"
     assert restored.last_entity_id == "a/_/b"
+    assert restored.requested_kind is AssistantRequestedKind.PREPARATION
+    assert restored.relation is AssistantRelation.PREPARATION_FOR
+    assert restored.relation_target == "ягодный чай"
+    assert restored.parent_entity_id == "tea/_/berry"
+    assert restored.related_entity_ids == ("prep/_/base",)
+    assert restored.selected_entity_id == "a/_/b"
     assert restored.turns[0].text == "кислота"
+
+    first.clear_structured(1, chat_id=10)
+    cleared = first.get(1, 10)
+    assert cleared is not None
+    assert cleared.relation is AssistantRelation.UNSPECIFIED
+    assert cleared.related_entity_ids == ()
 
 
 def test_ttl_reset_and_user_chat_isolation(tmp_path: Path) -> None:

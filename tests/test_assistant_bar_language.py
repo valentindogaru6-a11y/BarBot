@@ -21,6 +21,12 @@ from app.services.assistant import (
 )
 from app.services.auth_service import AuthService
 from app.models.catalog import Catalog
+from app.models.assistant import (
+    AssistantIntent,
+    AssistantRelation,
+    AssistantRequestedKind,
+)
+from pydantic import ValidationError
 
 
 class NeverProvider:
@@ -93,6 +99,105 @@ def test_preparation_relation_resolves_parent_card_ingredient() -> None:
     retriever = AssistantCatalogRetriever(load_catalog(Path("data/catalog.json")))
     result = retriever.retrieve("найди пф для Berry radiance")
     assert [item.item.name for item in result.exact] == ["Ягодное пюре"]
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("найди пф для Berry radiance", {"Ягодное пюре"}),
+        ("покажи полуфабрикат для Berry radiance", {"Ягодное пюре"}),
+        ("покажи что входит в ягодный чай", {"Ягодная основа для чая"}),
+        ("что в составе ягодной основы для чая", {"Ягодная основа для чая"}),
+        ("найди техничку ягодного чая", {"Ягодная основа для чая"}),
+        ("покажи тех карту ягодной основы", {"Ягодная основа для чая"}),
+        ("найди мне пфку для ягодного чая", {"Ягодная основа для чая"}),
+        ("покажи заготовку для ягодного чая", {"Ягодная основа для чая"}),
+        ("где рецепт п/ф для ягодного чая", {"Ягодная основа для чая"}),
+    ],
+)
+def test_live_relation_phrases_keep_semantics_locally(text, expected) -> None:
+    catalog = load_catalog(Path("data/catalog.json"))
+    intent = AssistantOrchestrator.local_intent(text)
+    assert intent is not None
+    action = AssistantToolRegistry(catalog).execute(intent)
+    names = {result.item.name for result in action.search_results}
+    assert expected <= names
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "найди пф для Berry radiance",
+        "покажи полуфабрикат для Berry radiance",
+        "покажи что входит в ягодный чай",
+        "что в составе ягодной основы для чая",
+        "найди техничку ягодного чая",
+        "покажи тех карту ягодной основы",
+    ],
+)
+def test_live_relation_phrases_never_call_provider(text) -> None:
+    provider = NeverProvider()
+    intent = asyncio.run(AssistantOrchestrator(provider).interpret(text))
+    assert intent.intent.value == "find_tech_card"
+    assert provider.calls == 0
+
+
+def _relation_catalog(*, second_child: bool = False, missing_child: bool = False) -> Catalog:
+    ingredients = [{"name": "Пряная основа п/ф", "amount": 10, "unit": "мл"}]
+    children = [{"id": "spice-base", "name": "Пряная основа", "tags": ["полуфабрикат"]}]
+    if second_child:
+        ingredients.append({"name": "Чайный сироп пф", "amount": 5, "unit": "мл"})
+        children.append({"id": "tea-syrup", "name": "Чайный сироп", "tags": ["заготовка"]})
+    if missing_child:
+        ingredients = [{"name": "Несуществующая основа пф", "amount": 10, "unit": "мл"}]
+    return Catalog.model_validate({
+        "version": 1,
+        "categories": [
+            {"id": "drinks", "name": "Напитки", "items": [{"id": "parent", "name": "Пряный чай", "ingredients": ingredients}]},
+            {"id": "prep", "name": "Полуфабрикаты", "items": children},
+        ],
+    })
+
+
+@pytest.mark.parametrize(("second_child", "count"), [(False, 1), (True, 2)])
+def test_generic_parent_relation_returns_one_or_multiple_children(second_child, count) -> None:
+    retrieval = AssistantCatalogRetriever(_relation_catalog(second_child=second_child)).retrieve(
+        "пряный чай",
+        requested_kind=AssistantRequestedKind.PREPARATION,
+        relation=AssistantRelation.PREPARATION_FOR,
+        relation_target="пряный чай",
+    )
+    assert len(retrieval.exact) == count
+    assert retrieval.parent_entity_ids == ("drinks/_/parent",)
+
+
+def test_missing_or_fuzzy_relation_child_is_never_selected_silently() -> None:
+    retrieval = AssistantCatalogRetriever(_relation_catalog(missing_child=True)).retrieve(
+        "пряный чай",
+        requested_kind=AssistantRequestedKind.PREPARATION,
+        relation=AssistantRelation.PREPARATION_FOR,
+        relation_target="пряный чай",
+    )
+    assert retrieval.exact == ()
+    assert retrieval.candidates == ()
+    assert retrieval.parent_entity_ids == ("drinks/_/parent",)
+
+
+def test_assistant_intent_relation_contract_is_strict() -> None:
+    intent = AssistantIntent(
+        intent="find_tech_card", query="чай", domain="catalog",
+        requested_kind="preparation", relation="preparation_for",
+        relation_target="чай",
+    )
+    assert intent.relation is AssistantRelation.PREPARATION_FOR
+    with pytest.raises(ValidationError):
+        AssistantIntent(intent="find_tech_card", query="чай", relation="invented")
+    with pytest.raises(ValidationError):
+        AssistantIntent(intent="find_tech_card", query="чай", invented=True)
+
+
+def test_explanatory_preparation_phrase_is_not_a_catalog_lookup() -> None:
+    assert AssistantOrchestrator.local_intent("расскажи, что такое ПФ") is None
 
 
 def test_domain_capabilities_are_minimal_and_keep_runtime_filtering() -> None:

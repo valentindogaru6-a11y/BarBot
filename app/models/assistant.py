@@ -21,6 +21,33 @@ class AssistantIntentName(StrEnum):
     GET_CURRENT_SHIFT_SUMMARY = "get_current_shift_summary"
 
 
+class AssistantDomain(StrEnum):
+    UNSPECIFIED = "unspecified"
+    CATALOG = "catalog"
+    WAREHOUSE = "warehouse"
+    ATTENDANCE = "attendance"
+    EMPLOYEES = "employees"
+    REPORTS = "reports"
+    ADMINISTRATION = "administration"
+    GENERAL = "general"
+
+
+class AssistantRequestedKind(StrEnum):
+    UNSPECIFIED = "unspecified"
+    PREPARATION = "preparation"
+    TECH_CARD = "tech_card"
+    INGREDIENT = "ingredient"
+    CATEGORY = "category"
+
+
+class AssistantRelation(StrEnum):
+    UNSPECIFIED = "unspecified"
+    PREPARATION_FOR = "preparation_for"
+    INGREDIENTS_OF = "ingredients_of"
+    SIMILAR_TO = "similar_to"
+    DIRECT_LOOKUP = "direct_lookup"
+
+
 class AssistantIntentItem(BaseModel):
     """One user-supplied warehouse line without internal identifiers."""
 
@@ -46,6 +73,13 @@ class AssistantIntent(BaseModel):
     answer_text: str | None = Field(default=None, max_length=4_000)
     needs_web: bool = False
     capability_id: str | None = Field(default=None, max_length=100)
+    domain: AssistantDomain = AssistantDomain.UNSPECIFIED
+    requested_kind: AssistantRequestedKind = AssistantRequestedKind.UNSPECIFIED
+    relation: AssistantRelation = AssistantRelation.UNSPECIFIED
+    relation_target: str | None = Field(default=None, max_length=300)
+    parent_entity_id: str | None = Field(default=None, max_length=300)
+    selected_entity_id: str | None = Field(default=None, max_length=300)
+    evidence: tuple[str, ...] = Field(default=(), max_length=8)
 
     @model_validator(mode="after")
     def validate_shape(self) -> "AssistantIntent":
@@ -57,9 +91,41 @@ class AssistantIntent(BaseModel):
         if self.intent is AssistantIntentName.CAPABILITY:
             if not self.capability_id:
                 raise ValueError("capability intent requires capability_id")
-            if self.items or self.query or self.clarification or self.answer_text or self.needs_web:
+            if (
+                self.items
+                or self.query
+                or self.clarification
+                or self.answer_text
+                or self.needs_web
+                or self.domain is not AssistantDomain.UNSPECIFIED
+                or self.requested_kind is not AssistantRequestedKind.UNSPECIFIED
+                or self.relation is not AssistantRelation.UNSPECIFIED
+                or self.relation_target
+                or self.parent_entity_id
+                or self.selected_entity_id
+                or self.evidence
+            ):
                 raise ValueError("capability intent contains unsupported fields")
             return self
+        catalog_metadata = bool(
+            self.requested_kind is not AssistantRequestedKind.UNSPECIFIED
+            or self.relation is not AssistantRelation.UNSPECIFIED
+            or self.relation_target
+            or self.parent_entity_id
+            or self.selected_entity_id
+        )
+        if catalog_metadata and self.intent not in {
+            AssistantIntentName.FIND_TECH_CARD,
+            AssistantIntentName.NOT_FOUND,
+        }:
+            raise ValueError("catalog relation fields require a catalog intent")
+        if (
+            self.relation is AssistantRelation.UNSPECIFIED
+            and self.relation_target is not None
+        ):
+            raise ValueError("relation_target requires relation")
+        if any(len(value) > 100 for value in self.evidence):
+            raise ValueError("evidence marker is too long")
         if self.capability_id is not None:
             raise ValueError("capability_id is only valid for capability intent")
         if self.intent not in query_intents and self.query is not None:

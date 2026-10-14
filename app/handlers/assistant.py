@@ -28,7 +28,13 @@ from app.keyboards.assistant import (
 )
 from app.keyboards.callbacks import AssistantCandidateCallback, AssistantProposalCallback
 from app.keyboards.main_menu import build_main_menu_keyboard
-from app.models.assistant import AssistantIntent, AssistantIntentName
+from app.models.assistant import (
+    AssistantDomain,
+    AssistantIntent,
+    AssistantIntentName,
+    AssistantRelation,
+    AssistantRequestedKind,
+)
 from app.services.assistant import (
     AssistantAccessDenied,
     AssistantAccessPolicy,
@@ -458,6 +464,7 @@ async def _run_assistant(
             await message.answer("Уточните, пожалуйста, о какой позиции или теме речь.")
             return
 
+    contextual_intent: AssistantIntent | None = None
     ordinal_match = _CANDIDATE_ORDINAL_RE.fullmatch(text)
     if context is not None and ordinal_match is not None and context.candidate_ids:
         ordinal = ordinal_match.group("ordinal").casefold()
@@ -468,7 +475,22 @@ async def _run_assistant(
         if 0 <= ordinal_index < len(context.candidate_ids):
             selected = registry.retriever.by_key(context.candidate_ids[ordinal_index])
             if selected is not None:
-                request_text = f"покажи техкарту {selected.item.name}"
+                contextual_intent = AssistantIntent(
+                    intent=AssistantIntentName.FIND_TECH_CARD,
+                    confidence=10_000,
+                    query=context.last_query or selected.item.name,
+                    domain=AssistantDomain.CATALOG,
+                    requested_kind=context.requested_kind,
+                    relation=context.relation,
+                    relation_target=(
+                        context.relation_target or context.last_query
+                        if context.relation is not AssistantRelation.UNSPECIFIED
+                        else None
+                    ),
+                    parent_entity_id=context.parent_entity_id or None,
+                    selected_entity_id=context.candidate_ids[ordinal_index],
+                    evidence=("stable_candidate_selection",),
+                )
     elif (
         context is not None
         and context.last_entity_type == "tech_card"
@@ -476,7 +498,17 @@ async def _run_assistant(
         and _REFERENCE_RE.search(text)
         and _CARD_CONTENT_RE.search(text)
     ):
-        request_text = f"покажи техкарту {context.last_entity_label}"
+        contextual_intent = AssistantIntent(
+            intent=AssistantIntentName.FIND_TECH_CARD,
+            confidence=10_000,
+            query=context.last_query or context.last_entity_label,
+            domain=AssistantDomain.CATALOG,
+            requested_kind=AssistantRequestedKind.INGREDIENT,
+            relation=AssistantRelation.INGREDIENTS_OF,
+            relation_target=context.last_entity_label,
+            selected_entity_id=context.last_entity_id,
+            evidence=("stable_entity_followup",),
+        )
 
     local_exact_hit = False
     provider_latency_bucket = "local"
@@ -496,12 +528,33 @@ async def _run_assistant(
             allowed_capability_ids,
             parsed_request.domain,
         )
-        local_intent = orchestrator.local_intent(request_text)
+        local_intent = contextual_intent or orchestrator.local_intent(request_text)
         retrieval = (
             CatalogRetrieval(normalized_query=context.last_query)
             if context is not None
             and context.last_entity_type == "warehouse_product"
-            else registry.retriever.retrieve(request_text)
+            else registry.retriever.retrieve(
+                local_intent.query if local_intent is not None and local_intent.query else request_text,
+                requested_kind=(
+                    local_intent.requested_kind
+                    if local_intent is not None
+                    else AssistantRequestedKind.UNSPECIFIED
+                ),
+                relation=(
+                    local_intent.relation
+                    if local_intent is not None
+                    else AssistantRelation.UNSPECIFIED
+                ),
+                relation_target=(
+                    local_intent.relation_target if local_intent is not None else None
+                ),
+                parent_entity_id=(
+                    local_intent.parent_entity_id if local_intent is not None else None
+                ),
+                selected_entity_id=(
+                    local_intent.selected_entity_id if local_intent is not None else None
+                ),
+            )
         )
         if (
             local_intent is None
@@ -512,6 +565,10 @@ async def _run_assistant(
                 intent="find_tech_card",
                 confidence=10_000,
                 query=retrieval.normalized_query,
+                domain=AssistantDomain.CATALOG,
+                requested_kind=retrieval.requested_kind,
+                relation=retrieval.relation,
+                relation_target=retrieval.relation_target,
             )
             fallback_action = registry.execute(fallback_intent)
         if local_intent is None and retrieval.exact:
@@ -524,7 +581,7 @@ async def _run_assistant(
                 candidate.provider_label for candidate in retrieval.candidates
             )
             provider_started = monotonic()
-            intent = await orchestrator.interpret(
+            intent = local_intent or await orchestrator.interpret(
                 request_text,
                 candidates=provider_candidates,
                 normalized_entity=retrieval.normalized_query,
@@ -567,6 +624,10 @@ async def _run_assistant(
                     intent="find_tech_card",
                     confidence=10_000,
                     query=retrieval.normalized_query,
+                    domain=AssistantDomain.CATALOG,
+                    requested_kind=retrieval.requested_kind,
+                    relation=retrieval.relation,
+                    relation_target=retrieval.relation_target,
                 )
             )
             action = replace(candidate_action, message=action.message)
@@ -588,6 +649,10 @@ async def _run_assistant(
                         intent="find_tech_card",
                         confidence=10_000,
                         query=retrieval.normalized_query,
+                        domain=AssistantDomain.CATALOG,
+                        requested_kind=retrieval.requested_kind,
+                        relation=retrieval.relation,
+                        relation_target=retrieval.relation_target,
                     )
                 )
 
@@ -792,6 +857,15 @@ async def _run_assistant(
                     last_entity_id=AssistantToolRegistry._candidate_key(result),
                     last_entity_label=result.item.name,
                     last_requested_action="find_tech_card",
+                    requested_kind=action.requested_kind,
+                    relation=action.relation,
+                    relation_target=action.relation_target or "",
+                    parent_entity_id=action.parent_entity_id or "",
+                    related_entity_ids=action.related_entity_ids,
+                    selected_entity_id=(
+                        action.selected_entity_id
+                        or AssistantToolRegistry._candidate_key(result)
+                    ),
                 )
                 conversation_memory.append_turn(
                     user_id,
@@ -833,6 +907,11 @@ async def _run_assistant(
                     or extract_catalog_entity(request_text),
                     candidate_ids=action.candidate_ids,
                     pending_slots=("candidate",),
+                    requested_kind=action.requested_kind,
+                    relation=action.relation,
+                    relation_target=action.relation_target or "",
+                    parent_entity_id=action.parent_entity_id or "",
+                    related_entity_ids=action.related_entity_ids,
                 )
             await message.answer(
                 action.message or "Возможно, вы имели в виду:",
@@ -1000,10 +1079,21 @@ async def handle_assistant_candidate(
         return
     if not await answer_callback_safely(callback):
         return
-    assistant_conversation_memory.clear_structured(
+    assistant_conversation_memory.remember(
         callback.from_user.id,
         last_intent="find_tech_card",
+        last_entity_type="tech_card",
+        last_query=context.last_query or result.item.name,
         topic=result.item.name,
+        last_entity_id=key,
+        last_entity_label=result.item.name,
+        last_requested_action="find_tech_card",
+        requested_kind=context.requested_kind,
+        relation=context.relation,
+        relation_target=context.relation_target,
+        parent_entity_id=context.parent_entity_id,
+        related_entity_ids=context.related_entity_ids,
+        selected_entity_id=key,
     )
     assistant_conversation_memory.append_turn(
         callback.from_user.id,

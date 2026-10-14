@@ -20,6 +20,11 @@ Importance: High
   local results without provider refinement; stable candidate/entity IDs back
   ordinal and card-content follow-ups. Known-domain provider planning receives
   only the actor-authorized capabilities for that domain.
+- Catalog relation semantics (`requested_kind`, relation, target, parent,
+  related and selected stable IDs) use strict enums from parsing through local
+  retrieval and are retained across process restart in the existing bounded
+  conversation JSON field. Old list-only context rows remain readable; no
+  schema migration or catalog-specific recipe alias is required.
 - Gemini receives the request, normalized entity and only bounded local
   candidate labels. Its output remains strict schema/Pydantic data and cannot
   supply database IDs, callbacks, SQL, or service methods.

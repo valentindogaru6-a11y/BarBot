@@ -7,16 +7,13 @@ import unicodedata
 from dataclasses import dataclass
 from typing import Literal, Sequence
 
+from app.models.assistant import (
+    AssistantDomain,
+    AssistantRelation,
+    AssistantRequestedKind,
+)
 
-BarDomain = Literal[
-    "catalog",
-    "warehouse",
-    "attendance",
-    "employees",
-    "reports",
-    "administration",
-    "general",
-]
+
 BarAction = Literal["search", "writeoff", "transfer", "read", "unknown"]
 
 
@@ -42,7 +39,14 @@ class BarLexicon:
     tech_card_patterns: tuple[re.Pattern[str], ...] = (
         re.compile(r"\bтех\s*карт\w*\b"),
         re.compile(r"\bтехнологическ\w*\s+карт\w*\b"),
+        re.compile(r"\bтехничк\w*\b"),
         re.compile(r"\bрецепт\w*\b"),
+    )
+    ingredients_patterns: tuple[re.Pattern[str], ...] = (
+        re.compile(r"\b(?:покажи\s+)?что\s+входит\s+в\b"),
+        re.compile(r"\bчто\s+в\s+составе\b"),
+        re.compile(r"\b(?:покажи\s+)?состав\b"),
+        re.compile(r"\bиз\s+чего\s+(?:делается|сделан\w*)?\b"),
     )
     search_patterns: tuple[re.Pattern[str], ...] = (
         re.compile(r"\bнайд\w*\b"),
@@ -65,9 +69,13 @@ class BarLexicon:
     def has_search(self, text: str) -> bool:
         return self._matches(self.search_patterns, text)
 
+    def has_ingredients_request(self, text: str) -> bool:
+        return self._matches(self.ingredients_patterns, text)
+
     def strip_catalog_language(self, text: str) -> str:
         cleaned = text
         for pattern in (
+            *self.ingredients_patterns,
             *self.search_patterns,
             *self.tech_card_patterns,
             *self.preparation_patterns,
@@ -90,10 +98,11 @@ class ParsedBarRequest:
     """Safe structured evidence produced before any provider is considered."""
 
     action: BarAction
-    domain: BarDomain
+    domain: AssistantDomain
     entity: str = ""
-    relation: str = ""
-    requested_kind: str = ""
+    relation: AssistantRelation = AssistantRelation.UNSPECIFIED
+    requested_kind: AssistantRequestedKind = AssistantRequestedKind.UNSPECIFIED
+    relation_target: str = ""
     quantity: str = ""
     unit: str = ""
     destination: str = ""
@@ -153,16 +162,18 @@ def _mutation_details(value: str, normalized: str) -> tuple[str, str, str, str]:
 
 
 def _canonical_catalog_entity(value: str) -> str:
-    replacements = {
-        "ягодного": "ягодный",
-        "ягодной": "ягодный",
-        "ягодному": "ягодный",
-        "чая": "чай",
-        "чаю": "чай",
-        "кислоты": "кислота",
-        "кислоту": "кислота",
-    }
-    return " ".join(replacements.get(token, token) for token in value.split())
+    def canonical_token(token: str) -> str:
+        if token.endswith("ого") and len(token) > 5:
+            return token[:-3] + "ый"
+        if token.endswith("его") and len(token) > 5:
+            return token[:-3] + "ий"
+        if token.endswith("ая") and len(token) <= 5:
+            return token[:-1] + "й"
+        if token.endswith("аю") and len(token) <= 5:
+            return token[:-2] + "й"
+        return token
+
+    return " ".join(canonical_token(token) for token in value.split())
 
 
 def parse_bar_request(value: str, *, lexicon: BarLexicon = BAR_LEXICON) -> ParsedBarRequest:
@@ -170,12 +181,12 @@ def parse_bar_request(value: str, *, lexicon: BarLexicon = BAR_LEXICON) -> Parse
 
     text = normalize_bar_text(value)
     if not text:
-        return ParsedBarRequest(action="unknown", domain="general")
+        return ParsedBarRequest(action="unknown", domain=AssistantDomain.GENERAL)
 
     if _WRITEOFF_RE.search(text):
         entity, quantity, unit, destination = _mutation_details(value, text)
         return ParsedBarRequest(
-            action="writeoff", domain="warehouse", entity=entity,
+            action="writeoff", domain=AssistantDomain.WAREHOUSE, entity=entity,
             quantity=quantity, unit=unit, destination=destination,
             confidence=10_000,
             evidence=("explicit_writeoff",), mutation=True,
@@ -183,7 +194,7 @@ def parse_bar_request(value: str, *, lexicon: BarLexicon = BAR_LEXICON) -> Parse
     if _TRANSFER_RE.search(text):
         entity, quantity, unit, destination = _mutation_details(value, text)
         return ParsedBarRequest(
-            action="transfer", domain="warehouse", entity=entity,
+            action="transfer", domain=AssistantDomain.WAREHOUSE, entity=entity,
             quantity=quantity, unit=unit, destination=destination,
             confidence=10_000,
             evidence=("explicit_transfer",), mutation=True,
@@ -191,10 +202,28 @@ def parse_bar_request(value: str, *, lexicon: BarLexicon = BAR_LEXICON) -> Parse
 
     preparation = lexicon.has_preparation(text)
     tech_card = lexicon.has_tech_card(text)
+    ingredients_request = lexicon.has_ingredients_request(text)
     search = lexicon.has_search(text)
     catalog_hint = bool(_CATALOG_HINT_RE.search(text))
-    if preparation or tech_card or (search and catalog_hint):
-        relation = "preparation_for" if preparation and re.search(r"\b(?:для|на)\b", text) else ""
+    preparation_lookup = preparation and bool(
+        search
+        or re.search(r"\b(?:для|на)\b", text)
+        or re.match(r"^нужн\w*\b", text)
+    )
+    if ingredients_request or preparation_lookup or tech_card or (search and catalog_hint):
+        if ingredients_request:
+            relation = AssistantRelation.INGREDIENTS_OF
+            requested_kind = AssistantRequestedKind.INGREDIENT
+        elif preparation_lookup and re.search(r"\b(?:для|на)\b", text):
+            relation = AssistantRelation.PREPARATION_FOR
+            requested_kind = AssistantRequestedKind.PREPARATION
+        else:
+            relation = AssistantRelation.DIRECT_LOOKUP
+            requested_kind = (
+                AssistantRequestedKind.PREPARATION
+                if preparation_lookup
+                else AssistantRequestedKind.TECH_CARD
+            )
         entity = _canonical_catalog_entity(lexicon.strip_catalog_language(text))
         evidence = tuple(
             marker
@@ -202,46 +231,52 @@ def parse_bar_request(value: str, *, lexicon: BarLexicon = BAR_LEXICON) -> Parse
                 ("search_verb", search),
                 ("preparation_term", preparation),
                 ("tech_card_term", tech_card),
+                ("ingredients_relation", ingredients_request),
                 ("catalog_term", catalog_hint),
-                ("preparation_relation", bool(relation)),
+                (
+                    "preparation_relation",
+                    relation is AssistantRelation.PREPARATION_FOR,
+                ),
             )
             if present
         )
         return ParsedBarRequest(
             action="search",
-            domain="catalog",
+            domain=AssistantDomain.CATALOG,
             entity=entity,
             relation=relation,
-            requested_kind="preparation" if preparation else "tech_card",
+            requested_kind=requested_kind,
+            relation_target=entity,
             confidence=10_000 if search or tech_card else 8_500,
             evidence=evidence,
         )
 
     if _ATTENDANCE_RE.search(text):
-        return ParsedBarRequest("read", "attendance", confidence=8_000, evidence=("attendance_term",))
+        return ParsedBarRequest("read", AssistantDomain.ATTENDANCE, confidence=8_000, evidence=("attendance_term",))
     if _EMPLOYEE_RE.search(text):
-        return ParsedBarRequest("read", "employees", confidence=8_000, evidence=("employee_term",))
+        return ParsedBarRequest("read", AssistantDomain.EMPLOYEES, confidence=8_000, evidence=("employee_term",))
     if _REPORT_RE.search(text):
-        return ParsedBarRequest("read", "reports", confidence=8_000, evidence=("report_term",))
+        return ParsedBarRequest("read", AssistantDomain.REPORTS, confidence=8_000, evidence=("report_term",))
     if _WAREHOUSE_RE.search(text):
-        return ParsedBarRequest("read", "warehouse", confidence=7_000, evidence=("warehouse_term",))
-    return ParsedBarRequest(action="unknown", domain="general")
+        return ParsedBarRequest("read", AssistantDomain.WAREHOUSE, confidence=7_000, evidence=("warehouse_term",))
+    return ParsedBarRequest(action="unknown", domain=AssistantDomain.GENERAL)
 
 
-_DOMAIN_PREFIXES: dict[BarDomain, tuple[str, ...]] = {
-    "catalog": ("catalog.",),
-    "warehouse": ("warehouse.",),
-    "attendance": ("attendance.", "attendance_reports."),
-    "employees": ("users.",),
-    "reports": ("reports.", "recipients.", "schedules.", "reminders."),
-    "administration": ("catalog.manage", "users.", "recipients.", "schedules.", "reminders."),
-    "general": ("capabilities.list", "navigation.main"),
+_DOMAIN_PREFIXES: dict[AssistantDomain, tuple[str, ...]] = {
+    AssistantDomain.CATALOG: ("catalog.",),
+    AssistantDomain.WAREHOUSE: ("warehouse.",),
+    AssistantDomain.ATTENDANCE: ("attendance.", "attendance_reports."),
+    AssistantDomain.EMPLOYEES: ("users.",),
+    AssistantDomain.REPORTS: ("reports.", "recipients.", "schedules.", "reminders."),
+    AssistantDomain.ADMINISTRATION: ("catalog.manage", "users.", "recipients.", "schedules.", "reminders."),
+    AssistantDomain.GENERAL: ("capabilities.list", "navigation.main"),
+    AssistantDomain.UNSPECIFIED: ("capabilities.list", "navigation.main"),
 }
 
 
 def capability_ids_for_domain(
     capability_ids: Sequence[str],
-    domain: BarDomain,
+    domain: AssistantDomain,
 ) -> tuple[str, ...]:
     """Return the smallest runtime-authorized provider surface for a domain."""
 
