@@ -128,3 +128,15 @@ reference only supplied stable IDs, and cannot assert permission,
 confirmation, or revision. BarBot rechecks access, flags, arguments, ownership,
 revision and proposal expiry; every mutation retains its existing preview and
 explicit-confirmation boundary.
+
+## D17 — Provider wire contracts are not BarBot authority
+
+Groq and Gemini use separate, closed response envelopes and explicit
+converters. They converge only after wire validation on the canonical
+`PlannerDecision`; neither provider may supply role, permission, confirmation,
+revision, execution method, arbitrary argument dictionaries or trusted context
+updates. Capability risk and stable references are derived locally from the
+runtime registry and bounded snapshot. Provider fallback is sequential under a
+shared deadline, shadow does not double-call by default, and process-local
+circuit state never affects business data. Groq-primary/Gemini-fallback is a
+development configuration, not evidence of production readiness or accuracy.

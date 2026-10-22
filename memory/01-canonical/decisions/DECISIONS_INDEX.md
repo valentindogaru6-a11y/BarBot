@@ -3,8 +3,8 @@
 Scope: durable BarBot architecture and safety decisions
 Trust: Confirmed
 Lifecycle: Fresh
-Last verified: 2026-10-14
-Evidence: `app/`, `tests/`, `docs/production_*.md`, Git history through `c2ce9fd2ae46509b8ed47aa6d44e1cc1b3ccf80f`
+Last verified: 2026-10-22
+Evidence: `app/`, `tests/`, `docs/production_*.md`, provider-neutral planner development
 Depends on: current application architecture
 Importance: Critical
 
@@ -25,3 +25,5 @@ Read [BarBot decisions](BARBOT_DECISIONS.md) for the compact decision set:
 13. Persistent AI context is bounded state, never mutation authority.
 14. Preserve typed local-first relation semantics across every AI layer.
 15. Measure the owner-approved Bar Jarvis end state on versioned corpora before claiming completion.
+16. AI plans; BarBot alone authorizes and executes.
+17. Provider-specific wire contracts never become BarBot authority.

@@ -10,6 +10,24 @@ Importance: High
 
 ## AI-first planner foundation (development)
 
+The development planner boundary is provider-neutral. `GroqPlannerProvider`
+(`openai/gpt-oss-20b`) is the configured fast primary and
+`GeminiPlannerProvider` the sequential fallback, while `PlannerDecision`
+remains the only internal plan contract. Each adapter validates its own closed,
+flat wire envelope, converts allowlisted string arguments, validates stable IDs
+and then derives read/mutation risk from the runtime `PlannerCapability`.
+Provider data cannot assert confirmation, actor, role, permission, revision or
+context updates. Provider-generated payloads never reach an executor.
+
+The Groq strict schema is versioned, has no `$defs`, `$ref`, defaults or open
+objects, and makes nullable fields explicitly required. It receives no tools.
+Fallback is sequential under one bounded deadline: shadow does not double-call
+by default; AI-first may fall back only for normalized transient/schema errors;
+auth/config failures do not retry. A process-local closed/open/half-open circuit
+breaker suppresses repeatedly unhealthy providers without touching business
+data. This composition is development evidence only: production promotion,
+provider quality and live accuracy remain `pending`.
+
 `AI_PLANNER_MODE` is `local_first` (safe default), `shadow` (comparison only,
 never execution), or `ai_first` (free text planned first). Commands, callbacks,
 active FSM and exact warehouse triggers retain priority. The strict planner

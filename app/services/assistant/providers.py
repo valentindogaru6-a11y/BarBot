@@ -107,12 +107,15 @@ def _request_size_bucket(size: int) -> str:
 
 class ProviderErrorKind(StrEnum):
     AUTH = "auth"
+    BILLING = "billing"
+    CONFIG = "config"
     RATE_LIMIT = "rate_limit"
     SERVER = "server"
     TIMEOUT = "timeout"
     UNAVAILABLE = "unavailable"
     MALFORMED_RESPONSE = "malformed_response"
     RESPONSE_TOO_LARGE = "response_too_large"
+    SCHEMA_INCOMPATIBLE = "schema_incompatible"
 
 
 class ProviderError(RuntimeError):
@@ -137,7 +140,9 @@ class AssistantHttpTransport(Protocol):
         *,
         headers: Mapping[str, str],
         payload: Mapping[str, object],
-        timeout_seconds: int,
+        timeout_seconds: float,
+        connect_timeout_seconds: float | None = None,
+        read_timeout_seconds: float | None = None,
         max_response_bytes: int,
     ) -> HttpResponse: ...
 
@@ -150,7 +155,7 @@ class AssistantHttpTransport(Protocol):
         file_name: str,
         content_type: str,
         file_bytes: bytes,
-        timeout_seconds: int,
+        timeout_seconds: float,
         max_response_bytes: int,
     ) -> HttpResponse: ...
 
@@ -178,10 +183,16 @@ class AioHttpTransport:
         *,
         headers: Mapping[str, str],
         payload: Mapping[str, object],
-        timeout_seconds: int,
+        timeout_seconds: float,
+        connect_timeout_seconds: float | None = None,
+        read_timeout_seconds: float | None = None,
         max_response_bytes: int,
     ) -> HttpResponse:
-        timeout = aiohttp.ClientTimeout(total=timeout_seconds)
+        timeout = aiohttp.ClientTimeout(
+            total=timeout_seconds,
+            connect=connect_timeout_seconds,
+            sock_read=read_timeout_seconds,
+        )
         async with aiohttp.ClientSession(timeout=timeout) as session:
             async with session.post(url, headers=headers, json=payload) as response:
                 body = await self._read_limited(response, max_response_bytes)

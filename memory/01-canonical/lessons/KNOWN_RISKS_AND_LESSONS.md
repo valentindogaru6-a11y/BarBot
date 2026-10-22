@@ -80,6 +80,17 @@ Importance: High
   model and subsequent output was truncated. Retain each bounded result before
   the next call, use Pydantic `model_copy`, and stop when call counters diverge.
   Cases 2–4 remain unknown and establish no accuracy claim.
+- **Canonical Pydantic schemas are not automatically provider-compatible:** a
+  nested schema with defaults, `$ref` or open dictionaries can be rejected even
+  when provider transport is healthy. Keep a versioned closed wire schema per
+  provider, validate it first, convert explicitly to the canonical decision,
+  and derive risk/stable references locally. Never relax the canonical model or
+  pass provider output directly to an executor to accommodate one API.
+- **Fallback can multiply latency, cost and ambiguous work:** do not race
+  providers. Use one shared deadline, no shadow fallback by default, no retry
+  for auth/config failures, and no automatic retry of mutation execution.
+  Circuit state is process-local health only and must not become authorization
+  or persistent business state.
 
 Revalidate runtime-dependent lessons before production action. Do not turn an
 owner observation into a measured infrastructure claim without evidence.

@@ -15,6 +15,12 @@ Development follow-up at `0205ec4f...` fixes shadow lifecycle and evaluation
 observability. Live planner Cases 2–4 remain unknown; no accuracy percentage is
 established. Production rollout is outside this development task.
 
+Development at starting HEAD `d8f0789...` adds separate strict Groq/Gemini
+wire contracts, canonical conversion, sequential bounded fallback and a
+process-local circuit breaker. Groq is configured as primary and Gemini as
+fallback, but live quality, promotion and production rollout remain pending.
+Schema stays v14; catalog, seed and migrations are unchanged.
+
 Task: none
 State: empty
 Started: n/a

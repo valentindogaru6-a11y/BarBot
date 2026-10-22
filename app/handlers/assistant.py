@@ -126,6 +126,16 @@ def _planner_inputs(
                 required_arguments=tuple(
                     name for name, field in fields.items() if field.is_required()
                 ),
+                allowed_arguments=tuple(
+                    name
+                    for name in fields
+                    if name not in {
+                        "entity_ref",
+                        "target_ref",
+                        "expected_revision",
+                        "values",
+                    }
+                ),
             ))
     role = auth_service.get_context(user_id).role.value
     domain = AssistantDomain.UNSPECIFIED

@@ -8,6 +8,7 @@ from app.bot import build_assistant_clients
 from app.config import Settings
 from app.models.assistant import AssistantIntentName
 from app.services.assistant import GeminiIntentClient, GroqSpeechToTextClient
+from app.services.assistant import GeminiPlannerProvider, MultiProviderPlanner
 from app.services.assistant.providers import HttpResponse
 
 
@@ -27,6 +28,10 @@ def test_ai_defaults_are_disabled_and_do_not_require_keys() -> None:
     assert settings.ai_conversation_max_turns == 12
     assert settings.ai_conversation_max_chars == 12000
     assert settings.ai_web_search_max_provider_calls_per_update == 1
+    assert settings.ai_planner_primary_provider == "groq"
+    assert settings.ai_planner_fallback_provider == "gemini"
+    assert settings.ai_planner_total_deadline_seconds == 12
+    assert settings.groq_planner_model == "openai/gpt-oss-20b"
 
 
 def test_web_search_cannot_bypass_master_switch() -> None:
@@ -131,6 +136,74 @@ def test_disabled_master_switch_does_not_require_provider_keys() -> None:
         ai_text_enabled=True,
         ai_voice_enabled=True,
     )
+
+
+def test_local_first_text_works_without_groq_planner_key() -> None:
+    settings = Settings(
+        _env_file=None,
+        bot_token="test",
+        ai_assistant_enabled=True,
+        ai_access_mode="role_based",
+        ai_text_enabled=True,
+        gemini_api_key="gemini",
+    )
+    orchestrator, _ = build_assistant_clients(settings)
+    assert isinstance(orchestrator.planner_client, MultiProviderPlanner)
+    assert isinstance(orchestrator.planner_client.primary, GeminiPlannerProvider)
+    assert orchestrator.planner_client.fallback is None
+
+
+@pytest.mark.parametrize("mode", ["shadow", "ai_first"])
+def test_enabled_groq_primary_planner_requires_groq_key(mode) -> None:
+    with pytest.raises(ValidationError, match="GROQ_API_KEY"):
+        Settings(
+            _env_file=None,
+            bot_token="test",
+            ai_assistant_enabled=True,
+            ai_access_mode="role_based",
+            ai_text_enabled=True,
+            ai_planner_mode=mode,
+            gemini_api_key="gemini",
+        )
+
+
+def test_planner_provider_names_and_models_are_strict() -> None:
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, bot_token="test", ai_planner_primary_provider="unknown")
+    with pytest.raises(ValidationError, match="должны различаться"):
+        Settings(
+            _env_file=None,
+            bot_token="test",
+            ai_assistant_enabled=True,
+            ai_access_mode="role_based",
+            ai_text_enabled=True,
+            ai_planner_primary_provider="gemini",
+            ai_planner_fallback_provider="gemini",
+            gemini_api_key="gemini",
+        )
+    with pytest.raises(ValidationError, match="model name"):
+        Settings(_env_file=None, bot_token="test", groq_planner_model="   ")
+    custom = Settings(
+        _env_file=None,
+        bot_token="test",
+        groq_planner_model="custom-groq",
+        gemini_fast_model="custom-gemini",
+    )
+    assert custom.groq_planner_model == "custom-groq"
+    assert custom.gemini_fast_model == "custom-gemini"
+
+
+def test_ai_first_groq_primary_requires_configured_gemini_fallback() -> None:
+    with pytest.raises(ValidationError, match="GEMINI_API_KEY"):
+        Settings(
+            _env_file=None,
+            bot_token="test",
+            ai_assistant_enabled=True,
+            ai_access_mode="role_based",
+            ai_text_enabled=True,
+            ai_planner_mode="ai_first",
+            groq_api_key="groq",
+        )
 
 
 def test_enabled_master_with_no_paths_is_documented_inert_mode() -> None:

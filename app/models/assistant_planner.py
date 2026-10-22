@@ -36,6 +36,7 @@ class PlannerCapability(BaseModel):
     read_only: bool
     mutation: bool
     required_arguments: tuple[str, ...] = Field(default=(), max_length=12)
+    allowed_arguments: tuple[str, ...] = Field(default=(), max_length=30)
 
 
 class PlannerContextSnapshot(BaseModel):

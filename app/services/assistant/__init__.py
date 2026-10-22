@@ -9,6 +9,7 @@ from app.services.assistant.shadow import (
     ShadowTelemetrySink,
 )
 from app.services.assistant.planner_smoke import (
+    OFFLINE_PLANNER_CONTRACT_CASES,
     PlannerSmokeCase,
     PlannerSmokeHarness,
     PlannerSmokeResult,
@@ -39,6 +40,19 @@ from app.services.assistant.providers import (
     ProviderError,
     ProviderErrorKind,
     SpeechToTextClient,
+)
+from app.services.assistant.planner_providers import (
+    CircuitState,
+    GeminiPlannerProvider,
+    GroqPlannerProvider,
+    MultiProviderPlanner,
+    PlannerCircuitBreaker,
+    PlannerProvider,
+    convert_gemini_envelope,
+    convert_groq_envelope,
+    gemini_planner_wire_schema,
+    groq_planner_wire_schema,
+    planner_wire_schema,
 )
 from app.models.assistant_planner import (
     AssistantDialogueAct,
@@ -96,6 +110,7 @@ __all__ = [
     "ShadowTelemetrySink",
     "LoggingShadowTelemetrySink",
     "PlannerSmokeCase",
+    "OFFLINE_PLANNER_CONTRACT_CASES",
     "PlannerSmokeHarness",
     "PlannerSmokeResult",
     "AssistantConversationContext",
@@ -122,6 +137,17 @@ __all__ = [
     "ProviderError",
     "ProviderErrorKind",
     "SpeechToTextClient",
+    "CircuitState",
+    "GeminiPlannerProvider",
+    "GroqPlannerProvider",
+    "MultiProviderPlanner",
+    "PlannerCircuitBreaker",
+    "PlannerProvider",
+    "convert_gemini_envelope",
+    "convert_groq_envelope",
+    "gemini_planner_wire_schema",
+    "groq_planner_wire_schema",
+    "planner_wire_schema",
     "CatalogRetrieval",
     "RankedCatalogCandidate",
     "candidate_key",

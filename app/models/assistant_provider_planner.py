@@ -1,0 +1,109 @@
+"""Provider-boundary planner contracts with no execution authority."""
+
+from __future__ import annotations
+
+from enum import StrEnum
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from app.models.assistant import AssistantDomain
+from app.models.assistant_planner import AssistantDialogueAct, PlannerDecision
+
+
+class PlannerInferredAction(StrEnum):
+    UNSPECIFIED = "unspecified"
+    SEARCH = "search"
+    GET = "get"
+    MANAGE = "manage"
+    WRITEOFF = "writeoff"
+    TRANSFER = "transfer"
+    LIST = "list"
+    GENERATE = "generate"
+    SEND = "send"
+    CREATE_OR_UPDATE = "create_or_update"
+    DISABLE = "disable"
+    OPEN = "open"
+    CLOSE = "close"
+    CANCEL = "cancel"
+    CONFIRM = "confirm"
+
+
+class PlannerNotesCode(StrEnum):
+    AMBIGUOUS = "ambiguous"
+    MISSING_ARGUMENT = "missing_argument"
+    CONTEXT_REFERENCE = "context_reference"
+    SAFE_FALLBACK = "safe_fallback"
+
+
+class PlannerArgumentItem(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    name: str = Field(min_length=1, max_length=100)
+    value: str = Field(min_length=1, max_length=1_000)
+
+
+class _PlannerEnvelope(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    dialogue_act: AssistantDialogueAct
+    domain: AssistantDomain
+    capability_id: str | None = Field(max_length=100)
+    target_entity_id: str | None = Field(max_length=300)
+    confidence_scaled: int = Field(ge=0, le=10_000)
+    needs_clarification: bool
+    clarification_question: str | None = Field(max_length=500)
+    inferred_action: PlannerInferredAction
+    argument_items: tuple[PlannerArgumentItem, ...] = Field(max_length=20)
+    referenced_candidate_ids: tuple[str, ...] = Field(max_length=5)
+    provider_notes_code: PlannerNotesCode | None
+
+
+class GroqPlannerEnvelope(_PlannerEnvelope):
+    """Flat strict envelope supported by Groq structured output."""
+
+
+class GeminiPlannerEnvelope(_PlannerEnvelope):
+    """Gemini wire envelope; converted independently to canonical state."""
+
+
+class PlannerValidationStatus(StrEnum):
+    PASSED = "passed"
+    PROVIDER_ERROR = "provider_error"
+    WIRE_INVALID = "wire_invalid"
+    CANONICAL_INVALID = "canonical_invalid"
+    POLICY_REJECTED = "policy_rejected"
+
+
+class ProviderPlanError(StrEnum):
+    AUTH = "auth"
+    BILLING = "billing"
+    CONFIG = "config"
+    RATE_LIMIT = "rate_limit"
+    TIMEOUT = "timeout"
+    NETWORK = "network"
+    SERVER = "server"
+    SCHEMA_INCOMPATIBLE = "schema_incompatible"
+    MALFORMED_RESPONSE = "malformed_response"
+    CIRCUIT_OPEN = "circuit_open"
+    DEADLINE = "deadline"
+    INTERNAL = "internal"
+
+
+class ProviderPlanResult(BaseModel):
+    """Normalized result; raw provider data never crosses this boundary."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str = Field(min_length=1, max_length=30)
+    model: str = Field(min_length=1, max_length=100)
+    decision: PlannerDecision | None = None
+    error: ProviderPlanError | None = None
+    latency_ms: int = Field(ge=0)
+    schema_mode: str = Field(min_length=1, max_length=40)
+    validation_status: PlannerValidationStatus
+
+    @model_validator(mode="after")
+    def exactly_one_outcome(self) -> "ProviderPlanResult":
+        if (self.decision is None) == (self.error is None):
+            raise ValueError("provider result must contain one outcome")
+        return self

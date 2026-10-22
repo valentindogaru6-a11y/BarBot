@@ -7,7 +7,11 @@ from app.models.assistant_planner import (
     PlannerContextSnapshot,
     PlannerDecision,
 )
-from app.services.assistant import PlannerSmokeCase, PlannerSmokeHarness
+from app.services.assistant import (
+    OFFLINE_PLANNER_CONTRACT_CASES,
+    PlannerSmokeCase,
+    PlannerSmokeHarness,
+)
 from app.services.assistant import GeminiIntentClient, ProviderError
 from app.services.assistant.providers import HttpResponse
 
@@ -142,3 +146,19 @@ def test_application_adapter_can_be_forced_to_zero_retries() -> None:
     assert transport.calls == 1
     assert harness.attempted_calls == 1
     assert harness.completed_calls == 0
+
+
+def test_offline_contract_cases_cover_required_planner_language_groups() -> None:
+    names = {name for name, _ in OFFLINE_PLANNER_CONTRACT_CASES}
+    assert names == {
+        "catalog_search",
+        "catalog_followup",
+        "catalog_correction",
+        "catalog_add_ingredient",
+        "warehouse_writeoff",
+        "warehouse_information",
+        "attendance_read",
+        "report_generation",
+        "cancellation",
+        "confirmation",
+    }

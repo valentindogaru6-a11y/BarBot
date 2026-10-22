@@ -15,7 +15,9 @@ from app.models.assistant_planner import PlannerCapability, PlannerContextSnapsh
 from app.services.assistant import (
     AioHttpTransport,
     AssistantCatalogRetriever,
-    GeminiIntentClient,
+    GeminiPlannerProvider,
+    GroqPlannerProvider,
+    MultiProviderPlanner,
     PlannerSmokeCase,
     PlannerSmokeHarness,
     ProviderError,
@@ -33,13 +35,12 @@ async def _run() -> int:
         action="store_true",
         help="acknowledge a one-time owner authorization for authenticated calls",
     )
+    parser.add_argument("--provider", choices=("groq", "gemini"), required=True)
     args = parser.parse_args()
     if not args.live_authorized:
         parser.error("live calls are disabled without --live-authorized")
 
     settings = Settings()
-    if settings.gemini_api_key is None:
-        raise SystemExit("Gemini key is not configured")
     catalog = JsonCatalogStorage(PROJECT_ROOT / "data" / "catalog.json").load()
     retrieval = AssistantCatalogRetriever(catalog).retrieve("Облепиха")
     if len(retrieval.exact) != 1:
@@ -50,18 +51,23 @@ async def _run() -> int:
         PlannerCapability(
             capability_id="catalog.search", domain="catalog",
             read_only=True, mutation=False,
+            required_arguments=("query",), allowed_arguments=("query",),
         ),
         PlannerCapability(
             capability_id="catalog.get", domain="catalog",
             read_only=True, mutation=False,
+            required_arguments=("entity_ref",),
+            allowed_arguments=(),
         ),
         PlannerCapability(
             capability_id="catalog.manage", domain="catalog",
             read_only=False, mutation=True,
+            allowed_arguments=("reason",),
         ),
         PlannerCapability(
             capability_id="capabilities.list", domain="general",
             read_only=True, mutation=False,
+            required_arguments=("query",), allowed_arguments=("query",),
         ),
     )
     snapshot = PlannerContextSnapshot(
@@ -70,13 +76,24 @@ async def _run() -> int:
         current_domain=AssistantDomain.CATALOG,
         candidate_entity_ids=(target_id,),
     )
-    client = GeminiIntentClient(
-        AioHttpTransport(),
-        api_key=settings.gemini_api_key.get_secret_value(),
-        model=settings.gemini_fast_model,
-        timeout_seconds=settings.ai_request_timeout_seconds,
-        max_attempts=1,
-    )
+    transport = AioHttpTransport()
+    if args.provider == "groq":
+        if settings.groq_api_key is None:
+            raise SystemExit("Groq key is not configured")
+        provider = GroqPlannerProvider(
+            transport,
+            api_key=settings.groq_api_key.get_secret_value(),
+            model=settings.groq_planner_model,
+        )
+    else:
+        if settings.gemini_api_key is None:
+            raise SystemExit("Gemini key is not configured")
+        provider = GeminiPlannerProvider(
+            transport,
+            api_key=settings.gemini_api_key.get_secret_value(),
+            model=settings.gemini_fast_model,
+        )
+    client = MultiProviderPlanner(provider, mode="local_first")
     harness = PlannerSmokeHarness(client, live_authorized=True, max_calls=4)
     cases = (
         PlannerSmokeCase("case_1", "найди пф для облепихи"),

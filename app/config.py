@@ -92,9 +92,17 @@ class Settings(BaseSettings):
     ai_general_chat_enabled: bool = False
     ai_web_search_enabled: bool = False
     ai_planner_mode: Literal["local_first", "shadow", "ai_first"] = "local_first"
+    ai_planner_primary_provider: Literal["groq", "gemini"] = "groq"
+    ai_planner_fallback_provider: Literal["groq", "gemini"] = "gemini"
+    ai_planner_total_deadline_seconds: int = Field(default=12, ge=1, le=30)
     groq_api_key: SecretStr | None = None
     groq_stt_model: str = Field(
         default="whisper-large-v3-turbo",
+        min_length=1,
+        max_length=100,
+    )
+    groq_planner_model: str = Field(
+        default="openai/gpt-oss-20b",
         min_length=1,
         max_length=100,
     )
@@ -148,6 +156,19 @@ class Settings(BaseSettings):
         """Parse owner-only pilot IDs without retaining duplicates."""
 
         return _parse_positive_ids(value, "AI_PILOT_USER_IDS") or frozenset()
+
+    @field_validator(
+        "groq_stt_model",
+        "groq_planner_model",
+        "gemini_fast_model",
+        "gemini_strong_model",
+    )
+    @classmethod
+    def reject_blank_model_names(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("AI model name must not be blank")
+        return cleaned
 
     @field_validator("catalog_path", "database_path")
     @classmethod
@@ -223,6 +244,8 @@ class Settings(BaseSettings):
             )
         if not self.ai_assistant_enabled:
             return self
+        if self.ai_planner_primary_provider == self.ai_planner_fallback_provider:
+            raise ValueError("AI planner primary и fallback должны различаться")
         if (
             self.ai_general_chat_enabled or self.ai_web_search_enabled
         ) and not (self.ai_text_enabled or self.ai_voice_enabled):
@@ -236,6 +259,37 @@ class Settings(BaseSettings):
             raise ValueError(
                 "GROQ_API_KEY обязателен при включённом AI voice pilot"
             )
+        active_input = self.ai_text_enabled or self.ai_voice_enabled
+        if (
+            active_input
+            and self.ai_planner_mode in {"shadow", "ai_first"}
+            and self.ai_planner_primary_provider == "groq"
+            and (
+                self.groq_api_key is None
+                or not self.groq_api_key.get_secret_value().strip()
+            )
+        ):
+            raise ValueError("GROQ_API_KEY обязателен для выбранного AI planner")
+        if (
+            active_input
+            and self.ai_planner_mode in {"shadow", "ai_first"}
+            and self.ai_planner_primary_provider == "gemini"
+            and (
+                self.gemini_api_key is None
+                or not self.gemini_api_key.get_secret_value().strip()
+            )
+        ):
+            raise ValueError("GEMINI_API_KEY обязателен для выбранного AI planner")
+        if (
+            active_input
+            and self.ai_planner_mode == "ai_first"
+            and self.ai_planner_fallback_provider == "groq"
+            and (
+                self.groq_api_key is None
+                or not self.groq_api_key.get_secret_value().strip()
+            )
+        ):
+            raise ValueError("GROQ_API_KEY обязателен для planner fallback")
         if (
             self.ai_text_enabled
             or self.ai_voice_enabled

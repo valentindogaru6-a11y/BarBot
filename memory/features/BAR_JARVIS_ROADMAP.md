@@ -19,6 +19,11 @@ capability remain `pending` and no percentage is claimed.
 Shadow isolation and privacy-safe comparison telemetry are implemented in
 development, but live planner accuracy remains `pending`. The incomplete smoke
 does not establish a score and needs a separately authorized re-smoke.
+Provider-neutral development adapters now define separate strict Groq and
+Gemini wire contracts, canonical conversion, sequential bounded fallback and a
+process-local circuit breaker. Groq-primary/Gemini-fallback remains `pending`
+for controlled live evaluation and rollout; no accuracy or production-health
+claim follows from offline contract tests.
 
 ## End state
 

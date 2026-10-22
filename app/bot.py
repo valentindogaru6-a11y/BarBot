@@ -40,6 +40,9 @@ from app.services.assistant import (
     AssistantAccessPolicy,
     CapabilityBinding,
     CapabilityRegistry,
+    GeminiPlannerProvider,
+    GroqPlannerProvider,
+    MultiProviderPlanner,
 )
 from app.services.audio_service import AudioService
 from app.services.audit_service import AuditService
@@ -144,6 +147,7 @@ def build_assistant_clients(
     speech_client = None
     intent_client = None
     search_client = None
+    planner_client = None
     if settings.ai_assistant_enabled and (
         settings.ai_voice_enabled
         or settings.ai_text_enabled
@@ -166,6 +170,38 @@ def build_assistant_clients(
             model=settings.gemini_fast_model,
             timeout_seconds=settings.ai_request_timeout_seconds,
         )
+        planner_providers = {}
+        if (
+            settings.groq_api_key is not None
+            and settings.groq_api_key.get_secret_value().strip()
+        ):
+            planner_providers["groq"] = GroqPlannerProvider(
+                provider_transport,
+                api_key=settings.groq_api_key.get_secret_value(),
+                model=settings.groq_planner_model,
+            )
+        if (
+            settings.gemini_api_key is not None
+            and settings.gemini_api_key.get_secret_value().strip()
+        ):
+            planner_providers["gemini"] = GeminiPlannerProvider(
+                provider_transport,
+                api_key=settings.gemini_api_key.get_secret_value(),
+                model=settings.gemini_fast_model,
+            )
+        primary = planner_providers.get(settings.ai_planner_primary_provider)
+        fallback = planner_providers.get(settings.ai_planner_fallback_provider)
+        if primary is None and settings.ai_planner_mode == "local_first":
+            primary, fallback = fallback, None
+        if primary is not None:
+            planner_client = MultiProviderPlanner(
+                primary,
+                fallback,
+                mode=settings.ai_planner_mode,
+                total_deadline_seconds=(
+                    settings.ai_planner_total_deadline_seconds
+                ),
+            )
         if settings.ai_web_search_enabled:
             search_client = GeminiGroundedSearchClient(
                 provider_transport,
@@ -182,6 +218,7 @@ def build_assistant_clients(
         general_chat_enabled=settings.ai_general_chat_enabled,
         web_search_enabled=settings.ai_web_search_enabled,
         planner_mode=settings.ai_planner_mode,
+        planner_client=planner_client,
     ), speech_client
 
 

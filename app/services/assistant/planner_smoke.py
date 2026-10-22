@@ -19,6 +19,20 @@ from app.models.assistant_planner import (
 from app.services.assistant.providers import PlannerModelClient
 
 
+OFFLINE_PLANNER_CONTRACT_CASES = (
+    ("catalog_search", "найди пф для облепихи"),
+    ("catalog_followup", "измени состав"),
+    ("catalog_correction", "нет, я имел в виду изменить состав облепиховой пфки"),
+    ("catalog_add_ingredient", "добавь туда 100 мл апельсинового фреша"),
+    ("warehouse_writeoff", "спиши апельсин 200 грамм"),
+    ("warehouse_information", "что такое списание"),
+    ("attendance_read", "чьи смены открыты"),
+    ("report_generation", "сформируй отчёт за сегодня"),
+    ("cancellation", "отменить"),
+    ("confirmation", "подтверждаю"),
+)
+
+
 @dataclass(frozen=True, slots=True)
 class PlannerSmokeCase:
     name: str
