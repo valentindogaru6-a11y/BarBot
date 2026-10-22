@@ -1,6 +1,18 @@
 """Bounded AI assistant services."""
 
 from app.services.assistant.coordinator import AssistantRequestCoordinator
+from app.services.assistant.shadow import (
+    LoggingShadowTelemetrySink,
+    ShadowEvaluationEvent,
+    ShadowLocalDecision,
+    ShadowPlannerSupervisor,
+    ShadowTelemetrySink,
+)
+from app.services.assistant.planner_smoke import (
+    PlannerSmokeCase,
+    PlannerSmokeHarness,
+    PlannerSmokeResult,
+)
 from app.services.assistant.context import (
     AssistantConversationContext,
     AssistantConversationMemory,
@@ -78,6 +90,14 @@ __all__ = [
     "AssistantDialogueAct",
     "AssistantOrchestrator",
     "AssistantRequestCoordinator",
+    "ShadowEvaluationEvent",
+    "ShadowLocalDecision",
+    "ShadowPlannerSupervisor",
+    "ShadowTelemetrySink",
+    "LoggingShadowTelemetrySink",
+    "PlannerSmokeCase",
+    "PlannerSmokeHarness",
+    "PlannerSmokeResult",
     "AssistantConversationContext",
     "AssistantConversationMemory",
     "AssistantConversationTurn",

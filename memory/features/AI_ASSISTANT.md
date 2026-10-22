@@ -23,7 +23,29 @@ Warehouse plans still need deterministic imperative evidence and use the
 existing draft/preview/confirmation path. Catalog management remains an admin
 FSM, never model access to JSON. Provider failure preserves the last successful
 entity and falls back to deterministic read-only behavior or a safe
-clarification. Shadow and AI-first live behavior is `pending`.
+clarification. Shadow and AI-first live accuracy is `pending`; the incomplete
+live smoke established no score and Cases 2–4 remain unknown.
+
+Shadow evaluation is detached from the primary request lifetime.
+`ShadowPlannerSupervisor` keeps strong task references, allows at most one
+active attempt per actor key, bounds global concurrency and provider time,
+drops duplicate/busy work, consumes terminal exceptions, and cancels/drains
+tasks on shutdown. The primary response and per-user coordinator claim never
+await shadow. Shadow receives only the redacted snapshot and runtime-filtered
+capability contracts; it has no executor and cannot update context, FSM,
+drafts, proposals, operations or storage.
+
+Each accepted, dropped, failed or cancelled attempt emits one bounded,
+versioned comparison event. It records local/planner dialogue act, domain,
+capability and allowed stable target ID, risk, clarification, validation,
+latency/payload buckets and a closed error category. It never records raw text,
+transcripts, Telegram identifiers, usernames, secrets, headers, provider
+payloads, system prompts or warehouse comments. Telemetry failure is isolated.
+
+The diagnostic smoke harness uses the application adapter and strict Pydantic
+decision, counts attempted/completed calls, retains each bounded result before
+the next case, uses `model_copy(update=...)`, executes no tools, and refuses
+live calls without an explicit one-time flag. It is not a production path.
 
 The owner-approved end state and phased measurable plan are maintained in
 `BAR_JARVIS_ROADMAP.md`. It is a target contract, not evidence that voice,

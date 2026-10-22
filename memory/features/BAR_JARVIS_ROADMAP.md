@@ -16,6 +16,9 @@ offline `bar-jarvis-planner-v1` corpus has 17 scripted contract cases across
 the required language/risk groups. It is not a live-provider accuracy measure;
 live accuracy, voice, web/image/video and complete 10–15 phrase coverage per
 capability remain `pending` and no percentage is claimed.
+Shadow isolation and privacy-safe comparison telemetry are implemented in
+development, but live planner accuracy remains `pending`. The incomplete smoke
+does not establish a score and needs a separately authorized re-smoke.
 
 ## End state
 
@@ -169,7 +172,8 @@ for individual cases, never an aggregate percentage.
 - **Scope:** versioned redacted corpora, deterministic/fake-provider runs,
   scoring by domain/capability, safety suites, latency/error categories and
   privacy-safe production counters without prompts, transcripts or IDs.
-- **Dependencies:** phases A–E contracts, stable test fixtures, release runbooks,
+- **Dependencies:** phases A–E contracts, stable test fixtures, bounded shadow
+  supervision, release runbooks,
   redaction policy and owner-approved acceptance datasets.
 - **Measurable acceptance:** reproducible reports include corpus/version/sample,
   route and argument accuracy, unsafe false positives, confirmation/idempotency,
@@ -178,7 +182,8 @@ for individual cases, never an aggregate percentage.
 - **Security boundaries:** no secrets, Telegram IDs, raw prompts, transcripts or
   provider bodies in metrics; no production mutation probes; least-retention
   diagnostics and explicit operator access.
-- **Live pilot:** shadow measurement of already authorized owner interactions,
+- **Live pilot:** shadow measurement of already authorized owner interactions
+  using only versioned decision comparisons and closed error/latency categories,
   then staged release dashboards and alerts; observability never sends Telegram
   updates or expands access.
 - **Rollback criteria:** telemetry leaks sensitive content, changes application

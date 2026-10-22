@@ -36,6 +36,7 @@ from app.models.assistant import (
     AssistantRequestedKind,
 )
 from app.models.assistant_planner import (
+    AssistantDialogueAct,
     PlannerCapability,
     PlannerContextSnapshot,
     PlannerTurn,
@@ -52,6 +53,7 @@ from app.services.assistant import (
     ProviderError,
     ProviderErrorKind,
     SpeechToTextClient,
+    ShadowLocalDecision,
     AssistantActionProposalService,
     AssistantCapabilityController,
     extract_catalog_entity,
@@ -387,7 +389,6 @@ async def _run_assistant(
             source_message_id=int(getattr(message, "message_id", 0)),
         )
         if dispatch is not None:
-            shadow_task = None
             if planner_mode == "shadow":
                 snapshot, planner_capabilities = _planner_inputs(
                     user_id,
@@ -396,16 +397,37 @@ async def _run_assistant(
                     controller=assistant_capability_controller,
                     memory=conversation_memory,
                 )
-                shadow_task = asyncio.create_task(orchestrator.observe_shadow(
+                contract = next(
+                    (
+                        item
+                        for item in planner_capabilities
+                        if item.capability_id == dispatch.capability_id
+                    ),
+                    None,
+                )
+                domain = AssistantDomain.UNSPECIFIED
+                if contract is not None:
+                    try:
+                        domain = AssistantDomain(contract.domain)
+                    except ValueError:
+                        pass
+                orchestrator.start_shadow(
                     text,
+                    user_key=user_id,
                     snapshot=snapshot,
                     capabilities=planner_capabilities,
-                ))
-            try:
-                await send_capability(dispatch)
-            finally:
-                if shadow_task is not None:
-                    await shadow_task
+                    local=ShadowLocalDecision(
+                        route_category="capability_dispatch",
+                        dialogue_act=AssistantDialogueAct.NEW_COMMAND,
+                        domain=domain,
+                        capability_id=dispatch.capability_id,
+                        target_entity_id=None,
+                        mutation=bool(contract.mutation) if contract else False,
+                        needs_clarification=False,
+                        validation_passed=True,
+                    ),
+                )
+            await send_capability(dispatch)
             return
     try:
         catalog = load_catalog(catalog_path)
@@ -709,6 +731,8 @@ async def _run_assistant(
                 f"покажи техкарту {retrieval.normalized_query}",
                 planner_snapshot=planner_snapshot,
                 planner_capabilities=planner_capabilities,
+                shadow_key=user_id,
+                shadow_text=request_text,
             )
         else:
             provider_candidates = tuple(
@@ -728,6 +752,7 @@ async def _run_assistant(
                 allowed_capability_ids=allowed_capability_ids,
                 planner_snapshot=planner_snapshot,
                 planner_capabilities=planner_capabilities,
+                shadow_key=user_id,
             ))
             if local_intent is None or planner_mode != "local_first":
                 provider_latency_bucket = _latency_bucket(

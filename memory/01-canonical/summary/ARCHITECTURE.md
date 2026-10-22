@@ -42,6 +42,13 @@ Importance: Critical
   `CapabilityRegistry` filters actions by role, private-chat policy and flags.
   General chat returns escaped text only; the separate grounded-search adapter
   returns text plus metadata-backed links and has no registry access.
+- Shadow comparison is owned by a bounded process-local supervisor, not the
+  Telegram request task. Primary responses and single-flight claims never
+  await shadow; duplicate/global overflow is dropped, time is bounded,
+  exceptions are consumed, and shutdown cancels/drains tasks. Shadow has no
+  executor or mutable service binding. Versioned telemetry contains only
+  redacted decision comparisons, stable catalog/capability IDs and closed
+  latency/error categories.
 - Bar Jarvis catalog requests follow one typed contract across `Local parser →
   AssistantIntent → Orchestrator → Catalog retrieval/tool → Persistent
   context → Renderer/callback`. The contract carries `domain`, action,

@@ -446,6 +446,7 @@ async def main() -> None:
             close_bot_session=False,
         )
     finally:
+        await assistant_orchestrator.shutdown()
         await stop_reminder_worker(reminder_task)
         await stop_reminder_worker(schedule_task)
         await bot.session.close()

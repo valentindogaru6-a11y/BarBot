@@ -36,6 +36,10 @@ from app.services.assistant.retrieval import (
     AssistantCatalogRetriever,
     display_catalog_entity,
 )
+from app.services.assistant.shadow import (
+    ShadowLocalDecision,
+    ShadowPlannerSupervisor,
+)
 from app.services.search_service import SearchResult
 
 MAX_ASSISTANT_TEXT_LENGTH = 2_000
@@ -162,6 +166,7 @@ class AssistantOrchestrator:
         web_search_enabled: bool = False,
         planner_mode: Literal["local_first", "shadow", "ai_first"] = "local_first",
         planner_client: PlannerModelClient | None = None,
+        shadow_supervisor: ShadowPlannerSupervisor | None = None,
     ) -> None:
         self.intent_client = intent_client
         self.search_client = search_client
@@ -170,6 +175,11 @@ class AssistantOrchestrator:
         self.planner_mode = planner_mode
         self.planner_client = planner_client or (
             intent_client if intent_client is not None and hasattr(intent_client, "plan") else None
+        )
+        self.shadow_supervisor = shadow_supervisor or (
+            ShadowPlannerSupervisor()
+            if planner_mode == "shadow" and self.planner_client is not None
+            else None
         )
 
     async def plan(
@@ -195,26 +205,72 @@ class AssistantOrchestrator:
         *,
         snapshot: PlannerContextSnapshot,
         capabilities: Sequence[PlannerCapability],
-    ) -> PlannerDecision | None:
+    ) -> PlannerDecision:
         """Evaluate a plan without returning or executing it."""
 
-        try:
-            decision = await self.plan(text, snapshot=snapshot, capabilities=capabilities)
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:
-            logger.info("Assistant shadow planner failed kind=%s", type(exc).__name__)
-            return None
-        logger.info(
-            "Assistant shadow decision act=%s domain=%s capability=%s "
-            "clarification=%s mutation=%s",
-            decision.dialogue_act.value,
-            decision.domain.value,
-            decision.capability_id or "none",
-            decision.needs_clarification,
-            decision.mutation,
+        return await self.plan(text, snapshot=snapshot, capabilities=capabilities)
+
+    @staticmethod
+    def shadow_local_decision(
+        intent: AssistantIntent,
+        *,
+        route_category: str = "deterministic_local",
+    ) -> ShadowLocalDecision:
+        capability_by_intent = {
+            AssistantIntentName.FIND_TECH_CARD: "catalog.search",
+            AssistantIntentName.PREPARE_WRITEOFF: "warehouse.prepare_writeoff",
+            AssistantIntentName.PREPARE_TRANSFER: "warehouse.prepare_transfer",
+            AssistantIntentName.LIST_OPEN_ATTENDANCE_SESSIONS: "attendance.list_open",
+            AssistantIntentName.GET_CURRENT_SHIFT_SUMMARY: "warehouse.shift_summary",
+        }
+        mutation = intent.intent in _WAREHOUSE_ACTION_INTENTS
+        return ShadowLocalDecision(
+            route_category=route_category,
+            dialogue_act=AssistantDialogueAct.NEW_COMMAND,
+            domain=intent.domain,
+            capability_id=(
+                intent.capability_id
+                if intent.intent is AssistantIntentName.CAPABILITY
+                else capability_by_intent.get(intent.intent)
+            ),
+            target_entity_id=intent.selected_entity_id,
+            mutation=mutation,
+            needs_clarification=intent.intent is AssistantIntentName.CLARIFY,
+            validation_passed=True,
         )
-        return decision
+
+    def start_shadow(
+        self,
+        text: str,
+        *,
+        user_key: object,
+        snapshot: PlannerContextSnapshot,
+        capabilities: Sequence[PlannerCapability],
+        local: ShadowLocalDecision,
+    ) -> bool:
+        """Submit a comparison attempt without extending the primary request."""
+
+        if self.planner_mode != "shadow" or self.shadow_supervisor is None:
+            return False
+        request_size = len(text.encode("utf-8")) + len(
+            snapshot.model_dump_json().encode("utf-8")
+        ) + sum(len(item.model_dump_json().encode("utf-8")) for item in capabilities)
+        return self.shadow_supervisor.submit(
+            user_key=user_key,
+            planner_call=lambda: self.observe_shadow(
+                text,
+                snapshot=snapshot,
+                capabilities=capabilities,
+            ),
+            local=local,
+            snapshot=snapshot,
+            capabilities=capabilities,
+            request_size=request_size,
+        )
+
+    async def shutdown(self) -> None:
+        if self.shadow_supervisor is not None:
+            await self.shadow_supervisor.shutdown()
 
     @staticmethod
     def planner_decision_to_intent(decision: PlannerDecision) -> AssistantIntent:
@@ -418,6 +474,8 @@ class AssistantOrchestrator:
         allowed_capability_ids: Sequence[str] = (),
         planner_snapshot: PlannerContextSnapshot | None = None,
         planner_capabilities: Sequence[PlannerCapability] = (),
+        shadow_key: object | None = None,
+        shadow_text: str | None = None,
     ) -> AssistantIntent:
         if self.planner_mode == "ai_first" and planner_snapshot is not None:
             try:
@@ -445,17 +503,15 @@ class AssistantOrchestrator:
                         ),
                     )
         local = self.local_intent(text)
-        if self.planner_mode == "shadow" and planner_snapshot is not None:
-            shadow_task = asyncio.create_task(self.observe_shadow(
-                text,
-                snapshot=planner_snapshot,
-                capabilities=planner_capabilities,
-            ))
-        else:
-            shadow_task = None
         if local is not None:
-            if shadow_task is not None:
-                await shadow_task
+            if self.planner_mode == "shadow" and planner_snapshot is not None:
+                self.start_shadow(
+                    shadow_text or text,
+                    user_key=shadow_key if shadow_key is not None else object(),
+                    snapshot=planner_snapshot,
+                    capabilities=planner_capabilities,
+                    local=self.shadow_local_decision(local),
+                )
             return local
         if self.intent_client is None:
             raise AssistantUnavailableError("intent provider is disabled")
@@ -469,20 +525,19 @@ class AssistantOrchestrator:
             self.intent_client.classify
         ).parameters:
             kwargs["allowed_capability_ids"] = allowed_capability_ids
-        try:
-            intent = await self.intent_client.classify(text, **kwargs)
-        except asyncio.CancelledError:
-            if shadow_task is not None:
-                shadow_task.cancel()
-                await asyncio.gather(shadow_task, return_exceptions=True)
-            raise
-        except Exception:
-            if shadow_task is not None:
-                await shadow_task
-            raise
-        if shadow_task is not None:
-            await shadow_task
-        return self._guard_provider_intent(intent, allowed_action)
+        intent = await self.intent_client.classify(text, **kwargs)
+        guarded = self._guard_provider_intent(intent, allowed_action)
+        if self.planner_mode == "shadow" and planner_snapshot is not None:
+            self.start_shadow(
+                shadow_text or text,
+                user_key=shadow_key if shadow_key is not None else object(),
+                snapshot=planner_snapshot,
+                capabilities=planner_capabilities,
+                local=self.shadow_local_decision(
+                    guarded, route_category="legacy_provider_primary"
+                ),
+            )
+        return guarded
 
     async def interpret_with_provider(
         self,

@@ -279,10 +279,14 @@ class _RetryingProvider:
         timeout_seconds: int,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         retry_delay_seconds: float = 0.2,
+        max_attempts: int = 2,
     ) -> None:
+        if max_attempts not in {1, 2}:
+            raise ValueError("provider max_attempts must be 1 or 2")
         self.timeout_seconds = timeout_seconds
         self._sleep = sleep
         self.retry_delay_seconds = retry_delay_seconds
+        self.max_attempts = max_attempts
 
     @staticmethod
     def _status_kind(status: int) -> ProviderErrorKind | None:
@@ -300,7 +304,7 @@ class _RetryingProvider:
         self,
         request: Callable[[], Awaitable[HttpResponse]],
     ) -> HttpResponse:
-        for attempt in range(2):
+        for attempt in range(self.max_attempts):
             try:
                 response = await request()
             except _ResponseTooLargeError as exc:
@@ -318,7 +322,10 @@ class _RetryingProvider:
             kind = self._status_kind(response.status)
             if kind is None:
                 return response
-            if kind in {ProviderErrorKind.RATE_LIMIT, ProviderErrorKind.SERVER} and attempt == 0:
+            if (
+                kind in {ProviderErrorKind.RATE_LIMIT, ProviderErrorKind.SERVER}
+                and attempt + 1 < self.max_attempts
+            ):
                 await self._sleep(self.retry_delay_seconds)
                 continue
             raise ProviderError(self.provider_name, kind)
@@ -402,11 +409,13 @@ class GeminiIntentClient(_RetryingProvider):
         timeout_seconds: int,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         retry_delay_seconds: float = 0.2,
+        max_attempts: int = 2,
     ) -> None:
         super().__init__(
             timeout_seconds=timeout_seconds,
             sleep=sleep,
             retry_delay_seconds=retry_delay_seconds,
+            max_attempts=max_attempts,
         )
         self.transport = transport
         self._api_key = api_key

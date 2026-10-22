@@ -11,6 +11,10 @@ Checkpoint 2026-10-22: AI-first planner foundation started from
 17 scripted contract cases and establishes no provider-accuracy percentage.
 Schema remains v14; catalog, seed and migrations are unchanged.
 
+Development follow-up at `0205ec4f...` fixes shadow lifecycle and evaluation
+observability. Live planner Cases 2–4 remain unknown; no accuracy percentage is
+established. Production rollout is outside this development task.
+
 Task: none
 State: empty
 Started: n/a

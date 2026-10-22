@@ -69,6 +69,17 @@ Importance: High
   before the request, reject invented IDs and risk mismatches afterward, and
   recheck access/proposal state at execution. Start with shadow. Provider
   failure must retain successful context and cannot create a mutation.
+- **Shadow must not extend primary latency or claims:** directly creating and
+  awaiting comparison work made provider timeout part of the Telegram response
+  and kept the actor single-flight claim busy. Route all shadow work through a
+  bounded executor-free supervisor, emit privacy-safe terminal telemetry, and
+  cancel/drain on shutdown. Prove the primary claim is reusable while shadow
+  remains pending.
+- **Diagnostic evidence must survive later-case failures:** a validated live
+  result was lost when a harness applied `dataclasses.replace()` to a Pydantic
+  model and subsequent output was truncated. Retain each bounded result before
+  the next call, use Pydantic `model_copy`, and stop when call counters diverge.
+  Cases 2–4 remain unknown and establish no accuracy claim.
 
 Revalidate runtime-dependent lessons before production action. Do not turn an
 owner observation into a measured infrastructure claim without evidence.
