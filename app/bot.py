@@ -181,6 +181,7 @@ def build_assistant_clients(
         search_client=search_client,
         general_chat_enabled=settings.ai_general_chat_enabled,
         web_search_enabled=settings.ai_web_search_enabled,
+        planner_mode=settings.ai_planner_mode,
     ), speech_client
 
 

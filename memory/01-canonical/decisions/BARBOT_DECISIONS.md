@@ -118,3 +118,13 @@ confirmation, idempotency, rollback and unsafe-false-positive security cases
 must pass 100%. Unmeasured capabilities stay `pending`. This direction never
 authorizes production access or weakens local-first, preview/confirmation,
 stable-ID, server-side authorization or no-silent-mutation rules.
+
+## D16 — AI plans; BarBot authorizes and executes
+
+AI-first interpretation is allowed only behind an explicit mode gate. The safe
+default is local-first and shadow decisions never execute. The planner sees
+only actor-filtered capability contracts and redacted structured context, may
+reference only supplied stable IDs, and cannot assert permission,
+confirmation, or revision. BarBot rechecks access, flags, arguments, ownership,
+revision and proposal expiry; every mutation retains its existing preview and
+explicit-confirmation boundary.

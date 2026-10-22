@@ -8,6 +8,23 @@ Evidence: `app/services/assistant/`, `app/handlers/assistant.py`, assistant test
 Depends on: catalog services, centralized access, warehouse draft confirmation
 Importance: High
 
+## AI-first planner foundation (development)
+
+`AI_PLANNER_MODE` is `local_first` (safe default), `shadow` (comparison only,
+never execution), or `ai_first` (free text planned first). Commands, callbacks,
+active FSM and exact warehouse triggers retain priority. The strict planner
+sees only role, runtime-filtered capability contracts, domain, supplied stable
+entity/candidate IDs, pending state, a safe tool summary, six bounded turns and
+revision/expiry. It receives no actor/chat ID, secret, database dump or
+authority field. BarBot rejects unavailable capabilities, invented IDs and
+risk mismatches, then rechecks all normal access/proposal boundaries.
+
+Warehouse plans still need deterministic imperative evidence and use the
+existing draft/preview/confirmation path. Catalog management remains an admin
+FSM, never model access to JSON. Provider failure preserves the last successful
+entity and falls back to deterministic read-only behavior or a safe
+clarification. Shadow and AI-first live behavior is `pending`.
+
 The owner-approved end state and phased measurable plan are maintained in
 `BAR_JARVIS_ROADMAP.md`. It is a target contract, not evidence that voice,
 multi-step planning, full 41-capability language coverage, web, image or video

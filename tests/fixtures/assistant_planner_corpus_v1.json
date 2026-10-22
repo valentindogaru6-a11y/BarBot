@@ -1,0 +1,19 @@
+{"version":"bar-jarvis-planner-v1","methodology":"Offline contract corpus with scripted provider decisions; no live-provider accuracy is claimed.","cases":[
+{"id":"correction-seabuckthorn","group":"corrections","text":"нет, я имел в виду изменить состав облепиховой пфки","dialogue_act":"correction","capability_id":"catalog.manage"},
+{"id":"followup-pronoun","group":"pronoun_followups","text":"что входит в неё?","dialogue_act":"follow_up","capability_id":"catalog.get"},
+{"id":"topic-switch","group":"topic_switch","text":"а теперь покажи открытые смены","dialogue_act":"new_command","capability_id":"attendance.list_open"},
+{"id":"topic-return","group":"topic_return","text":"вернёмся к той заготовке","dialogue_act":"follow_up","capability_id":"catalog.get"},
+{"id":"writeoff-missing","group":"incomplete_mutations","text":"спиши апельсин","dialogue_act":"new_command","capability_id":"warehouse.prepare_writeoff"},
+{"id":"colloquial-pf","group":"colloquial_catalog","text":"найди пфку для ягодного чая","dialogue_act":"new_command","capability_id":"catalog.search"},
+{"id":"mixed-layout","group":"mixed_ru_ua_typos","text":"що ті знаєш про ягідний чай","dialogue_act":"new_command","capability_id":"catalog.search"},
+{"id":"attendance","group":"attendance","text":"чьи смены открыты","dialogue_act":"new_command","capability_id":"attendance.list_open"},
+{"id":"report","group":"reports_delivery","text":"покажи историю отчётов","dialogue_act":"new_command","capability_id":"reports.history"},
+{"id":"delivery","group":"reports_delivery","text":"отправь готовый отчёт","dialogue_act":"new_command","capability_id":"reports.send"},
+{"id":"users","group":"administration","text":"сколько барменов зарегистрировано","dialogue_act":"new_command","capability_id":"users.list_bartenders"},
+{"id":"reminders","group":"administration","text":"покажи настройки напоминаний","dialogue_act":"new_command","capability_id":"reminders.get"},
+{"id":"schedule","group":"administration","text":"покажи расписания отчётов","dialogue_act":"new_command","capability_id":"schedules.list"},
+{"id":"false-positive","group":"false_positive_mutations","text":"что такое списание","dialogue_act":"general_chat","capability_id":null},
+{"id":"confirmation","group":"confirmation_cancellation","text":"подтверждаю","dialogue_act":"confirmation","capability_id":null},
+{"id":"cancellation","group":"confirmation_cancellation","text":"отмени","dialogue_act":"cancellation","capability_id":null},
+{"id":"provider-timeout","group":"provider_failures","text":"измени состав","dialogue_act":"follow_up","capability_id":"catalog.manage"}
+]}

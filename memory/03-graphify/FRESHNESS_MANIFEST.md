@@ -1,8 +1,8 @@
 # Freshness Manifest
 
 Metadata: scope `BarBot`; trust `mixed`; lifecycle `active`; last reviewed
-`2026-10-14` during the follow-up/local-action development phase based on
-HEAD `f66e402976e6e037ab483744536a52cadb21ded8`.
+`2026-10-22` during AI-first planner foundation development based on starting
+HEAD `a5482d033c9a480c544547459a71b39caf69b74f`.
 
 | Note | Scope | Importance | Trust | Lifecycle | Last verified | Evidence / dependencies | Revalidation trigger |
 |---|---|---:|---|---|---|---|---|
@@ -28,8 +28,10 @@ being used for an operational decision.
 
 ## Current development checkpoint
 
-- Schema target remains v14. The follow-up/local-action development changes do
+- Schema target remains v14. The planner foundation changes do
   not change catalog, warehouse seed or migrations.
+- Planner modes and the 17-case offline corpus are development evidence only;
+  shadow/AI-first live coverage and accuracy remain pending.
 - Production rollout of the development changes has not been performed.
 - Service state, deployed HEAD, schema, counts, flags and provider health remain
   runtime facts and must be revalidated under the controlled rollout policy

@@ -8,6 +8,17 @@ Evidence: `app/services/assistant/capabilities.py`, assistant tests, commit `c2c
 Depends on: `features/AI_ASSISTANT.md`, `docs/ai_capability_inventory.md`
 Importance: High
 
+## Planner corpus
+
+`tests/fixtures/assistant_planner_corpus_v1.json` defines 17 offline contract
+cases covering corrections, pronouns, topic switch/return, incomplete
+mutations, colloquialisms, mixed Russian/Ukrainian typos, attendance,
+reports/delivery, administration, false positives, confirmation/cancellation
+and provider failure. The owner’s Облепиха correction is `correction` plus
+`catalog.manage` with the supplied stable ID, never a literal catalog query.
+Decisions are scripted for contract tests; live Gemini coverage remains
+`pending`, so this corpus carries no accuracy percentage.
+
 The authoritative capability count and structural metadata remain `CAPABILITIES`;
 this index must not become an independent permission source. Role abbreviations:
 `SA` super-admin, `A` admin, `B` bartender, `Acc` accountant. Risks are

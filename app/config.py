@@ -91,6 +91,7 @@ class Settings(BaseSettings):
     ai_voice_enabled: bool = False
     ai_general_chat_enabled: bool = False
     ai_web_search_enabled: bool = False
+    ai_planner_mode: Literal["local_first", "shadow", "ai_first"] = "local_first"
     groq_api_key: SecretStr | None = None
     groq_stt_model: str = Field(
         default="whisper-large-v3-turbo",

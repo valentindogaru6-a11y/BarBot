@@ -243,6 +243,13 @@ Runtime readiness: the live Gemini structured-output smoke passed on
 must use a controlled Telegram voice request sent only by the owner during a
 separately authorized rollout step.
 
+`AI_PLANNER_MODE` gates the planner foundation: `local_first` preserves the
+current route, `shadow` records a comparison decision but never executes it,
+and `ai_first` plans free text before BarBot validates the actor-filtered
+capability. The safe default is `local_first`; planner output cannot assert
+authority/confirmation, invent stable IDs, or bypass existing FSM, proposal,
+access, and warehouse imperative-evidence boundaries.
+
 ```dotenv
 AI_ASSISTANT_ENABLED=false
 AI_ACCESS_MODE=pilot_allowlist
@@ -251,6 +258,7 @@ AI_TEXT_ENABLED=false
 AI_VOICE_ENABLED=false
 AI_GENERAL_CHAT_ENABLED=false
 AI_WEB_SEARCH_ENABLED=false
+AI_PLANNER_MODE=local_first
 GROQ_API_KEY=
 GROQ_STT_MODEL=whisper-large-v3-turbo
 GEMINI_API_KEY=

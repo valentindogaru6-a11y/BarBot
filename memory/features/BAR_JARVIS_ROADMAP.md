@@ -8,6 +8,15 @@ Evidence: owner direction; current implementation evidence remains in `AI_ASSIST
 Depends on: `AI_ASSISTANT.md`, `AI_CAPABILITY_LANGUAGE.md`, production safety policy
 Importance: Critical
 
+## Planner foundation checkpoint
+
+Development now contains gated `local_first`, `shadow` and `ai_first` modes.
+Promotion starts with shadow because its decision is comparison-only. The
+offline `bar-jarvis-planner-v1` corpus has 17 scripted contract cases across
+the required language/risk groups. It is not a live-provider accuracy measure;
+live accuracy, voice, web/image/video and complete 10–15 phrase coverage per
+capability remain `pending` and no percentage is claimed.
+
 ## End state
 
 Bar Jarvis is a text and voice AI pilot that uses natural language to operate

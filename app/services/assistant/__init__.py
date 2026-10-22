@@ -23,9 +23,16 @@ from app.services.assistant.providers import (
     GroundedSource,
     GroqSpeechToTextClient,
     IntentModelClient,
+    PlannerModelClient,
     ProviderError,
     ProviderErrorKind,
     SpeechToTextClient,
+)
+from app.models.assistant_planner import (
+    AssistantDialogueAct,
+    PlannerCapability,
+    PlannerContextSnapshot,
+    PlannerDecision,
 )
 from app.services.assistant.retrieval import (
     AssistantCatalogRetriever,
@@ -68,6 +75,7 @@ from app.services.assistant.bar_language import (
 )
 
 __all__ = [
+    "AssistantDialogueAct",
     "AssistantOrchestrator",
     "AssistantRequestCoordinator",
     "AssistantConversationContext",
@@ -87,6 +95,10 @@ __all__ = [
     "GroundedSource",
     "GroqSpeechToTextClient",
     "IntentModelClient",
+    "PlannerModelClient",
+    "PlannerCapability",
+    "PlannerContextSnapshot",
+    "PlannerDecision",
     "ProviderError",
     "ProviderErrorKind",
     "SpeechToTextClient",

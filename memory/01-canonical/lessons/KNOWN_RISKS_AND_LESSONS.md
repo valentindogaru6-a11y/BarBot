@@ -65,6 +65,10 @@ Importance: High
   evidence, typed Decimal quantity/unit/destination parsing and the existing
   draft/preview/confirmation boundary; keep informational language negative
   tests alongside mutation tests.
+- **Planner output is not execution authority:** filter capability contracts
+  before the request, reject invented IDs and risk mismatches afterward, and
+  recheck access/proposal state at execution. Start with shadow. Provider
+  failure must retain successful context and cannot create a mutation.
 
 Revalidate runtime-dependent lessons before production action. Do not turn an
 owner observation into a measured infrastructure claim without evidence.

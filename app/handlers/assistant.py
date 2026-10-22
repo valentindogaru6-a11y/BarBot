@@ -35,6 +35,12 @@ from app.models.assistant import (
     AssistantRelation,
     AssistantRequestedKind,
 )
+from app.models.assistant_planner import (
+    PlannerCapability,
+    PlannerContextSnapshot,
+    PlannerTurn,
+)
+from app.models.assistant_capabilities import CapabilityRisk
 from app.services.assistant import (
     AssistantAccessDenied,
     AssistantAccessPolicy,
@@ -86,6 +92,74 @@ WEB_SEARCH_UNAVAILABLE_TEXT = (
     "Актуальный поиск в интернете пока недоступен. Могу ответить по общим "
     "знаниям или помочь с данными BarBot."
 )
+
+
+def _planner_inputs(
+    user_id: int,
+    chat_id: int,
+    *,
+    auth_service: AuthService,
+    controller: AssistantCapabilityController | None,
+    memory: AssistantConversationMemory | None,
+) -> tuple[PlannerContextSnapshot, tuple[PlannerCapability, ...]]:
+    """Build a bounded snapshot after server-side access filtering."""
+
+    context = memory.get(user_id, chat_id) if memory is not None else None
+    available_ids = controller.available_ids(user_id) if controller is not None else ()
+    active_proposal = (
+        controller.proposals.active_for_actor(user_id)
+        if controller is not None
+        else None
+    )
+    capabilities: list[PlannerCapability] = []
+    if controller is not None:
+        for identifier in available_ids:
+            definition = controller.registry.require(identifier)
+            fields = definition.input_model.model_fields
+            capabilities.append(PlannerCapability(
+                capability_id=identifier,
+                domain=definition.category,
+                read_only=definition.risk_level is CapabilityRisk.READ,
+                mutation=definition.risk_level is not CapabilityRisk.READ,
+                required_arguments=tuple(
+                    name for name, field in fields.items() if field.is_required()
+                ),
+            ))
+    role = auth_service.get_context(user_id).role.value
+    domain = AssistantDomain.UNSPECIFIED
+    if context is not None:
+        domain = {
+            "catalog": AssistantDomain.CATALOG,
+            "warehouse": AssistantDomain.WAREHOUSE,
+            "attendance": AssistantDomain.ATTENDANCE,
+            "employees": AssistantDomain.EMPLOYEES,
+            "reports": AssistantDomain.REPORTS,
+            "administration": AssistantDomain.ADMINISTRATION,
+            "general": AssistantDomain.GENERAL,
+        }.get(context.last_entity_type, AssistantDomain.UNSPECIFIED)
+    snapshot = PlannerContextSnapshot(
+        actor_role=role,
+        available_capability_ids=tuple(available_ids),
+        current_domain=domain,
+        last_successful_entity_id=(context.last_successful_entity_id or None) if context else None,
+        last_successful_entity_name=(context.last_successful_entity_label or None) if context else None,
+        candidate_entity_ids=context.current_candidates if context else (),
+        pending_clarification=(context.pending_clarification or None) if context else None,
+        pending_action=(
+            active_proposal.capability_id
+            if active_proposal is not None
+            else (context.authorized_action or None) if context else None
+        ),
+        last_tool_operation=(context.last_tool_name or None) if context else None,
+        last_tool_summary=(context.summary_text or None) if context else None,
+        recent_turns=tuple(
+            PlannerTurn(role=turn.role, text=turn.text)
+            for turn in (context.turns[-6:] if context else ())
+        ),
+        revision=context.revision if context else 0,
+        expires_at=context.expires_at if context else None,
+    )
+    return snapshot, tuple(capabilities)
 _CONVERSATION_RESET_PHRASES = {
     "забудь этот разговор",
     "начнем заново",
@@ -249,6 +323,7 @@ async def _run_assistant(
     user_id = message.from_user.id if message.from_user is not None else None
     if user_id is None:
         return
+    planner_mode = getattr(orchestrator, "planner_mode", "local_first")
     # Runtime entry points always inject and recheck the unified policy. Keeping
     # this private execution helper independently testable avoids coupling pure
     # routing regressions to the full user repository composition.
@@ -300,7 +375,11 @@ async def _run_assistant(
             ),
         )
 
-    if assistant_capability_controller is not None and user_id is not None:
+    if (
+        assistant_capability_controller is not None
+        and user_id is not None
+        and planner_mode in {"local_first", "shadow"}
+    ):
         dispatch = assistant_capability_controller.dispatch(
             text,
             actor_user_id=user_id,
@@ -308,7 +387,25 @@ async def _run_assistant(
             source_message_id=int(getattr(message, "message_id", 0)),
         )
         if dispatch is not None:
-            await send_capability(dispatch)
+            shadow_task = None
+            if planner_mode == "shadow":
+                snapshot, planner_capabilities = _planner_inputs(
+                    user_id,
+                    message.chat.id,
+                    auth_service=auth_service,
+                    controller=assistant_capability_controller,
+                    memory=conversation_memory,
+                )
+                shadow_task = asyncio.create_task(orchestrator.observe_shadow(
+                    text,
+                    snapshot=snapshot,
+                    capabilities=planner_capabilities,
+                ))
+            try:
+                await send_capability(dispatch)
+            finally:
+                if shadow_task is not None:
+                    await shadow_task
             return
     try:
         catalog = load_catalog(catalog_path)
@@ -548,6 +645,17 @@ async def _run_assistant(
             allowed_capability_ids,
             parsed_request.domain,
         )
+        planner_snapshot, all_planner_capabilities = _planner_inputs(
+            user_id,
+            message.chat.id,
+            auth_service=auth_service,
+            controller=assistant_capability_controller,
+            memory=conversation_memory,
+        )
+        planner_capabilities = tuple(
+            item for item in all_planner_capabilities
+            if item.capability_id in allowed_capability_ids
+        )
         local_intent = contextual_intent or orchestrator.local_intent(request_text)
         retrieval = (
             CatalogRetrieval(normalized_query=context.last_query)
@@ -591,25 +699,37 @@ async def _run_assistant(
                 relation_target=retrieval.relation_target,
             )
             fallback_action = registry.execute(fallback_intent)
-        if local_intent is None and retrieval.exact:
+        if (
+            planner_mode != "ai_first"
+            and local_intent is None
+            and retrieval.exact
+        ):
             local_exact_hit = True
             intent = await orchestrator.interpret(
-                f"покажи техкарту {retrieval.normalized_query}"
+                f"покажи техкарту {retrieval.normalized_query}",
+                planner_snapshot=planner_snapshot,
+                planner_capabilities=planner_capabilities,
             )
         else:
             provider_candidates = tuple(
                 candidate.provider_label for candidate in retrieval.candidates
             )
             provider_started = monotonic()
-            intent = local_intent or await orchestrator.interpret(
+            intent = (
+                local_intent
+                if local_intent is not None
+                and planner_mode == "local_first"
+                else await orchestrator.interpret(
                 request_text,
                 candidates=provider_candidates,
                 normalized_entity=retrieval.normalized_query,
                 conversation=provider_history,
                 allowed_action=allowed_action,
                 allowed_capability_ids=allowed_capability_ids,
-            )
-            if local_intent is None:
+                planner_snapshot=planner_snapshot,
+                planner_capabilities=planner_capabilities,
+            ))
+            if local_intent is None or planner_mode != "local_first":
                 provider_latency_bucket = _latency_bucket(
                     monotonic() - provider_started
                 )

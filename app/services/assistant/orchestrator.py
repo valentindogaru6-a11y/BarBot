@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 import unicodedata
@@ -17,11 +18,18 @@ from app.models.assistant import (
     AssistantRelation,
     AssistantRequestedKind,
 )
+from app.models.assistant_planner import (
+    AssistantDialogueAct,
+    PlannerCapability,
+    PlannerContextSnapshot,
+    PlannerDecision,
+)
 from app.models.catalog import Catalog
 from app.services.assistant.providers import (
     GroundedSearchClient,
     GroundedSearchResult,
     IntentModelClient,
+    PlannerModelClient,
 )
 from app.services.assistant.bar_language import parse_bar_request
 from app.services.assistant.retrieval import (
@@ -101,6 +109,11 @@ _OPEN_ATTENDANCE_RE = re.compile(
 _CURRENT_SHIFT_RE = re.compile(
     r"\b(?:текущ\w*|сейчас)\b.*\bсмен\w*\b", re.IGNORECASE
 )
+_CONTEXT_MUTATION_FOLLOWUP_RE = re.compile(
+    r"\b(?:измени|изменить|исправь|редактир|не\s+это|"
+    r"имел[аи]?\s+в\s+виду|точнее)\b",
+    re.IGNORECASE,
+)
 
 
 class AssistantUnavailableError(RuntimeError):
@@ -147,11 +160,119 @@ class AssistantOrchestrator:
         search_client: GroundedSearchClient | None = None,
         general_chat_enabled: bool = False,
         web_search_enabled: bool = False,
+        planner_mode: Literal["local_first", "shadow", "ai_first"] = "local_first",
+        planner_client: PlannerModelClient | None = None,
     ) -> None:
         self.intent_client = intent_client
         self.search_client = search_client
         self.general_chat_enabled = general_chat_enabled
         self.web_search_enabled = web_search_enabled
+        self.planner_mode = planner_mode
+        self.planner_client = planner_client or (
+            intent_client if intent_client is not None and hasattr(intent_client, "plan") else None
+        )
+
+    async def plan(
+        self,
+        text: str,
+        *,
+        snapshot: PlannerContextSnapshot,
+        capabilities: Sequence[PlannerCapability],
+    ) -> PlannerDecision:
+        if self.planner_client is None:
+            raise AssistantUnavailableError("planner provider is disabled")
+        decision = await self.planner_client.plan(
+            text, snapshot=snapshot, capabilities=capabilities
+        )
+        allowed = {item.capability_id for item in capabilities}
+        if decision.capability_id is not None and decision.capability_id not in allowed:
+            raise ValueError("planner capability escaped the runtime allowlist")
+        return decision
+
+    async def observe_shadow(
+        self,
+        text: str,
+        *,
+        snapshot: PlannerContextSnapshot,
+        capabilities: Sequence[PlannerCapability],
+    ) -> PlannerDecision | None:
+        """Evaluate a plan without returning or executing it."""
+
+        try:
+            decision = await self.plan(text, snapshot=snapshot, capabilities=capabilities)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logger.info("Assistant shadow planner failed kind=%s", type(exc).__name__)
+            return None
+        logger.info(
+            "Assistant shadow decision act=%s domain=%s capability=%s "
+            "clarification=%s mutation=%s",
+            decision.dialogue_act.value,
+            decision.domain.value,
+            decision.capability_id or "none",
+            decision.needs_clarification,
+            decision.mutation,
+        )
+        return decision
+
+    @staticmethod
+    def planner_decision_to_intent(decision: PlannerDecision) -> AssistantIntent:
+        if decision.needs_clarification:
+            return AssistantIntent(
+                intent=AssistantIntentName.CLARIFY,
+                clarification=decision.clarification_question,
+            )
+        if decision.capability_id in {"catalog.search", "catalog.get"}:
+            query = str(decision.arguments.get("query") or "").strip()
+            if not query and decision.target_entity_id:
+                query = str(decision.arguments.get("display_name") or "").strip()
+            if not query:
+                return AssistantIntent(
+                    intent=AssistantIntentName.CLARIFY,
+                    clarification="Уточните, какую позицию каталога найти.",
+                )
+            return AssistantIntent(
+                intent=AssistantIntentName.FIND_TECH_CARD,
+                query=query,
+                domain=AssistantDomain.CATALOG,
+                selected_entity_id=decision.target_entity_id,
+            )
+        if decision.capability_id in {
+            "warehouse.prepare_writeoff", "warehouse.prepare_transfer"
+        }:
+            args = decision.arguments
+            return AssistantIntent(
+                intent=(
+                    AssistantIntentName.PREPARE_WRITEOFF
+                    if decision.capability_id == "warehouse.prepare_writeoff"
+                    else AssistantIntentName.PREPARE_TRANSFER
+                ),
+                items=[AssistantIntentItem(
+                    product_text=args.get("product"),
+                    quantity_text=args.get("quantity"),
+                    unit_text=args.get("unit"),
+                    destination_text=args.get("destination"),
+                    comment_text=args.get("comment"),
+                )],
+            )
+        if decision.capability_id:
+            return AssistantIntent(
+                intent=AssistantIntentName.CAPABILITY,
+                capability_id=decision.capability_id,
+            )
+        if decision.dialogue_act in {
+            AssistantDialogueAct.CONFIRMATION,
+            AssistantDialogueAct.CANCELLATION,
+        }:
+            return AssistantIntent(
+                intent=AssistantIntentName.CLARIFY,
+                clarification="Используйте кнопку у ожидающего подтверждения.",
+            )
+        return AssistantIntent(
+            intent=AssistantIntentName.CLARIFY,
+            clarification="Уточните, пожалуйста, что нужно сделать.",
+        )
 
     @staticmethod
     def local_action_evidence(text: str) -> AssistantIntentName | None:
@@ -295,9 +416,46 @@ class AssistantOrchestrator:
         conversation: Sequence[tuple[str, str]] = (),
         allowed_action: AssistantIntentName | None = None,
         allowed_capability_ids: Sequence[str] = (),
+        planner_snapshot: PlannerContextSnapshot | None = None,
+        planner_capabilities: Sequence[PlannerCapability] = (),
     ) -> AssistantIntent:
+        if self.planner_mode == "ai_first" and planner_snapshot is not None:
+            try:
+                decision = await self.plan(
+                    text,
+                    snapshot=planner_snapshot,
+                    capabilities=planner_capabilities,
+                )
+                return self._guard_provider_intent(
+                    self.planner_decision_to_intent(decision),
+                    allowed_action,
+                )
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                logger.info("Assistant planner fallback kind=%s", type(exc).__name__)
+                if (
+                    planner_snapshot.last_successful_entity_id
+                    and _CONTEXT_MUTATION_FOLLOWUP_RE.search(text)
+                ):
+                    return AssistantIntent(
+                        intent=AssistantIntentName.CLARIFY,
+                        clarification=(
+                            "Уточните, что именно нужно изменить в выбранной позиции."
+                        ),
+                    )
         local = self.local_intent(text)
+        if self.planner_mode == "shadow" and planner_snapshot is not None:
+            shadow_task = asyncio.create_task(self.observe_shadow(
+                text,
+                snapshot=planner_snapshot,
+                capabilities=planner_capabilities,
+            ))
+        else:
+            shadow_task = None
         if local is not None:
+            if shadow_task is not None:
+                await shadow_task
             return local
         if self.intent_client is None:
             raise AssistantUnavailableError("intent provider is disabled")
@@ -311,7 +469,19 @@ class AssistantOrchestrator:
             self.intent_client.classify
         ).parameters:
             kwargs["allowed_capability_ids"] = allowed_capability_ids
-        intent = await self.intent_client.classify(text, **kwargs)
+        try:
+            intent = await self.intent_client.classify(text, **kwargs)
+        except asyncio.CancelledError:
+            if shadow_task is not None:
+                shadow_task.cancel()
+                await asyncio.gather(shadow_task, return_exceptions=True)
+            raise
+        except Exception:
+            if shadow_task is not None:
+                await shadow_task
+            raise
+        if shadow_task is not None:
+            await shadow_task
         return self._guard_provider_intent(intent, allowed_action)
 
     async def interpret_with_provider(
