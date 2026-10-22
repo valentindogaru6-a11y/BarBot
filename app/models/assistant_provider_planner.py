@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -76,17 +77,75 @@ class PlannerValidationStatus(StrEnum):
 
 class ProviderPlanError(StrEnum):
     AUTH = "auth"
-    BILLING = "billing"
+    QUOTA = "quota"
     CONFIG = "config"
     RATE_LIMIT = "rate_limit"
     TIMEOUT = "timeout"
     NETWORK = "network"
-    SERVER = "server"
-    SCHEMA_INCOMPATIBLE = "schema_incompatible"
+    SERVER_ERROR = "server_error"
+    INVALID_SCHEMA = "invalid_schema"
+    GENERATED_OUTPUT_SCHEMA_MISMATCH = "generated_output_schema_mismatch"
+    UNSUPPORTED_PARAMETER = "unsupported_parameter"
+    MODEL_REFUSAL = "model_refusal"
+    SAFETY_REFUSAL = "safety_refusal"
+    UNKNOWN_BAD_REQUEST = "unknown_bad_request"
     MALFORMED_RESPONSE = "malformed_response"
     CIRCUIT_OPEN = "circuit_open"
     DEADLINE = "deadline"
     INTERNAL = "internal"
+
+
+class SafeProviderErrorType(StrEnum):
+    INVALID_REQUEST = "invalid_request_error"
+    AUTHENTICATION = "authentication_error"
+    PERMISSION = "permission_error"
+    RATE_LIMIT = "rate_limit_error"
+    SERVER = "server_error"
+    MODEL_REFUSAL = "model_refusal"
+    SAFETY_REFUSAL = "safety_refusal"
+    UNKNOWN = "unknown_provider_error"
+
+
+class SafeProviderErrorCode(StrEnum):
+    INVALID_SCHEMA = "invalid_schema"
+    JSON_SCHEMA_INVALID = "json_schema_invalid"
+    JSON_VALIDATE_FAILED = "json_validate_failed"
+    GENERATED_OUTPUT_SCHEMA_MISMATCH = "generated_output_schema_mismatch"
+    UNSUPPORTED_PARAMETER = "unsupported_parameter"
+    MODEL_REFUSAL = "model_refusal"
+    SAFETY_REFUSAL = "safety_refusal"
+    INVALID_API_KEY = "invalid_api_key"
+    INSUFFICIENT_QUOTA = "insufficient_quota"
+    QUOTA_EXCEEDED = "quota_exceeded"
+    RATE_LIMIT_EXCEEDED = "rate_limit_exceeded"
+    SERVER_ERROR = "server_error"
+    UNKNOWN = "unknown_provider_error"
+
+
+SafeProviderErrorParam = Literal[
+    "response_format",
+    "json_schema",
+    "messages",
+    "model",
+    "reasoning_effort",
+    "max_completion_tokens",
+]
+
+
+class ProviderErrorDiagnostic(BaseModel):
+    """Bounded error metadata; raw provider text never enters this model."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    http_status: int | None = Field(default=None, ge=100, le=599)
+    provider_error_type: SafeProviderErrorType
+    provider_error_code: SafeProviderErrorCode
+    parameter: SafeProviderErrorParam | None = None
+    category: ProviderPlanError
+    retryable: bool
+    response_bytes: int = Field(ge=0)
+    request_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    schema_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
 class ProviderPlanResult(BaseModel):
@@ -98,6 +157,7 @@ class ProviderPlanResult(BaseModel):
     model: str = Field(min_length=1, max_length=100)
     decision: PlannerDecision | None = None
     error: ProviderPlanError | None = None
+    diagnostic: ProviderErrorDiagnostic | None = None
     latency_ms: int = Field(ge=0)
     schema_mode: str = Field(min_length=1, max_length=40)
     validation_status: PlannerValidationStatus

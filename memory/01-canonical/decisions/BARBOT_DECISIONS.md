@@ -140,3 +140,12 @@ runtime registry and bounded snapshot. Provider fallback is sequential under a
 shared deadline, shadow does not double-call by default, and process-local
 circuit state never affects business data. Groq-primary/Gemini-fallback is a
 development configuration, not evidence of production readiness or accuracy.
+
+## D18 — Provider diagnostics are closed metadata, not provider prose
+
+Provider errors may retain only an allowlisted type/code/parameter, normalized
+category, retryability, byte count and one-way request/schema hashes. Raw error
+messages, bodies, prompts, identifiers, headers and secrets never cross the
+adapter boundary. A deterministic 400 request/schema failure is not provider
+transport health and cannot open the circuit. Shadow never falls back; AI-first
+fallback remains an explicit category policy and never executes side effects.

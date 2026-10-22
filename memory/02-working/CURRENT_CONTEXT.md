@@ -21,6 +21,13 @@ process-local circuit breaker. Groq is configured as primary and Gemini as
 fallback, but live quality, promotion and production rollout remain pending.
 Schema stays v14; catalog, seed and migrations are unchanged.
 
+At development HEAD `fbbd6ab...`, controlled Groq Call 1 passed the strict
+planner contract; Call 2 returned HTTP 400 before semantic evidence was
+available. Offline reconstruction shows identical strict schema hashes across
+both turns. Safe provider-error classification is being added without changing
+the schema. Exact correction quality and the original provider subcategory are
+unknown; one controlled correction re-smoke remains pending.
+
 Task: none
 State: empty
 Started: n/a

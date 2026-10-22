@@ -91,6 +91,14 @@ Importance: High
   for auth/config failures, and no automatic retry of mutation execution.
   Circuit state is process-local health only and must not become authorization
   or persistent business state.
+- **A generic HTTP-400 label destroys the evidence needed for safe provider
+  work:** the first Groq planner lookup passed its strict contract, while the
+  following correction returned 400 and the old adapter retained only
+  `schema_incompatible`. Do not retain provider prose to compensate. Keep a
+  closed error envelope with allowlisted type/code/parameter and hashes; prove
+  schema invariance offline, and distinguish invalid request schema from
+  generated-output mismatch, unsupported parameters and refusals. Correction
+  semantics remain pending until a separately authorized live re-smoke.
 
 Revalidate runtime-dependent lessons before production action. Do not turn an
 owner observation into a measured infrastructure claim without evidence.

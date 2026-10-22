@@ -27,3 +27,4 @@ Read [BarBot decisions](BARBOT_DECISIONS.md) for the compact decision set:
 15. Measure the owner-approved Bar Jarvis end state on versioned corpora before claiming completion.
 16. AI plans; BarBot alone authorizes and executes.
 17. Provider-specific wire contracts never become BarBot authority.
+18. Provider diagnostics retain closed metadata only; deterministic request errors are not circuit outages.

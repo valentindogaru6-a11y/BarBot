@@ -1,6 +1,7 @@
 import asyncio
 import json
 
+import aiohttp
 import pytest
 from pydantic import ValidationError
 
@@ -11,6 +12,8 @@ from app.models.assistant_provider_planner import (
     PlannerValidationStatus,
     ProviderPlanError,
     ProviderPlanResult,
+    SafeProviderErrorCode,
+    SafeProviderErrorType,
 )
 from app.services.assistant.planner_providers import (
     CircuitState,
@@ -202,12 +205,139 @@ def test_groq_transport_uses_strict_wire_schema_bounded_timeouts_and_no_tools():
     assert "secret" not in json.dumps(payload)
 
 
-def test_groq_malformed_extra_fields_and_schema_http_error_are_normalized():
+def test_groq_schema_is_invariant_across_context_and_stable_ids_stay_out_of_schema():
+    body = json.dumps({"choices": [{"message": {"content": json.dumps(envelope())}}]}).encode()
+    transport = Transport(HttpResponse(200, body))
+    provider = GroqPlannerProvider(transport, api_key="secret")
+
+    async def scenario():
+        await provider.plan(
+            snapshot(last_successful_entity_id=None), "first", CAPS
+        )
+        await provider.plan(
+            snapshot(
+                last_successful_entity_id="stable-oblepikha",
+                candidate_entity_ids=(),
+                last_tool_operation="catalog.get",
+                last_tool_summary="selected tracked card",
+                revision=2,
+            ),
+            "second",
+            CAPS,
+        )
+
+    asyncio.run(scenario())
+    payloads = [call[1]["payload"] for call in transport.calls]
+    schemas = [payload["response_format"]["json_schema"]["schema"] for payload in payloads]
+    assert schemas[0] == schemas[1]
+    assert "stable-oblepikha" not in json.dumps(schemas)
+    assert schemas[0]["properties"]["target_entity_id"] == {
+        "type": ["string", "null"],
+        "maxLength": 300,
+    }
+
+
+def test_groq_diagnostics_prove_same_schema_hash_for_different_contexts():
+    body = _error_body(code="json_validate_failed", param="response_format")
+    transport = Transport(HttpResponse(400, body))
+    provider = GroqPlannerProvider(transport, api_key="secret")
+
+    async def scenario():
+        first = await provider.plan(
+            snapshot(last_successful_entity_id=None), "first", CAPS
+        )
+        second = await provider.plan(
+            snapshot(
+                last_successful_entity_id="stable-oblepikha",
+                candidate_entity_ids=(),
+                last_tool_operation="catalog.get",
+                last_tool_summary="selected tracked card",
+                revision=2,
+            ),
+            "second",
+            CAPS,
+        )
+        return first, second
+
+    first, second = asyncio.run(scenario())
+    assert first.diagnostic is not None and second.diagnostic is not None
+    assert first.diagnostic.schema_hash == second.diagnostic.schema_hash
+    assert first.diagnostic.request_hash != second.diagnostic.request_hash
+
+
+def _error_body(*, error_type="invalid_request_error", code=None, param=None, message="hidden"):
+    return json.dumps(
+        {"error": {"type": error_type, "code": code, "param": param, "message": message}}
+    ).encode()
+
+
+@pytest.mark.parametrize(
+    "status,body,expected,retryable",
+    [
+        (400, _error_body(code="json_schema_invalid", param="json_schema"), ProviderPlanError.INVALID_SCHEMA, False),
+        (400, _error_body(code="json_validate_failed", param="response_format"), ProviderPlanError.GENERATED_OUTPUT_SCHEMA_MISMATCH, False),
+        (400, _error_body(code="unsupported_parameter", param="reasoning_effort"), ProviderPlanError.UNSUPPORTED_PARAMETER, False),
+        (400, _error_body(error_type="model_refusal", code="model_refusal"), ProviderPlanError.MODEL_REFUSAL, False),
+        (400, _error_body(error_type="safety_refusal", code="safety_refusal"), ProviderPlanError.SAFETY_REFUSAL, False),
+        (400, _error_body(error_type="novel", code="novel", param="secret"), ProviderPlanError.UNKNOWN_BAD_REQUEST, False),
+        (401, _error_body(code="invalid_api_key"), ProviderPlanError.AUTH, False),
+        (402, _error_body(code="insufficient_quota"), ProviderPlanError.QUOTA, False),
+        (429, _error_body(code="rate_limit_exceeded"), ProviderPlanError.RATE_LIMIT, True),
+        (503, _error_body(error_type="server_error", code="server_error"), ProviderPlanError.SERVER_ERROR, True),
+    ],
+)
+def test_groq_error_envelope_classifies_only_safe_allowlisted_metadata(
+    status, body, expected, retryable
+):
+    result = asyncio.run(
+        GroqPlannerProvider(Transport(HttpResponse(status, body)), api_key="x").plan(
+            snapshot(), "request-secret", CAPS
+        )
+    )
+    assert result.error is expected
+    assert result.diagnostic is not None
+    assert result.diagnostic.category is expected
+    assert result.diagnostic.retryable is retryable
+    serialized = result.diagnostic.model_dump_json()
+    assert "hidden" not in serialized
+    assert "request-secret" not in serialized
+    assert "secret" not in serialized
+    if expected is ProviderPlanError.UNKNOWN_BAD_REQUEST:
+        assert result.diagnostic.provider_error_type is SafeProviderErrorType.UNKNOWN
+        assert result.diagnostic.provider_error_code is SafeProviderErrorCode.UNKNOWN
+        assert result.diagnostic.parameter is None
+
+
+def test_groq_malformed_extra_fields_are_normalized():
     malformed = json.dumps({"choices": [{"message": {"content": json.dumps({**envelope(), "confirmed": True})}}]}).encode()
     result = asyncio.run(GroqPlannerProvider(Transport(HttpResponse(200, malformed)), api_key="x").plan(snapshot(), "x", CAPS))
     assert result.error is ProviderPlanError.MALFORMED_RESPONSE
-    schema_error = asyncio.run(GroqPlannerProvider(Transport(HttpResponse(400, b"hidden")), api_key="x").plan(snapshot(), "x", CAPS))
-    assert schema_error.error is ProviderPlanError.SCHEMA_INCOMPATIBLE
+
+
+class RaisingTransport:
+    def __init__(self, exception):
+        self.exception = exception
+
+    async def post_json(self, *_args, **_kwargs):
+        raise self.exception
+
+
+@pytest.mark.parametrize(
+    "exception,expected",
+    [
+        (asyncio.TimeoutError(), ProviderPlanError.TIMEOUT),
+        (aiohttp.ClientConnectionError(), ProviderPlanError.NETWORK),
+    ],
+)
+def test_groq_transport_failures_have_safe_diagnostics(exception, expected):
+    result = asyncio.run(
+        GroqPlannerProvider(RaisingTransport(exception), api_key="x").plan(
+            snapshot(), "synthetic", CAPS
+        )
+    )
+    assert result.error is expected
+    assert result.diagnostic is not None and result.diagnostic.retryable is True
+    assert result.diagnostic.http_status is None
 
 
 class FakeProvider:
@@ -245,7 +375,7 @@ def test_primary_success_does_not_call_fallback():
     assert (primary.calls, fallback.calls) == (1, 0)
 
 
-@pytest.mark.parametrize("error", [ProviderPlanError.TIMEOUT, ProviderPlanError.SCHEMA_INCOMPATIBLE, ProviderPlanError.RATE_LIMIT, ProviderPlanError.SERVER])
+@pytest.mark.parametrize("error", [ProviderPlanError.TIMEOUT, ProviderPlanError.GENERATED_OUTPUT_SCHEMA_MISMATCH, ProviderPlanError.RATE_LIMIT, ProviderPlanError.SERVER_ERROR])
 def test_transient_primary_failure_uses_one_bounded_fallback(error):
     primary = FakeProvider("groq", [outcome("groq", ok=False, error=error)])
     fallback = FakeProvider("gemini", [outcome("gemini")])
@@ -255,9 +385,9 @@ def test_transient_primary_failure_uses_one_bounded_fallback(error):
 
 @pytest.mark.parametrize(
     "non_retryable",
-    [ProviderPlanError.AUTH, ProviderPlanError.BILLING, ProviderPlanError.CONFIG],
+    [ProviderPlanError.AUTH, ProviderPlanError.QUOTA, ProviderPlanError.CONFIG],
 )
-def test_auth_billing_config_error_does_not_fallback_and_both_fail_safely(non_retryable):
+def test_auth_quota_config_error_does_not_fallback_and_both_fail_safely(non_retryable):
     primary = FakeProvider("groq", [outcome("groq", ok=False, error=non_retryable)])
     fallback = FakeProvider("gemini", [outcome("gemini")])
     with pytest.raises(ProviderError):
@@ -278,6 +408,55 @@ def test_shadow_never_calls_fallback_by_default():
     with pytest.raises(ProviderError):
         asyncio.run(MultiProviderPlanner(primary, fallback, mode="shadow").plan("x", snapshot=snapshot(), capabilities=CAPS))
     assert fallback.calls == 0
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        ProviderPlanError.INVALID_SCHEMA,
+        ProviderPlanError.UNSUPPORTED_PARAMETER,
+        ProviderPlanError.UNKNOWN_BAD_REQUEST,
+        ProviderPlanError.SAFETY_REFUSAL,
+    ],
+)
+def test_deterministic_bad_requests_neither_fallback_nor_open_circuit(error):
+    circuit = PlannerCircuitBreaker(failure_threshold=1, cooldown_seconds=30)
+    primary = FakeProvider(
+        "groq",
+        [outcome("groq", ok=False, error=error), outcome("groq", ok=False, error=error)],
+    )
+    fallback = FakeProvider("gemini", [outcome("gemini"), outcome("gemini")])
+    planner = MultiProviderPlanner(
+        primary,
+        fallback,
+        mode="ai_first",
+        circuit_breaker=circuit,
+    )
+    for _ in range(2):
+        with pytest.raises(ProviderError):
+            asyncio.run(planner.plan("x", snapshot=snapshot(), capabilities=CAPS))
+    assert primary.calls == 2
+    assert fallback.calls == 0
+    assert circuit.state("groq") is CircuitState.CLOSED
+
+
+def test_generated_output_mismatch_can_fallback_without_opening_primary_circuit():
+    circuit = PlannerCircuitBreaker(failure_threshold=1, cooldown_seconds=30)
+    primary = FakeProvider(
+        "groq",
+        [outcome("groq", ok=False, error=ProviderPlanError.GENERATED_OUTPUT_SCHEMA_MISMATCH)],
+    )
+    fallback = FakeProvider("gemini", [outcome("gemini")])
+    result = asyncio.run(
+        MultiProviderPlanner(
+            primary,
+            fallback,
+            mode="ai_first",
+            circuit_breaker=circuit,
+        ).plan("x", snapshot=snapshot(), capabilities=CAPS)
+    )
+    assert result.capability_id == "catalog.search"
+    assert circuit.state("groq") is CircuitState.CLOSED
 
 
 def test_total_deadline_and_cancellation_are_bounded_and_propagated():

@@ -2,7 +2,7 @@
 
 Metadata: scope `BarBot`; trust `mixed`; lifecycle `active`; last reviewed
 `2026-10-22` during provider-neutral planner development based on starting HEAD
-`d8f07893573a32c673b67e207cc298ef4f7fed6a`.
+`fbbd6ab464d21e5c93d9acc8f9fcf11bc1a01cea`.
 
 | Note | Scope | Importance | Trust | Lifecycle | Last verified | Evidence / dependencies | Revalidation trigger |
 |---|---|---:|---|---|---|---|---|
@@ -37,6 +37,10 @@ being used for an operational decision.
 - Groq-primary/Gemini-fallback, provider wire conversion and circuit breaking
   are development evidence only. Live multi-provider quality and production
   rollout remain pending.
+- Groq Call 1 passed the live strict planner contract; Call 2 returned an
+  unclassified HTTP 400 under the prior lossy adapter. Offline evidence proves
+  schema invariance, but correction semantics and the exact provider category
+  remain pending until a separately authorized re-smoke.
 - Production rollout of the development changes has not been performed.
 - Service state, deployed HEAD, schema, counts, flags and provider health remain
   runtime facts and must be revalidated under the controlled rollout policy

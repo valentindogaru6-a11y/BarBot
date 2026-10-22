@@ -28,6 +28,20 @@ breaker suppresses repeatedly unhealthy providers without touching business
 data. This composition is development evidence only: production promotion,
 provider quality and live accuracy remain `pending`.
 
+The first controlled Groq planner smoke established a strict-schema PASS for
+the initial catalog lookup. Its second correction call returned HTTP 400, but
+the old adapter discarded provider `type`/`code`/safe `param`, so the precise
+cause is not recoverable and correction quality remains `pending`. Offline
+reconstruction proves the two turns use the same strict schema hash; stable
+entity IDs stay in bounded context and local conversion, never a schema enum.
+The adapter now retains only allowlisted error metadata, response size and
+one-way request/schema hashes. It separates invalid schema, generated-output
+mismatch, unsupported parameters, refusals, auth, quota, rate limit, server,
+timeout, network and unknown bad requests without retaining provider prose.
+Deterministic request/schema failures neither retry nor count as transport
+outages for circuit health; shadow still has no fallback, while AI-first uses
+only its explicit fallback categories.
+
 `AI_PLANNER_MODE` is `local_first` (safe default), `shadow` (comparison only,
 never execution), or `ai_first` (free text planned first). Commands, callbacks,
 active FSM and exact warehouse triggers retain priority. The strict planner

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -27,8 +28,11 @@ from app.models.assistant_provider_planner import (
     PlannerInferredAction,
     PlannerNotesCode,
     PlannerValidationStatus,
+    ProviderErrorDiagnostic,
     ProviderPlanError,
     ProviderPlanResult,
+    SafeProviderErrorCode,
+    SafeProviderErrorType,
 )
 from app.services.assistant.providers import (
     AssistantHttpTransport,
@@ -286,16 +290,142 @@ def convert_gemini_envelope(
 def _normalized_error(kind: ProviderErrorKind) -> ProviderPlanError:
     return {
         ProviderErrorKind.AUTH: ProviderPlanError.AUTH,
-        ProviderErrorKind.BILLING: ProviderPlanError.BILLING,
+        ProviderErrorKind.BILLING: ProviderPlanError.QUOTA,
         ProviderErrorKind.CONFIG: ProviderPlanError.CONFIG,
         ProviderErrorKind.RATE_LIMIT: ProviderPlanError.RATE_LIMIT,
-        ProviderErrorKind.SERVER: ProviderPlanError.SERVER,
+        ProviderErrorKind.SERVER: ProviderPlanError.SERVER_ERROR,
         ProviderErrorKind.TIMEOUT: ProviderPlanError.TIMEOUT,
         ProviderErrorKind.UNAVAILABLE: ProviderPlanError.NETWORK,
         ProviderErrorKind.MALFORMED_RESPONSE: ProviderPlanError.MALFORMED_RESPONSE,
         ProviderErrorKind.RESPONSE_TOO_LARGE: ProviderPlanError.MALFORMED_RESPONSE,
-        ProviderErrorKind.SCHEMA_INCOMPATIBLE: ProviderPlanError.SCHEMA_INCOMPATIBLE,
+        ProviderErrorKind.SCHEMA_INCOMPATIBLE: ProviderPlanError.INVALID_SCHEMA,
     }[kind]
+
+
+def _canonical_hash(value: Mapping[str, object]) -> str:
+    encoded = json.dumps(
+        value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+_SAFE_ERROR_TYPES = {
+    item.value: item
+    for item in SafeProviderErrorType
+    if item is not SafeProviderErrorType.UNKNOWN
+}
+_SAFE_ERROR_CODES = {
+    item.value: item
+    for item in SafeProviderErrorCode
+    if item is not SafeProviderErrorCode.UNKNOWN
+}
+_SAFE_ERROR_PARAMS = frozenset(
+    {
+        "response_format",
+        "json_schema",
+        "messages",
+        "model",
+        "reasoning_effort",
+        "max_completion_tokens",
+    }
+)
+
+
+def _provider_error_diagnostic(
+    *,
+    status: int | None,
+    body: bytes,
+    request_hash: str,
+    schema_hash: str,
+    transport_error: ProviderPlanError | None = None,
+) -> ProviderErrorDiagnostic:
+    """Parse only allowlisted Groq metadata and discard all provider prose."""
+
+    raw_type: object = None
+    raw_code: object = None
+    raw_param: object = None
+    if body:
+        try:
+            decoded = json.loads(body)
+            error = decoded.get("error") if isinstance(decoded, dict) else None
+            if isinstance(error, dict):
+                raw_type = error.get("type")
+                raw_code = error.get("code")
+                raw_param = error.get("param")
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            pass
+    safe_type = (
+        _SAFE_ERROR_TYPES.get(raw_type, SafeProviderErrorType.UNKNOWN)
+        if isinstance(raw_type, str)
+        else SafeProviderErrorType.UNKNOWN
+    )
+    safe_code = (
+        _SAFE_ERROR_CODES.get(raw_code, SafeProviderErrorCode.UNKNOWN)
+        if isinstance(raw_code, str)
+        else SafeProviderErrorCode.UNKNOWN
+    )
+    safe_param = (
+        raw_param
+        if isinstance(raw_param, str) and raw_param in _SAFE_ERROR_PARAMS
+        else None
+    )
+
+    if transport_error is not None:
+        category = transport_error
+    elif status in {401, 403} or safe_code is SafeProviderErrorCode.INVALID_API_KEY:
+        category = ProviderPlanError.AUTH
+    elif status == 402 or safe_code in {
+        SafeProviderErrorCode.INSUFFICIENT_QUOTA,
+        SafeProviderErrorCode.QUOTA_EXCEEDED,
+    }:
+        category = ProviderPlanError.QUOTA
+    elif status == 429 or safe_code is SafeProviderErrorCode.RATE_LIMIT_EXCEEDED:
+        category = ProviderPlanError.RATE_LIMIT
+    elif status is not None and status >= 500:
+        category = ProviderPlanError.SERVER_ERROR
+    elif safe_code in {
+        SafeProviderErrorCode.INVALID_SCHEMA,
+        SafeProviderErrorCode.JSON_SCHEMA_INVALID,
+    }:
+        category = ProviderPlanError.INVALID_SCHEMA
+    elif safe_code in {
+        SafeProviderErrorCode.JSON_VALIDATE_FAILED,
+        SafeProviderErrorCode.GENERATED_OUTPUT_SCHEMA_MISMATCH,
+    }:
+        category = ProviderPlanError.GENERATED_OUTPUT_SCHEMA_MISMATCH
+    elif safe_code is SafeProviderErrorCode.UNSUPPORTED_PARAMETER:
+        category = ProviderPlanError.UNSUPPORTED_PARAMETER
+    elif (
+        safe_code is SafeProviderErrorCode.MODEL_REFUSAL
+        or safe_type is SafeProviderErrorType.MODEL_REFUSAL
+    ):
+        category = ProviderPlanError.MODEL_REFUSAL
+    elif (
+        safe_code is SafeProviderErrorCode.SAFETY_REFUSAL
+        or safe_type is SafeProviderErrorType.SAFETY_REFUSAL
+    ):
+        category = ProviderPlanError.SAFETY_REFUSAL
+    elif status == 400:
+        category = ProviderPlanError.UNKNOWN_BAD_REQUEST
+    else:
+        category = ProviderPlanError.CONFIG
+    retryable = category in {
+        ProviderPlanError.RATE_LIMIT,
+        ProviderPlanError.SERVER_ERROR,
+        ProviderPlanError.TIMEOUT,
+        ProviderPlanError.NETWORK,
+    }
+    return ProviderErrorDiagnostic(
+        http_status=status,
+        provider_error_type=safe_type,
+        provider_error_code=safe_code,
+        parameter=safe_param,
+        category=category,
+        retryable=retryable,
+        response_bytes=len(body),
+        request_hash=request_hash,
+        schema_hash=schema_hash,
+    )
 
 
 class _PlannerProviderBase:
@@ -326,6 +456,7 @@ class _PlannerProviderBase:
         *,
         decision: PlannerDecision | None = None,
         error: ProviderPlanError | None = None,
+        diagnostic: ProviderErrorDiagnostic | None = None,
         status: PlannerValidationStatus,
     ) -> ProviderPlanResult:
         return ProviderPlanResult(
@@ -333,6 +464,7 @@ class _PlannerProviderBase:
             model=self.model,
             decision=decision,
             error=error,
+            diagnostic=diagnostic,
             latency_ms=max(0, round((monotonic() - started) * 1_000)),
             schema_mode=self.schema_mode,
             validation_status=status,
@@ -414,12 +546,27 @@ class GroqPlannerProvider(_PlannerProviderBase):
         }
         if len(json.dumps(payload, ensure_ascii=False).encode()) > MAX_PLANNER_REQUEST_BYTES:
             return self._result(started, error=ProviderPlanError.CONFIG, status=PlannerValidationStatus.POLICY_REJECTED)
+        request_hash = _canonical_hash(payload)
+        schema_hash = _canonical_hash(schema)
         try:
-            response = await self._safe_post(
+            response = await self._post(
                 GROQ_CHAT_COMPLETIONS_URL,
                 {"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json"},
                 payload,
             )
+            if response.status >= 400:
+                diagnostic = _provider_error_diagnostic(
+                    status=response.status,
+                    body=response.body,
+                    request_hash=request_hash,
+                    schema_hash=schema_hash,
+                )
+                return self._result(
+                    started,
+                    error=diagnostic.category,
+                    diagnostic=diagnostic,
+                    status=PlannerValidationStatus.PROVIDER_ERROR,
+                )
             outer = json.loads(response.body)
             raw = outer["choices"][0]["message"]["content"]
             envelope = GroqPlannerEnvelope.model_validate_json(raw)
@@ -427,8 +574,36 @@ class GroqPlannerProvider(_PlannerProviderBase):
             return self._result(started, decision=decision, status=PlannerValidationStatus.PASSED)
         except asyncio.CancelledError:
             raise
-        except ProviderError as exc:
-            return self._result(started, error=_normalized_error(exc.kind), status=PlannerValidationStatus.PROVIDER_ERROR)
+        except (asyncio.TimeoutError, TimeoutError):
+            diagnostic = _provider_error_diagnostic(
+                status=None,
+                body=b"",
+                request_hash=request_hash,
+                schema_hash=schema_hash,
+                transport_error=ProviderPlanError.TIMEOUT,
+            )
+            return self._result(
+                started,
+                error=diagnostic.category,
+                diagnostic=diagnostic,
+                status=PlannerValidationStatus.PROVIDER_ERROR,
+            )
+        except _ResponseTooLargeError:
+            return self._result(started, error=ProviderPlanError.MALFORMED_RESPONSE, status=PlannerValidationStatus.WIRE_INVALID)
+        except aiohttp.ClientError:
+            diagnostic = _provider_error_diagnostic(
+                status=None,
+                body=b"",
+                request_hash=request_hash,
+                schema_hash=schema_hash,
+                transport_error=ProviderPlanError.NETWORK,
+            )
+            return self._result(
+                started,
+                error=diagnostic.category,
+                diagnostic=diagnostic,
+                status=PlannerValidationStatus.PROVIDER_ERROR,
+            )
         except (json.JSONDecodeError, KeyError, IndexError, TypeError, ValidationError):
             return self._result(started, error=ProviderPlanError.MALFORMED_RESPONSE, status=PlannerValidationStatus.WIRE_INVALID)
         except ValueError:
@@ -538,10 +713,18 @@ _FALLBACK_ERRORS = frozenset({
     ProviderPlanError.TIMEOUT,
     ProviderPlanError.NETWORK,
     ProviderPlanError.RATE_LIMIT,
-    ProviderPlanError.SERVER,
-    ProviderPlanError.SCHEMA_INCOMPATIBLE,
+    ProviderPlanError.SERVER_ERROR,
+    ProviderPlanError.GENERATED_OUTPUT_SCHEMA_MISMATCH,
+    ProviderPlanError.MODEL_REFUSAL,
     ProviderPlanError.MALFORMED_RESPONSE,
     ProviderPlanError.CIRCUIT_OPEN,
+})
+
+_CIRCUIT_TRANSIENT_ERRORS = frozenset({
+    ProviderPlanError.TIMEOUT,
+    ProviderPlanError.NETWORK,
+    ProviderPlanError.RATE_LIMIT,
+    ProviderPlanError.SERVER_ERROR,
 })
 
 
@@ -562,7 +745,7 @@ class MultiProviderPlanner:
         if not self.circuit.acquire(provider.provider_name):
             return ProviderPlanResult(provider=provider.provider_name, model=provider.model, error=ProviderPlanError.CIRCUIT_OPEN, latency_ms=0, schema_mode="skipped", validation_status=PlannerValidationStatus.PROVIDER_ERROR)
         result = await provider.plan(snapshot, text, capabilities)
-        transient = result.error in _FALLBACK_ERRORS
+        transient = result.error in _CIRCUIT_TRANSIENT_ERRORS
         if result.decision is not None:
             self.circuit.success(provider.provider_name)
         else:
