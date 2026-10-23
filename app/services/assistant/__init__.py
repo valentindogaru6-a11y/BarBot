@@ -99,6 +99,20 @@ from app.services.assistant.bar_language import (
     context_reference_relation,
     has_context_reference,
 )
+from app.services.assistant.conversation_brain import (
+    ContextReferenceResolver,
+    ConversationToolLoop,
+    ResolvedReference,
+    build_context_snapshot,
+)
+from app.services.assistant.long_term_memory import (
+    AssistantLongTermMemoryService,
+    AssistantMemoryKind,
+    AssistantMemoryRecord,
+    AssistantMemoryScope,
+    AssistantMemorySource,
+    parse_memory_command,
+)
 
 __all__ = [
     "AssistantDialogueAct",
@@ -174,4 +188,14 @@ __all__ = [
     "parse_bar_request",
     "context_reference_relation",
     "has_context_reference",
+    "ContextReferenceResolver",
+    "ConversationToolLoop",
+    "ResolvedReference",
+    "build_context_snapshot",
+    "AssistantLongTermMemoryService",
+    "AssistantMemoryKind",
+    "AssistantMemoryRecord",
+    "AssistantMemoryScope",
+    "AssistantMemorySource",
+    "parse_memory_command",
 ]

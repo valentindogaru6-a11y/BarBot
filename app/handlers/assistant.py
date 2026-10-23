@@ -25,8 +25,15 @@ from app.keyboards.assistant import (
     build_assistant_candidates_keyboard,
     build_assistant_flow_keyboard,
     build_assistant_proposal_keyboard,
+    build_assistant_memory_keyboard,
+    build_assistant_memory_delete_keyboard,
+    build_assistant_memory_choices,
 )
-from app.keyboards.callbacks import AssistantCandidateCallback, AssistantProposalCallback
+from app.keyboards.callbacks import (
+    AssistantCandidateCallback,
+    AssistantMemoryCallback,
+    AssistantProposalCallback,
+)
 from app.keyboards.main_menu import build_main_menu_keyboard
 from app.models.assistant import (
     AssistantDomain,
@@ -39,7 +46,6 @@ from app.models.assistant_planner import (
     AssistantDialogueAct,
     PlannerCapability,
     PlannerContextSnapshot,
-    PlannerTurn,
 )
 from app.models.assistant_capabilities import CapabilityRisk
 from app.services.assistant import (
@@ -61,6 +67,14 @@ from app.services.assistant import (
     context_reference_relation,
     has_context_reference,
     parse_bar_request,
+)
+from app.services.assistant.conversation_brain import ConversationToolLoop, build_context_snapshot
+from app.services.assistant.long_term_memory import (
+    AssistantLongTermMemoryService,
+    AssistantMemoryKind,
+    AssistantMemoryScope,
+    AssistantMemorySource,
+    parse_memory_command,
 )
 from app.services.assistant.proposals import (
     AssistantProposalError,
@@ -103,6 +117,7 @@ def _planner_inputs(
     auth_service: AuthService,
     controller: AssistantCapabilityController | None,
     memory: AssistantConversationMemory | None,
+    long_term_memory: AssistantLongTermMemoryService | None = None,
 ) -> tuple[PlannerContextSnapshot, tuple[PlannerCapability, ...]]:
     """Build a bounded snapshot after server-side access filtering."""
 
@@ -138,38 +153,23 @@ def _planner_inputs(
                 ),
             ))
     role = auth_service.get_context(user_id).role.value
-    domain = AssistantDomain.UNSPECIFIED
-    if context is not None:
-        domain = {
-            "catalog": AssistantDomain.CATALOG,
-            "warehouse": AssistantDomain.WAREHOUSE,
-            "attendance": AssistantDomain.ATTENDANCE,
-            "employees": AssistantDomain.EMPLOYEES,
-            "reports": AssistantDomain.REPORTS,
-            "administration": AssistantDomain.ADMINISTRATION,
-            "general": AssistantDomain.GENERAL,
-        }.get(context.last_entity_type, AssistantDomain.UNSPECIFIED)
-    snapshot = PlannerContextSnapshot(
+    if context is not None and active_proposal is not None:
+        context = replace(
+            context,
+            pending_task=active_proposal.capability_id,
+            proposal_ref=active_proposal.token,
+        )
+    snapshot = build_context_snapshot(
+        context=context,
         actor_role=role,
-        available_capability_ids=tuple(available_ids),
-        current_domain=domain,
-        last_successful_entity_id=(context.last_successful_entity_id or None) if context else None,
-        last_successful_entity_name=(context.last_successful_entity_label or None) if context else None,
-        candidate_entity_ids=context.current_candidates if context else (),
-        pending_clarification=(context.pending_clarification or None) if context else None,
-        pending_action=(
-            active_proposal.capability_id
-            if active_proposal is not None
-            else (context.authorized_action or None) if context else None
+        access_mode="server_enforced",
+        capabilities=capabilities,
+        feature_flags=("assistant",),
+        owner_memories=(
+            tuple(record.content for record in long_term_memory.list(user_id))
+            if long_term_memory is not None
+            else ()
         ),
-        last_tool_operation=(context.last_tool_name or None) if context else None,
-        last_tool_summary=(context.summary_text or None) if context else None,
-        recent_turns=tuple(
-            PlannerTurn(role=turn.role, text=turn.text)
-            for turn in (context.turns[-6:] if context else ())
-        ),
-        revision=context.revision if context else 0,
-        expires_at=context.expires_at if context else None,
     )
     return snapshot, tuple(capabilities)
 _CONVERSATION_RESET_PHRASES = {
@@ -331,6 +331,7 @@ async def _run_assistant(
     warehouse_attendance_service: WarehouseAttendanceService | None = None,
     assistant_capability_controller: AssistantCapabilityController | None = None,
     assistant_access_policy: AssistantAccessPolicy | None = None,
+    assistant_long_term_memory: AssistantLongTermMemoryService | None = None,
 ) -> None:
     user_id = message.from_user.id if message.from_user is not None else None
     if user_id is None:
@@ -346,6 +347,71 @@ async def _run_assistant(
                 chat_type=message.chat.type,
             )
         except AssistantAccessDenied:
+            return
+
+    memory_command = parse_memory_command(text)
+    if memory_command is not None and assistant_long_term_memory is not None:
+        if memory_command.action == "recall":
+            records = assistant_long_term_memory.list(user_id)
+            if not records:
+                await message.answer("Подтверждённой долгой памяти пока нет.")
+            else:
+                lines = ["Я помню только подтверждённые записи:"]
+                lines.extend(f"• {escape(record.content)}" for record in records)
+                await message.answer("\n".join(lines))
+            return
+        if memory_command.action == "preview_save":
+            content = memory_command.content
+            folded = content.casefold()
+            kind = (
+                AssistantMemoryKind.TERMINOLOGY
+                if " значит " in folded
+                else AssistantMemoryKind.USER_PREFERENCE
+                if any(marker in folded for marker in ("предпочитаю", "называй меня"))
+                else AssistantMemoryKind.STANDING_INSTRUCTION
+            )
+            preview = assistant_long_term_memory.create_preview(
+                user_id,
+                scope=AssistantMemoryScope.USER,
+                kind=kind,
+                content=content,
+                source=AssistantMemorySource.EXPLICIT_REMEMBER,
+            )
+            await message.answer(
+                "Проверьте запись перед сохранением:\n"
+                f"Тип: {escape(kind.value)}\n"
+                f"Scope: user\n"
+                f"Содержание: {escape(preview.content)}",
+                reply_markup=build_assistant_memory_keyboard(preview.token, preview.revision),
+            )
+            return
+        if memory_command.action == "select_delete":
+            needle = memory_command.content.casefold()
+            records = assistant_long_term_memory.list(user_id)
+            matches = tuple(
+                record
+                for record in records
+                if needle in record.content.casefold()
+            )
+            if not matches and needle in {"это правило", "правило", "это"} and len(records) == 1:
+                matches = records
+            if not matches:
+                await message.answer(
+                    "Такой подтверждённой записи не найдено."
+                )
+                return
+            if len(matches) > 1:
+                await message.answer(
+                    "Выберите точную запись:",
+                    reply_markup=build_assistant_memory_choices(matches[:8]),
+                )
+                return
+            await message.answer(
+                f"Удалить подтверждённую память?\n{escape(matches[0].content)}",
+                reply_markup=build_assistant_memory_delete_keyboard(
+                    matches[0].token, matches[0].revision
+                ),
+            )
             return
 
     async def send_capability(dispatch: Any) -> None:
@@ -406,6 +472,7 @@ async def _run_assistant(
                     auth_service=auth_service,
                     controller=assistant_capability_controller,
                     memory=conversation_memory,
+                    long_term_memory=assistant_long_term_memory,
                 )
                 contract = next(
                     (
@@ -683,6 +750,7 @@ async def _run_assistant(
             auth_service=auth_service,
             controller=assistant_capability_controller,
             memory=conversation_memory,
+            long_term_memory=assistant_long_term_memory,
         )
         planner_capabilities = tuple(
             item for item in all_planner_capabilities
@@ -774,12 +842,44 @@ async def _run_assistant(
                 or intent.capability_id not in allowed_capability_ids
             ):
                 raise AccessDeniedError("Provider selected unavailable capability")
-            planned = assistant_capability_controller.dispatch(
-                text,
-                actor_user_id=user_id,
-                source_chat_id=message.chat.id,
-                source_message_id=int(getattr(message, "message_id", 0)),
-            )
+            planned = None
+
+            def dispatch_once() -> Any:
+                return assistant_capability_controller.dispatch(
+                    text,
+                    actor_user_id=user_id,
+                    source_chat_id=message.chat.id,
+                    source_message_id=int(getattr(message, "message_id", 0)),
+                )
+
+            if planner_mode == "ai_first":
+                captured: dict[str, Any] = {}
+
+                async def execute_read(_capability_id: str) -> str:
+                    captured["dispatch"] = dispatch_once()
+                    result = captured["dispatch"]
+                    return result.message if result is not None else "clarification required"
+
+                async def prepare_mutation(_capability_id: str) -> str:
+                    captured["dispatch"] = dispatch_once()
+                    result = captured["dispatch"]
+                    return (
+                        result.proposal.token
+                        if result is not None and result.proposal is not None
+                        else "ui-preview"
+                    )
+
+                definition = assistant_capability_controller.registry.require(intent.capability_id)
+                await ConversationToolLoop().run(
+                    (intent.capability_id,),
+                    allowed=set(allowed_capability_ids),
+                    is_read_only=lambda _value: definition.risk_level is CapabilityRisk.READ,
+                    execute_read=execute_read,
+                    prepare_mutation=prepare_mutation,
+                )
+                planned = captured.get("dispatch")
+            else:
+                planned = dispatch_once()
             if planned is None or planned.capability_id != intent.capability_id:
                 await message.answer(
                     "Не хватает параметров для этого действия. Уточните запрос."
@@ -1164,6 +1264,66 @@ async def _run_assistant(
     await message.answer(escape(action.message or AI_UNAVAILABLE_TEXT))
 
 
+@voice_router.callback_query(StateFilter(None), AssistantMemoryCallback.filter())
+async def handle_assistant_memory_callback(
+    callback: CallbackQuery,
+    callback_data: AssistantMemoryCallback,
+    assistant_long_term_memory: AssistantLongTermMemoryService,
+    assistant_access_policy: AssistantAccessPolicy,
+) -> None:
+    if (
+        not isinstance(callback.message, Message)
+        or not assistant_access_policy.can_enter_assistant(
+            callback.from_user.id, chat_type=callback.message.chat.type
+        )
+    ):
+        await answer_callback_safely(callback, "Недостаточно прав.", show_alert=True)
+        return
+    try:
+        if callback_data.action == "c":
+            assistant_long_term_memory.confirm_preview(
+                callback.from_user.id, token=callback_data.token,
+                revision=callback_data.revision,
+            )
+            await answer_callback_safely(callback, "Сохранено")
+            await callback.message.answer("Подтверждённая память сохранена.")
+            return
+        if callback_data.action == "x":
+            assistant_long_term_memory.cancel_preview(
+                callback.from_user.id, token=callback_data.token,
+                revision=callback_data.revision,
+            )
+            await answer_callback_safely(callback, "Отменено")
+            return
+        if callback_data.action == "fp":
+            row = assistant_long_term_memory.database.get_owned(
+                callback.from_user.id, callback_data.token
+            )
+            if row is None or row["status"] != "active" or int(row["revision"]) != callback_data.revision:
+                raise ValueError("memory choice changed")
+            await answer_callback_safely(callback)
+            await callback.message.answer(
+                f"Удалить подтверждённую память?\n{escape(str(row['normalized_content']))}",
+                reply_markup=build_assistant_memory_delete_keyboard(
+                    callback_data.token, callback_data.revision
+                ),
+            )
+            return
+        if callback_data.action == "d":
+            assistant_long_term_memory.delete_confirmed(
+                callback.from_user.id, token=callback_data.token,
+                revision=callback_data.revision,
+            )
+            await answer_callback_safely(callback, "Удалено")
+            await callback.message.answer("Подтверждённая память удалена.")
+            return
+        await answer_callback_safely(callback, "Отменено")
+    except Exception:
+        await answer_callback_safely(
+            callback, "Запись изменилась или подтверждение устарело.", show_alert=True
+        )
+
+
 @voice_router.callback_query(
     StateFilter(None), AssistantProposalCallback.filter()
 )
@@ -1347,6 +1507,7 @@ async def handle_assistant_voice(
     warehouse_service: WarehouseOperationsService | None = None,
     warehouse_attendance_service: WarehouseAttendanceService | None = None,
     assistant_capability_controller: AssistantCapabilityController | None = None,
+    assistant_long_term_memory: AssistantLongTermMemoryService | None = None,
 ) -> None:
     voice = message.voice
     if voice is None or assistant_speech_client is None or assistant_orchestrator is None:
@@ -1380,6 +1541,7 @@ async def handle_assistant_voice(
             warehouse_attendance_service,
             assistant_capability_controller,
             assistant_access_policy,
+            assistant_long_term_memory,
         )
 
 
@@ -1397,6 +1559,7 @@ async def _handle_assistant_voice_claimed(
     warehouse_attendance_service: WarehouseAttendanceService | None,
     assistant_capability_controller: AssistantCapabilityController | None,
     assistant_access_policy: AssistantAccessPolicy | None,
+    assistant_long_term_memory: AssistantLongTermMemoryService | None,
 ) -> None:
     """Run the voice pipeline while the caller owns the per-user claim."""
 
@@ -1464,6 +1627,7 @@ async def _handle_assistant_voice_claimed(
         warehouse_attendance_service=warehouse_attendance_service,
         assistant_capability_controller=assistant_capability_controller,
         assistant_access_policy=assistant_access_policy,
+        assistant_long_term_memory=assistant_long_term_memory,
     )
 
 
@@ -1480,6 +1644,7 @@ async def handle_assistant_text(
     warehouse_service: WarehouseOperationsService | None = None,
     warehouse_attendance_service: WarehouseAttendanceService | None = None,
     assistant_capability_controller: AssistantCapabilityController | None = None,
+    assistant_long_term_memory: AssistantLongTermMemoryService | None = None,
 ) -> None:
     if (
         assistant_orchestrator is None
@@ -1508,4 +1673,5 @@ async def handle_assistant_text(
             warehouse_attendance_service=warehouse_attendance_service,
             assistant_capability_controller=assistant_capability_controller,
             assistant_access_policy=assistant_access_policy,
+            assistant_long_term_memory=assistant_long_term_memory,
         )

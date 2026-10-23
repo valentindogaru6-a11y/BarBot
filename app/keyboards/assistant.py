@@ -5,7 +5,11 @@ from collections.abc import Sequence
 from aiogram.types import InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.keyboards.callbacks import AssistantCandidateCallback, AssistantProposalCallback
+from app.keyboards.callbacks import (
+    AssistantCandidateCallback,
+    AssistantMemoryCallback,
+    AssistantProposalCallback,
+)
 from app.keyboards.admin_callbacks import AdminPanelCallback
 from app.keyboards.user_callbacks import UserAdminCallback
 from app.keyboards.warehouse_callbacks import WarehouseCallback
@@ -49,6 +53,48 @@ def build_assistant_proposal_keyboard(token: str, *, has_reason: bool = False) -
         text="❌ Отменить",
         callback_data=AssistantProposalCallback(action="x", token=token),
     )
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def build_assistant_memory_keyboard(token: str, revision: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text="✅ Сохранить",
+        callback_data=AssistantMemoryCallback(action="c", token=token, revision=revision),
+    )
+    builder.button(
+        text="❌ Отменить",
+        callback_data=AssistantMemoryCallback(action="x", token=token, revision=revision),
+    )
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def build_assistant_memory_delete_keyboard(token: str, revision: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text="🗑 Подтвердить удаление",
+        callback_data=AssistantMemoryCallback(action="d", token=token, revision=revision),
+    )
+    builder.button(
+        text="❌ Отменить",
+        callback_data=AssistantMemoryCallback(action="n", token=token, revision=revision),
+    )
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def build_assistant_memory_choices(records: Sequence[object]) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for record in records:
+        builder.button(
+            text=str(getattr(record, "content"))[:48],
+            callback_data=AssistantMemoryCallback(
+                action="fp", token=str(getattr(record, "token")),
+                revision=int(getattr(record, "revision")),
+            ),
+        )
     builder.adjust(1)
     return builder.as_markup()
 

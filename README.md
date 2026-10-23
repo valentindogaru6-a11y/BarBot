@@ -220,6 +220,8 @@ The phrases `забудь этот разговор`, `начать новый �
 and `сбрось контекст` clear only this AI memory, not FSM or warehouse drafts.
 Schema v13 adds only these bounded conversation tables. Schema v14 adds a
 restart-safe action-proposal table with opaque ten-minute confirmation tokens.
+Schema v15 adds revisioned long-term assistant-memory previews: a memory is
+active only after an owner-confirmed, access-checked callback.
 The Phase 3 capability registry is filtered by the current server-side role,
 private-chat policy and feature flags. Read-only tools execute immediately;
 business mutations create a preview and can run only from a server-generated

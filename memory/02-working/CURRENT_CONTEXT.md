@@ -9,7 +9,9 @@ Checkpoint 2026-10-22: AI-first planner foundation started from
 `a5482d033c9a480c544547459a71b39caf69b74f`. Safe default remains
 `local_first`; shadow/AI-first live coverage is pending. Offline corpus v1 has
 17 scripted contract cases and establishes no provider-accuracy percentage.
-Schema remains v14; catalog, seed and migrations are unchanged.
+Development schema target is v15 for explicit long-term assistant memory.
+Catalog and warehouse seed content are unchanged; production remains on its
+separately verified version until an authorized staged rollout.
 
 Development follow-up at `0205ec4f...` fixes shadow lifecycle and evaluation
 observability. Live planner Cases 2–4 remain unknown; no accuracy percentage is

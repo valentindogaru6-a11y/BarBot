@@ -58,3 +58,9 @@ class AssistantCandidateCallback(CallbackData, prefix="ai"):
 class AssistantProposalCallback(CallbackData, prefix="ap"):
     action: Literal["c", "x"]
     token: str
+
+
+class AssistantMemoryCallback(CallbackData, prefix="am"):
+    action: Literal["c", "x", "fp", "d", "n"]
+    token: str
+    revision: int

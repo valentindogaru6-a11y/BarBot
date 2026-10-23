@@ -44,6 +44,7 @@ from app.services.assistant import (
     GroqPlannerProvider,
     MultiProviderPlanner,
 )
+from app.services.assistant.long_term_memory import AssistantLongTermMemoryService
 from app.services.audio_service import AudioService
 from app.services.audit_service import AuditService
 from app.services.auth_service import AuthService
@@ -80,6 +81,7 @@ from app.storage.warehouse_schedule_database import WarehouseScheduleDatabase
 from app.storage.warehouse_attendance_database import WarehouseAttendanceDatabase
 from app.storage.assistant_conversation_database import AssistantConversationDatabase
 from app.storage.assistant_action_database import AssistantActionDatabase
+from app.storage.assistant_memory_database import AssistantMemoryDatabase
 from app.telegram_commands import configure_bot_commands
 
 
@@ -287,6 +289,9 @@ async def main() -> None:
         max_turns=settings.ai_conversation_max_turns,
         max_chars=settings.ai_conversation_max_chars,
     )
+    assistant_long_term_memory = AssistantLongTermMemoryService(
+        AssistantMemoryDatabase(settings.database_path)
+    )
     bot = Bot(
         token=settings.bot_token.get_secret_value(),
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
@@ -480,6 +485,7 @@ async def main() -> None:
             assistant_action_proposals=assistant_action_proposals,
             assistant_capability_controller=assistant_capability_controller,
             assistant_access_policy=assistant_access_policy,
+            assistant_long_term_memory=assistant_long_term_memory,
             close_bot_session=False,
         )
     finally:

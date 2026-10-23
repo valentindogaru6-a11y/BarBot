@@ -13,6 +13,9 @@ def _prepare_v13(path: Path) -> None:
     UserDatabase(path).initialize()
     UserDatabase(path).ensure_user(101, first_name="v14 marker")
     with sqlite3.connect(path) as connection:
+        connection.execute("DROP INDEX ux_assistant_memory_active_content")
+        connection.execute("DROP INDEX ix_assistant_memory_owner_active")
+        connection.execute("DROP TABLE assistant_long_term_memories")
         connection.execute("DROP TABLE assistant_action_proposals")
         connection.execute("PRAGMA user_version=13")
         connection.commit()
@@ -52,15 +55,15 @@ def test_fresh_v14_and_v13_upgrade_are_valid_and_idempotent(tmp_path: Path) -> N
     UserDatabase(fresh).initialize()
     UserDatabase(fresh).initialize()
     with sqlite3.connect(fresh) as connection:
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 14
-        migrations._validate_schema(connection, 14)
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 15
+        migrations._validate_schema(connection, 15)
 
     upgrade = tmp_path / "upgrade.db"
     _prepare_v13(upgrade)
     UserDatabase(upgrade).initialize()
     UserDatabase(upgrade).initialize()
     with sqlite3.connect(upgrade) as connection:
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 14
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 15
         assert connection.execute("SELECT COUNT(*) FROM assistant_action_proposals").fetchone()[0] == 0
         assert connection.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
         assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
@@ -120,10 +123,10 @@ def test_fresh_v14_failure_rolls_back_to_empty_database(tmp_path: Path) -> None:
     _run(path)
 
 
-def test_future_v15_is_rejected(tmp_path: Path) -> None:
+def test_future_v16_is_rejected(tmp_path: Path) -> None:
     path = tmp_path / "future.db"
     with sqlite3.connect(path) as connection:
-        connection.execute("PRAGMA user_version=15")
+        connection.execute("PRAGMA user_version=16")
     with pytest.raises(migrations.UnsupportedSchemaVersionError):
         _run(path)
 

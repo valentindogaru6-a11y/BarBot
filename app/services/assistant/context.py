@@ -16,6 +16,32 @@ from app.storage.assistant_conversation_database import (
 )
 
 
+def _bounded_working_summary(
+    previous: "AssistantConversationContext | None",
+    evicted: list["AssistantConversationTurn"],
+) -> str:
+    """Summarize only server-confirmed structure; never promote model prose."""
+
+    parts: list[str] = []
+    if previous and previous.summary_text:
+        parts.append(previous.summary_text)
+    if not evicted:
+        return " ".join(parts)[-2000:]
+    parts.append(f"Архивировано реплик: {len(evicted)}.")
+    if previous:
+        if previous.topic:
+            parts.append(f"Тема: {previous.topic}.")
+        if previous.last_successful_entity_label:
+            parts.append(f"Выбрано: {previous.last_successful_entity_label}.")
+        if previous.pending_task:
+            parts.append(f"Ожидает: {previous.pending_task}.")
+        if previous.pending_clarification:
+            parts.append("Требуется уточнение.")
+        if previous.last_successful_capability:
+            parts.append(f"Последнее успешное действие: {previous.last_successful_capability}.")
+    return " ".join(" ".join(parts).split())[-2000:]
+
+
 @dataclass(frozen=True, slots=True)
 class AssistantConversationTurn:
     """One dialog turn passed to a provider without a Telegram identifier."""
@@ -52,6 +78,12 @@ class AssistantConversationContext:
     selected_entity_id: str = ""
     last_attempt: str = ""
     revision: int = 1
+    dialogue_state: str = "idle"
+    pending_task: str = ""
+    proposal_ref: str = ""
+    last_successful_capability: str = ""
+    last_tool_result_ref: str = ""
+    owner_memory_refs: tuple[str, ...] = ()
 
     @property
     def last_successful_entity_id(self) -> str:
@@ -128,6 +160,12 @@ class AssistantConversationMemory:
         related_entity_ids: tuple[str, ...] = (),
         selected_entity_id: str | None = None,
         last_attempt: str = "",
+        dialogue_state: str | None = None,
+        pending_task: str | None = None,
+        proposal_ref: str | None = None,
+        last_successful_capability: str | None = None,
+        last_tool_result_ref: str | None = None,
+        owner_memory_refs: tuple[str, ...] | None = None,
     ) -> AssistantConversationContext:
         now = self._clock()
         previous = self.get(user_id, chat_id)
@@ -167,6 +205,12 @@ class AssistantConversationMemory:
             )[:300],
             last_attempt=" ".join(last_attempt.split())[:500],
             revision=(previous.revision + 1) if previous else 1,
+            dialogue_state=(dialogue_state if dialogue_state is not None else (previous.dialogue_state if previous else "idle"))[:40],
+            pending_task=(pending_task if pending_task is not None else (previous.pending_task if previous else ""))[:200],
+            proposal_ref=(proposal_ref if proposal_ref is not None else (previous.proposal_ref if previous else ""))[:100],
+            last_successful_capability=(last_successful_capability if last_successful_capability is not None else (previous.last_successful_capability if previous else ""))[:100],
+            last_tool_result_ref=(last_tool_result_ref if last_tool_result_ref is not None else (previous.last_tool_result_ref if previous else ""))[:100],
+            owner_memory_refs=tuple((owner_memory_refs if owner_memory_refs is not None else (previous.owner_memory_refs if previous else ()))[:8]),
         )
         return self._store(self._key(user_id, chat_id), context)
 
@@ -188,10 +232,11 @@ class AssistantConversationMemory:
         turns = list(previous.turns if previous else ())
         if cleaned:
             turns.append(AssistantConversationTurn(role, cleaned, now))
+        evicted: list[AssistantConversationTurn] = []
         while len(turns) > self.max_turns:
-            turns.pop(0)
+            evicted.append(turns.pop(0))
         while turns and sum(len(turn.text) for turn in turns) > self.max_chars:
-            turns.pop(0)
+            evicted.append(turns.pop(0))
         context = AssistantConversationContext(
             last_intent=(last_intent or (previous.last_intent if previous else ""))[:100],
             last_entity_type=previous.last_entity_type if previous else "conversation",
@@ -203,7 +248,7 @@ class AssistantConversationMemory:
             created_at=previous.created_at if previous else now,
             expires_at=now + self.ttl_seconds,
             authorized_action=previous.authorized_action if previous else "",
-            summary_text=previous.summary_text if previous else "",
+            summary_text=_bounded_working_summary(previous, evicted),
             last_requested_action=previous.last_requested_action if previous else "",
             last_entity_id=previous.last_entity_id if previous else "",
             last_entity_label=previous.last_entity_label if previous else "",
@@ -401,6 +446,14 @@ class PersistentAssistantConversationMemory:
             ),
             last_attempt=str(candidate_context.get("last_attempt", "")),
             revision=int(row["revision"]),
+            dialogue_state=str(candidate_context.get("dialogue_state", "idle"))[:40],
+            pending_task=str(candidate_context.get("pending_task", ""))[:200],
+            proposal_ref=str(candidate_context.get("proposal_ref", ""))[:100],
+            last_successful_capability=str(
+                candidate_context.get("last_successful_capability", "")
+            )[:100],
+            last_tool_result_ref=str(candidate_context.get("last_tool_result_ref", ""))[:100],
+            owner_memory_refs=tuple(candidate_context.get("owner_memory_refs", ()))[:8],
         )
 
     def _save(self, user_id: int, chat_id: int, context: AssistantConversationContext, expected: int | None) -> AssistantConversationContext:
@@ -440,6 +493,12 @@ class PersistentAssistantConversationMemory:
                     if context.last_attempt
                     else {}
                 ),
+                "dialogue_state": context.dialogue_state[:40],
+                "pending_task": context.pending_task[:200],
+                "proposal_ref": context.proposal_ref[:100],
+                "last_successful_capability": context.last_successful_capability[:100],
+                "last_tool_result_ref": context.last_tool_result_ref[:100],
+                "owner_memory_refs": context.owner_memory_refs[:8],
             },
             "last_tool_name": context.last_tool_name[:100],
             "pending_clarification": context.pending_slots[0][:500] if context.pending_slots else "",
@@ -452,7 +511,7 @@ class PersistentAssistantConversationMemory:
         revision = self.database.save(user_id, chat_id, data, turns, expected_revision=expected, now=self._stamp(now))
         return replace(context, revision=revision, expires_at=(now + timedelta(seconds=self.ttl_seconds)).timestamp())
 
-    def remember(self, user_id: int, *, last_intent: str, last_entity_type: str, last_query: str, candidate_ids: tuple[str, ...] = (), pending_slots: tuple[str, ...] = (), topic: str | None = None, authorized_action: str = "", chat_id: int | None = None, summary_text: str | None = None, last_requested_action: str = "", last_entity_id: str | None = None, last_entity_label: str | None = None, last_tool_name: str = "", requested_kind: AssistantRequestedKind = AssistantRequestedKind.UNSPECIFIED, relation: AssistantRelation = AssistantRelation.UNSPECIFIED, relation_target: str = "", parent_entity_id: str = "", related_entity_ids: tuple[str, ...] = (), selected_entity_id: str | None = None, last_attempt: str = "") -> AssistantConversationContext:
+    def remember(self, user_id: int, *, last_intent: str, last_entity_type: str, last_query: str, candidate_ids: tuple[str, ...] = (), pending_slots: tuple[str, ...] = (), topic: str | None = None, authorized_action: str = "", chat_id: int | None = None, summary_text: str | None = None, last_requested_action: str = "", last_entity_id: str | None = None, last_entity_label: str | None = None, last_tool_name: str = "", requested_kind: AssistantRequestedKind = AssistantRequestedKind.UNSPECIFIED, relation: AssistantRelation = AssistantRelation.UNSPECIFIED, relation_target: str = "", parent_entity_id: str = "", related_entity_ids: tuple[str, ...] = (), selected_entity_id: str | None = None, last_attempt: str = "", dialogue_state: str | None = None, pending_task: str | None = None, proposal_ref: str | None = None, last_successful_capability: str | None = None, last_tool_result_ref: str | None = None, owner_memory_refs: tuple[str, ...] | None = None) -> AssistantConversationContext:
         actual_chat_id = user_id if chat_id is None else chat_id
         previous = self.get(user_id, actual_chat_id)
         now = self._now().timestamp()
@@ -473,6 +532,12 @@ class PersistentAssistantConversationMemory:
             selected_entity_id=(selected_entity_id if selected_entity_id is not None else (previous.selected_entity_id if previous else ""))[:300],
             last_attempt=" ".join(last_attempt.split())[:500],
             revision=previous.revision if previous else 0,
+            dialogue_state=(dialogue_state if dialogue_state is not None else (previous.dialogue_state if previous else "idle"))[:40],
+            pending_task=(pending_task if pending_task is not None else (previous.pending_task if previous else ""))[:200],
+            proposal_ref=(proposal_ref if proposal_ref is not None else (previous.proposal_ref if previous else ""))[:100],
+            last_successful_capability=(last_successful_capability if last_successful_capability is not None else (previous.last_successful_capability if previous else ""))[:100],
+            last_tool_result_ref=(last_tool_result_ref if last_tool_result_ref is not None else (previous.last_tool_result_ref if previous else ""))[:100],
+            owner_memory_refs=tuple((owner_memory_refs if owner_memory_refs is not None else (previous.owner_memory_refs if previous else ()))[:8]),
         )
         return self._save(user_id, actual_chat_id, context, previous.revision if previous else None)
 
@@ -485,13 +550,15 @@ class PersistentAssistantConversationMemory:
             turns = list(previous.turns if previous else ())
             if cleaned:
                 turns.append(AssistantConversationTurn(role, cleaned, now))
+            evicted: list[AssistantConversationTurn] = []
             while len(turns) > self.max_turns or sum(len(turn.text) for turn in turns) > self.max_chars:
-                turns.pop(0)
+                evicted.append(turns.pop(0))
             context = replace(
                 previous or AssistantConversationContext("", "conversation", "", (), (), "", (), now, now + self.ttl_seconds),
                 last_intent=(last_intent or (previous.last_intent if previous else ""))[:100],
                 topic=" ".join((topic or (previous.topic if previous else "")).split())[:500],
                 turns=tuple(turns),
+                summary_text=_bounded_working_summary(previous, evicted),
             )
             try:
                 return self._save(user_id, actual_chat_id, context, previous.revision if previous else None)

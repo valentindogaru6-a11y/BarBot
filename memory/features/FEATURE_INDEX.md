@@ -23,6 +23,7 @@ Importance: High
 | Spreadsheet import | `source/import_bar_xls.py`, catalog JSON | imported-catalog/storage tests |
 | [AI assistant pilot](AI_ASSISTANT.md) | `app/handlers/assistant.py`, `app/services/assistant/`, `app/storage/assistant_conversation_*`, strict assistant/tool models | assistant retrieval/context/provider/orchestrator/routing/tool/migration tests |
 | [Bar Jarvis product goal and roadmap](BAR_JARVIS_ROADMAP.md) | owner-approved Definition of Done and phases A–F | future versioned corpora, evaluation harness and controlled pilots; currently pending where noted |
+| [Bar Jarvis conversation brain](BAR_JARVIS_CONVERSATION.md) | bounded context, v15 confirmed memory and two-step tool boundary | conversation, memory and v15 migration tests |
 | [AI capability language coverage](AI_CAPABILITY_LANGUAGE.md) | authoritative `CAPABILITIES`, verified phrases and pending coverage | capability/controller and per-domain regression tests |
 
 Use this table to localize; read exact code when changing behavior.

@@ -8,6 +8,16 @@ Evidence: regression tests, Git history, rollout docs, owner observations
 Depends on: callbacks, SQLite/WAL, workers, XLSX, imports, VPS environment
 Importance: High
 
+- **Conversation state separation:** successful entity/task facts must remain
+  separate from failed attempts, candidates and active proposals. Provider
+  failure must not erase the last stable selection.
+- **Evaluation claims:** scripted planner outputs are not conversational
+  accuracy. Percentages require a versioned corpus, frozen runner, recorded
+  predictions and methodology.
+- **Long-term memory is a mutation:** only explicit owner instruction or a
+  confirmed preview may write; ambiguous deletion/update must stop for exact
+  selection.
+
 - **Stale Telegram callbacks:** expired callbacks must stop safely and never
   retry business logic. Global error handling must not create a second action.
 - **Replay/idempotency:** revisions, one-shot tokens, unique message keys, and

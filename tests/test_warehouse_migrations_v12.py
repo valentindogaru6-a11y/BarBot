@@ -14,7 +14,7 @@ def test_fresh_v12_repeat_and_schema(tmp_path: Path) -> None:
     path = tmp_path / "fresh.db"
     UserDatabase(path).initialize(); UserDatabase(path).initialize()
     with sqlite3.connect(path) as connection:
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 14
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 15
         validate_warehouse_attendance_schema(connection)
         foreign = {row[2] for row in connection.execute("PRAGMA foreign_key_list(warehouse_shift_sessions)")}
         assert {"users", "warehouse_shifts", "warehouse_locations"} <= foreign
@@ -24,6 +24,9 @@ def test_v11_to_v12_and_rollback(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     path = tmp_path / "upgrade.db"
     UserDatabase(path).initialize()
     with sqlite3.connect(path) as connection:
+        connection.execute("DROP INDEX ux_assistant_memory_active_content")
+        connection.execute("DROP INDEX ix_assistant_memory_owner_active")
+        connection.execute("DROP TABLE assistant_long_term_memories")
         connection.execute("DROP TABLE assistant_action_proposals")
         connection.execute("DROP TABLE assistant_conversation_turns")
         connection.execute("DROP TABLE assistant_conversation_sessions")
@@ -33,11 +36,14 @@ def test_v11_to_v12_and_rollback(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
         connection.commit()
     UserDatabase(path).initialize()
     with sqlite3.connect(path) as connection:
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 14
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 15
 
     rollback = tmp_path / "rollback.db"
     UserDatabase(rollback).initialize()
     with sqlite3.connect(rollback) as connection:
+        connection.execute("DROP INDEX ux_assistant_memory_active_content")
+        connection.execute("DROP INDEX ix_assistant_memory_owner_active")
+        connection.execute("DROP TABLE assistant_long_term_memories")
         connection.execute("DROP TABLE assistant_action_proposals")
         connection.execute("DROP TABLE assistant_conversation_turns")
         connection.execute("DROP TABLE assistant_conversation_sessions")

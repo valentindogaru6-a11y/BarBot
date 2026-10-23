@@ -12,6 +12,7 @@ from app.models.assistant import AssistantDomain
 
 
 class AssistantDialogueAct(StrEnum):
+    NEW_REQUEST = "new_request"
     NEW_COMMAND = "new_command"
     CORRECTION = "correction"
     CLARIFICATION_ANSWER = "clarification_answer"
@@ -19,6 +20,7 @@ class AssistantDialogueAct(StrEnum):
     CANCELLATION = "cancellation"
     FOLLOW_UP = "follow_up"
     GENERAL_CHAT = "general_chat"
+    MEMORY_REQUEST = "memory_request"
 
 
 class PlannerTurn(BaseModel):
@@ -59,6 +61,10 @@ class PlannerContextSnapshot(BaseModel):
     actor_role: str = Field(min_length=1, max_length=40)
     available_capability_ids: tuple[str, ...] = Field(max_length=50)
     current_domain: AssistantDomain = AssistantDomain.UNSPECIFIED
+    dialogue_state: str = Field(default="idle", max_length=40)
+    access_mode: str = Field(default="pilot_allowlist", max_length=40)
+    feature_flags: tuple[str, ...] = Field(default=(), max_length=12)
+    rolling_summary: str | None = Field(default=None, max_length=2_000)
     last_successful_entity_id: str | None = Field(default=None, max_length=300)
     last_successful_entity_name: str | None = Field(default=None, max_length=500)
     candidate_entity_ids: tuple[str, ...] = Field(default=(), max_length=5)
@@ -67,9 +73,16 @@ class PlannerContextSnapshot(BaseModel):
     pending_action: str | None = Field(default=None, max_length=100)
     last_tool_operation: str | None = Field(default=None, max_length=100)
     last_tool_summary: str | None = Field(default=None, max_length=500)
-    recent_turns: tuple[PlannerTurn, ...] = Field(default=(), max_length=6)
+    recent_turns: tuple[PlannerTurn, ...] = Field(default=(), max_length=12)
+    owner_memories: tuple[str, ...] = Field(default=(), max_length=8)
     revision: int = Field(default=0, ge=0)
     expires_at: float | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def bounded_payload(self) -> "PlannerContextSnapshot":
+        if len(self.model_dump_json().encode("utf-8")) > 24_000:
+            raise ValueError("planner context payload exceeds 24000 bytes")
+        return self
 
 
 class PlannerContextUpdates(BaseModel):

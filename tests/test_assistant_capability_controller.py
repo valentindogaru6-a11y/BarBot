@@ -13,6 +13,13 @@ from app.services.assistant.capabilities import CapabilityBinding, CapabilityReg
 from app.services.assistant.capability_controller import AssistantCapabilityController
 from app.services.assistant.proposals import AssistantActionProposalService
 from app.services.assistant.access_policy import AssistantAccessPolicy
+from app.services.assistant import AssistantOrchestrator
+from app.models.assistant import AssistantDomain
+from app.models.assistant_planner import (
+    AssistantDialogueAct,
+    PlannerContextUpdates,
+    PlannerDecision,
+)
 from app.services.access_service import AccessDeniedError
 from app.services.user_service import UserService
 from app.storage.assistant_action_database import AssistantActionDatabase
@@ -65,6 +72,45 @@ def _controller(path: Path):
         attendance=Attendance(),
         reports=Reports(),
     )
+
+
+def test_ai_first_uses_guarded_tool_loop_for_read_capability(tmp_path: Path) -> None:
+    controller = _controller(tmp_path / "loop.db")
+
+    class Planner:
+        calls = 0
+        async def plan(self, text, *, snapshot, capabilities):
+            del text, snapshot, capabilities
+            self.calls += 1
+            return PlannerDecision(
+                dialogue_act=AssistantDialogueAct.NEW_REQUEST,
+                domain=AssistantDomain.GENERAL,
+                capability_id="capabilities.list",
+                target_entity_id=None,
+                arguments={}, confidence=10_000, needs_clarification=False,
+                clarification_question=None, read_only=True, mutation=False,
+                context_updates=PlannerContextUpdates(),
+            )
+
+    planner = Planner()
+    orchestrator = AssistantOrchestrator(
+        None, planner_mode="ai_first", planner_client=planner
+    )
+    catalog = tmp_path / "catalog.json"
+    catalog.write_text('{"version":1,"categories":[]}', encoding="utf-8")
+    message = SimpleNamespace(
+        from_user=SimpleNamespace(id=10), chat=SimpleNamespace(id=10, type="private"),
+        message_id=7, answer=AsyncMock(),
+    )
+    asyncio.run(assistant._run_assistant(
+        message, SimpleNamespace(), text="что ты умеешь делать?",
+        catalog_path=catalog, auth_service=controller.access,
+        orchestrator=orchestrator, warehouse_service=None,
+        assistant_capability_controller=controller,
+        assistant_access_policy=controller.access_policy,
+    ))
+    assert planner.calls == 1
+    assert "Доступные вам функции" in message.answer.await_args.args[0]
 
 
 @pytest.mark.parametrize(

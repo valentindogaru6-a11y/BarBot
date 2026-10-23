@@ -110,3 +110,14 @@ All other natural-command, synonym, clarification and fallback cells remain
 pending live coverage until a test or controlled owner observation confirms
 them. Runtime access still comes from `CapabilityRegistry`, `AccessService`,
 the pilot gate, private-chat policy and feature flags.
+
+## Conversation-brain coverage
+
+Offline contracts now cover gender-tolerant pronouns, first/second/last bounded
+candidates, exact confirmed-memory commands and a maximum two-step tool loop.
+The versioned `bar-jarvis-conversation-v1` fixture contains at least one
+three-turn chain for each of the 41 capability IDs. This is structural and
+safety coverage, not measured provider routing quality; per-capability natural
+language accuracy and live synonym coverage remain `pending live coverage`.
+Scripted runner scores always carry provider mode `offline_scripted`; live
+Groq/Gemini metrics remain `pending — requires controlled shadow evaluation`.

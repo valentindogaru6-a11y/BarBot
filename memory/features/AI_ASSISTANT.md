@@ -8,6 +8,9 @@ Evidence: `app/services/assistant/`, `app/handlers/assistant.py`, assistant test
 Depends on: catalog services, centralized access, warehouse draft confirmation
 Importance: High
 
+The multi-turn context, confirmed-memory and guarded tool-loop contract is in
+[BAR_JARVIS_CONVERSATION.md](BAR_JARVIS_CONVERSATION.md).
+
 ## AI-first planner foundation (development)
 
 The provider boundary is now explicitly two-stage. Stage 1 has seven required

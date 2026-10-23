@@ -4,6 +4,11 @@ Metadata: scope `BarBot`; trust `mixed`; lifecycle `active`; last reviewed
 `2026-10-23` during two-stage planner development based on starting HEAD
 `7871802965d3fa4700e982551b744f370f44f25b`.
 
+Conversation-brain development was revalidated on 2026-10-23 from base
+`b21ec7e69d213e781c3b5188c0e027844a14122d`. Schema target is v15; catalog and
+warehouse seed content are unchanged; production rollout/runtime facts remain
+pending revalidation.
+
 | Note | Scope | Importance | Trust | Lifecycle | Last verified | Evidence / dependencies | Revalidation trigger |
 |---|---|---:|---|---|---|---|---|
 | `01-canonical/summary/PROJECT_SUMMARY.md` | whole project | high | mixed | active | 2026-09-29 | repository source; owner runtime statement last verified 2026-09-24 | architecture, release, or live-runtime task |

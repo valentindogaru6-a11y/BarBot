@@ -14,6 +14,9 @@ def _prepare_v12(path: Path) -> None:
     database.initialize()
     database.ensure_user(101, first_name="Migration marker")
     with sqlite3.connect(path) as connection:
+        connection.execute("DROP INDEX ux_assistant_memory_active_content")
+        connection.execute("DROP INDEX ix_assistant_memory_owner_active")
+        connection.execute("DROP TABLE assistant_long_term_memories")
         connection.execute("DROP TABLE assistant_action_proposals")
         connection.execute("DROP TABLE assistant_conversation_turns")
         connection.execute("DROP TABLE assistant_conversation_sessions")
@@ -84,8 +87,8 @@ def test_fresh_v13_is_valid_and_idempotent(tmp_path: Path) -> None:
     UserDatabase(path).initialize()
     UserDatabase(path).initialize()
     with sqlite3.connect(path) as connection:
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 14
-        migrations._validate_schema(connection, 14)
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 15
+        migrations._validate_schema(connection, 15)
         assert connection.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
         assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
 
@@ -96,8 +99,8 @@ def test_v12_to_v13_is_valid_and_idempotent(tmp_path: Path) -> None:
     UserDatabase(path).initialize()
     UserDatabase(path).initialize()
     with sqlite3.connect(path) as connection:
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 14
-        migrations._validate_schema(connection, 14)
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 15
+        migrations._validate_schema(connection, 15)
         assert connection.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
         assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
 
@@ -145,7 +148,7 @@ def test_v12_to_v13_rolls_back_after_all_schema_objects(
     UserDatabase(path).initialize()
     UserDatabase(path).initialize()
     with sqlite3.connect(path) as connection:
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 14
+            assert connection.execute("PRAGMA user_version").fetchone()[0] == 15
 
 
 def test_v12_to_v13_rolls_back_after_user_version_before_validation(
@@ -178,7 +181,7 @@ def test_v12_to_v13_rolls_back_after_user_version_before_validation(
     UserDatabase(path).initialize()
     UserDatabase(path).initialize()
     with sqlite3.connect(path) as connection:
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 14
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 15
 
 
 def test_fresh_v13_failure_rolls_back_entire_schema_and_can_retry(tmp_path: Path) -> None:
@@ -206,8 +209,8 @@ def test_fresh_v13_failure_rolls_back_entire_schema_and_can_retry(tmp_path: Path
     _run_direct(path)
     _run_direct(path)
     with sqlite3.connect(path) as connection:
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 14
-        migrations._validate_schema(connection, 14)
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 15
+        migrations._validate_schema(connection, 15)
 
 
 def test_v13_validator_rejects_missing_index(tmp_path: Path) -> None:

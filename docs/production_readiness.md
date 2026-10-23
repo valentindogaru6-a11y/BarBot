@@ -19,7 +19,7 @@ forward automatically.
   reminder worker, and the schedule worker in one process.
 - Shutdown: `finally` cancels and awaits both workers, then closes the bot HTTP
   session. SIGTERM must be allowed enough time to complete this path.
-- SQLite target: schema v14. `UserDatabase.initialize()` performs the
+- SQLite target: schema v15. `UserDatabase.initialize()` performs the
   transactional migration/validation and enables WAL.
 - Seed entrypoint: `scripts/import_warehouse_products.py`; dry-run is default,
   writes require `--apply`. The production path additionally requires two
@@ -91,7 +91,7 @@ runs `UserDatabase.initialize()`, migrations, `journal_mode`, a WAL checkpoint,
 or `chmod`, but operators must treat sidecars as live runtime state. Never
 delete them while the service is running. Git ignores SQLite sidecars.
 
-Strict mode still requires schema v14 and existing runtime paths. An explicitly
+Strict mode still requires schema v15 and existing runtime paths. An explicitly
 authorized controlled Stage 0 may add:
 
 ```bash
@@ -118,7 +118,7 @@ only for offline automated tests and must not be used in production.
 Checks cover Python/imports, key presence, timezone/cutoff, normalized paths,
 safe path types and separation, non-temporary report location, access based on
 existing permissions without probe writes, declared polling ownership,
-entrypoint/router/callback imports, schema target v13, the 414-product seed,
+entrypoint/router/callback imports, schema target v15, the 414-product seed,
 the application-fixed audit path, and the real Telegram delivery adapter. It
 also requires the report directory to resolve inside the repository, matching
 runtime configuration validation. It never imports seed, migrates SQLite,

@@ -10,6 +10,17 @@ Importance: Critical
 
 ## Planner foundation checkpoint
 
+The Conversation Brain is implemented for offline security review: bounded
+context, atomic summary/session updates, stable-ID reference resolution,
+owner-confirmed v15 memory and a two-step server tool loop. Provider-quality
+thresholds, live shadow evidence and owner pilot remain pending; no accuracy
+percentage follows from unit or scripted corpus results.
+
+Acceptance reporting is split permanently into: (A) offline application safety
+contracts, (B) explicitly labelled `offline_scripted` runner/scoring, and (C)
+live/shadow provider metrics. Only category C may establish real Groq/Gemini
+route/entity/reference accuracy.
+
 Development now contains gated `local_first`, `shadow` and `ai_first` modes.
 Promotion starts with shadow because its decision is comparison-only. The
 offline `bar-jarvis-planner-v1` corpus has 17 scripted contract cases across
