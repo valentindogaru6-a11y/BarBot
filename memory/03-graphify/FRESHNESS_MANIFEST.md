@@ -1,8 +1,8 @@
 # Freshness Manifest
 
 Metadata: scope `BarBot`; trust `mixed`; lifecycle `active`; last reviewed
-`2026-10-22` during provider-neutral planner development based on starting HEAD
-`fbbd6ab464d21e5c93d9acc8f9fcf11bc1a01cea`.
+`2026-10-23` during two-stage planner development based on starting HEAD
+`7871802965d3fa4700e982551b744f370f44f25b`.
 
 | Note | Scope | Importance | Trust | Lifecycle | Last verified | Evidence / dependencies | Revalidation trigger |
 |---|---|---:|---|---|---|---|---|
@@ -34,13 +34,12 @@ being used for an operational decision.
   shadow/AI-first live coverage and accuracy remain pending.
 - Shadow supervision and privacy-safe telemetry are development evidence only;
   live Cases 2–4 remain unknown and require a separately authorized re-smoke.
-- Groq-primary/Gemini-fallback, provider wire conversion and circuit breaking
-  are development evidence only. Live multi-provider quality and production
-  rollout remain pending.
-- Groq Call 1 passed the live strict planner contract; Call 2 returned an
-  unclassified HTTP 400 under the prior lossy adapter. Offline evidence proves
-  schema invariance, but correction semantics and the exact provider category
-  remain pending until a separately authorized re-smoke.
+- Groq-primary/Gemini-fallback now uses compact Stage 1 routing, local policy
+  assembly and separate bounded Stage 2 argument contracts. Live route quality
+  and production rollout remain pending.
+- The former monolithic correction schema failed constrained generation on
+  Groq 20B and 120B. The compact replacement has offline contract evidence
+  only and requires a separately authorized live route smoke.
 - Production rollout of the development changes has not been performed.
 - Service state, deployed HEAD, schema, counts, flags and provider health remain
   runtime facts and must be revalidated under the controlled rollout policy

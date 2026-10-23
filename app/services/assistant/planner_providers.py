@@ -21,12 +21,14 @@ from app.models.assistant_planner import (
     PlannerContextSnapshot,
     PlannerContextUpdates,
     PlannerDecision,
+    PlannerTargetOption,
 )
 from app.models.assistant_provider_planner import (
-    GeminiPlannerEnvelope,
-    GroqPlannerEnvelope,
-    PlannerInferredAction,
-    PlannerNotesCode,
+    GeminiPlannerRouteEnvelope,
+    GroqPlannerRouteEnvelope,
+    PlannerRouteActionCode,
+    PlannerRouteDomain,
+    PlannerRouteEnvelope,
     PlannerValidationStatus,
     ProviderErrorDiagnostic,
     ProviderPlanError,
@@ -43,14 +45,13 @@ from app.services.assistant.providers import (
     ProviderErrorKind,
     _ResponseTooLargeError,
 )
-from app.services.assistant.system_prompt import build_assistant_system_prompt
+from app.services.assistant.planner_arguments import local_stage_two_arguments
+from app.services.assistant.system_prompt import build_planner_route_system_prompt
 
 GROQ_CHAT_COMPLETIONS_URL = "https://api.groq.com/openai/v1/chat/completions"
 GEMINI_API_ROOT = "https://generativelanguage.googleapis.com/v1beta/models"
-GROQ_PLANNER_SCHEMA_NAME = "barbot_groq_planner_v1"
-GEMINI_PLANNER_SCHEMA_NAME = "barbot_gemini_planner_v1"
-MAX_ARGUMENT_ITEMS = 20
-MAX_ARGUMENT_VALUE_LENGTH = 1_000
+GROQ_PLANNER_SCHEMA_NAME = "barbot_groq_route_v2"
+GEMINI_PLANNER_SCHEMA_NAME = "barbot_gemini_route_v2"
 
 
 class PlannerProvider(Protocol):
@@ -65,49 +66,44 @@ class PlannerProvider(Protocol):
     ) -> ProviderPlanResult: ...
 
 
-def _nullable_string(*, max_length: int, enum: Sequence[str] | None = None) -> dict[str, object]:
-    result: dict[str, object] = {"type": ["string", "null"], "maxLength": max_length}
-    if enum is not None:
-        result["enum"] = [*enum, None]
-    return result
-
-
-def planner_wire_schema(
+def planner_route_schema(
     capabilities: Sequence[PlannerCapability],
+    *,
+    target_count: int = 0,
 ) -> dict[str, object]:
-    """Build the flat, fully-required provider boundary schema."""
+    """Return a small Stage 1 schema with no IDs, arguments or authority."""
 
-    capability_ids = tuple(dict.fromkeys(item.capability_id for item in capabilities[:50]))
+    capability_ids = tuple(
+        dict.fromkeys(item.capability_id for item in capabilities[:50])
+    )
     properties: dict[str, object] = {
-        "dialogue_act": {"type": "string", "enum": [item.value for item in AssistantDialogueAct]},
-        "domain": {"type": "string", "enum": [item.value for item in AssistantDomain]},
-        "capability_id": _nullable_string(max_length=100, enum=capability_ids),
-        "target_entity_id": _nullable_string(max_length=300),
-        "confidence_scaled": {"type": "integer", "minimum": 0, "maximum": 10_000},
+        "dialogue_act": {
+            "type": "string",
+            "enum": [item.value for item in AssistantDialogueAct],
+        },
+        "domain": {
+            "type": "string",
+            "enum": [item.value for item in PlannerRouteDomain],
+        },
+        "capability_id": {
+            "type": "string",
+            "enum": [*capability_ids, "none"],
+        },
+        "target_index": {
+            "type": "integer",
+            "minimum": -1,
+            "maximum": max(-1, min(target_count, 5) - 1),
+        },
+        "action_code": {
+            "type": "string",
+            "enum": [item.value for item in PlannerRouteActionCode],
+        },
         "needs_clarification": {"type": "boolean"},
-        "clarification_question": _nullable_string(max_length=500),
-        "inferred_action": {"type": "string", "enum": [item.value for item in PlannerInferredAction]},
-        "argument_items": {
-            "type": "array",
-            "maxItems": MAX_ARGUMENT_ITEMS,
-            "items": {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "name": {"type": "string", "minLength": 1, "maxLength": 100},
-                    "value": {"type": "string", "minLength": 1, "maxLength": MAX_ARGUMENT_VALUE_LENGTH},
-                },
-                "required": ["name", "value"],
-            },
+        "confidence_scaled": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10_000,
         },
-        "referenced_candidate_ids": {
-            "type": "array",
-            "maxItems": 5,
-            "items": {"type": "string", "minLength": 1, "maxLength": 300},
-        },
-        "provider_notes_code": _nullable_string(
-            max_length=40, enum=[item.value for item in PlannerNotesCode]
-        ),
     }
     return {
         "type": "object",
@@ -117,174 +113,287 @@ def planner_wire_schema(
     }
 
 
-def groq_planner_wire_schema(
-    capabilities: Sequence[PlannerCapability],
+def groq_planner_route_schema(
+    capabilities: Sequence[PlannerCapability], *, target_count: int = 0
 ) -> dict[str, object]:
-    return planner_wire_schema(capabilities)
+    return planner_route_schema(capabilities, target_count=target_count)
 
 
-def gemini_planner_wire_schema(
-    capabilities: Sequence[PlannerCapability],
+def gemini_planner_route_schema(
+    capabilities: Sequence[PlannerCapability], *, target_count: int = 0
 ) -> dict[str, object]:
-    # Explicit boundary even while fields align; either provider can evolve
-    # without leaking its wire format into the canonical contract.
-    return planner_wire_schema(capabilities)
+    return planner_route_schema(capabilities, target_count=target_count)
 
 
-def _safe_request_data(
+def _route_domain_for_capability(contract: PlannerCapability) -> PlannerRouteDomain:
+    prefix = contract.capability_id.split(".", 1)[0]
+    if prefix == "attendance_reports":
+        return PlannerRouteDomain.REPORTS
+    if prefix == "capabilities":
+        return PlannerRouteDomain.GENERAL
+    if prefix in {item.value for item in PlannerRouteDomain}:
+        return PlannerRouteDomain(prefix)
+    return {
+        "employees": PlannerRouteDomain.USERS,
+        "help": PlannerRouteDomain.GENERAL,
+        "administration": PlannerRouteDomain.GENERAL,
+    }.get(contract.domain, PlannerRouteDomain.GENERAL)
+
+
+def _canonical_domain(domain: PlannerRouteDomain) -> AssistantDomain:
+    return {
+        PlannerRouteDomain.CATALOG: AssistantDomain.CATALOG,
+        PlannerRouteDomain.WAREHOUSE: AssistantDomain.WAREHOUSE,
+        PlannerRouteDomain.ATTENDANCE: AssistantDomain.ATTENDANCE,
+        PlannerRouteDomain.REPORTS: AssistantDomain.REPORTS,
+        PlannerRouteDomain.USERS: AssistantDomain.EMPLOYEES,
+        PlannerRouteDomain.RECIPIENTS: AssistantDomain.ADMINISTRATION,
+        PlannerRouteDomain.REMINDERS: AssistantDomain.ADMINISTRATION,
+        PlannerRouteDomain.SCHEDULES: AssistantDomain.ADMINISTRATION,
+        PlannerRouteDomain.NAVIGATION: AssistantDomain.GENERAL,
+        PlannerRouteDomain.GENERAL: AssistantDomain.GENERAL,
+    }[domain]
+
+
+def planner_target_options(
+    snapshot: PlannerContextSnapshot,
+) -> tuple[PlannerTargetOption, ...]:
+    """Build a server index map while retaining old snapshot compatibility."""
+
+    if snapshot.target_options:
+        return tuple(snapshot.target_options[:5])
+    options: list[PlannerTargetOption] = []
+    current_domain = snapshot.current_domain.value
+    safe_domain = current_domain if current_domain != "unspecified" else "general"
+    if snapshot.last_successful_entity_id and snapshot.last_successful_entity_name:
+        options.append(PlannerTargetOption(
+            stable_id=snapshot.last_successful_entity_id,
+            display_name=snapshot.last_successful_entity_name,
+            entity_kind="selected_entity",
+            relation_label="last_successful",
+            domain=safe_domain,
+        ))
+    known = {item.stable_id for item in options}
+    for index, stable_id in enumerate(snapshot.candidate_entity_ids):
+        if stable_id in known:
+            continue
+        options.append(PlannerTargetOption(
+            stable_id=stable_id,
+            display_name=f"Вариант {index + 1}",
+            entity_kind="candidate",
+            relation_label="candidate",
+            domain=safe_domain,
+        ))
+        if len(options) == 5:
+            break
+    return tuple(options)
+
+
+def _safe_route_request_data(
     snapshot: PlannerContextSnapshot,
     message: str,
     capabilities: Sequence[PlannerCapability],
 ) -> dict[str, object]:
+    targets = planner_target_options(snapshot)
     return {
         "request": message[:2_000],
-        "context": snapshot.model_dump(mode="json"),
-        "capabilities": [item.model_dump(mode="json") for item in capabilities[:50]],
+        "context": {
+            "actor_role": snapshot.actor_role,
+            "current_domain": snapshot.current_domain.value,
+            "pending_clarification": snapshot.pending_clarification or "",
+            "pending_action": snapshot.pending_action or "",
+            "last_tool_operation": snapshot.last_tool_operation or "",
+            "last_tool_summary": snapshot.last_tool_summary or "",
+            "recent_turns": [
+                item.model_dump(mode="json") for item in snapshot.recent_turns
+            ],
+            "targets": [
+                {
+                    "index": index,
+                    "display_name": item.display_name,
+                    "entity_kind": item.entity_kind,
+                    "relation_label": item.relation_label,
+                    "domain": item.domain,
+                }
+                for index, item in enumerate(targets)
+            ],
+        },
+        "capabilities": [
+            {
+                "capability_id": item.capability_id,
+                "domain": _route_domain_for_capability(item).value,
+            }
+            for item in capabilities[:50]
+        ],
     }
 
 
-def _known_entity_ids(snapshot: PlannerContextSnapshot) -> frozenset[str]:
-    return frozenset(
-        value
-        for value in (snapshot.last_successful_entity_id, *snapshot.candidate_entity_ids)
-        if value
-    )
-
-
-def _capability_domain(contract: PlannerCapability) -> AssistantDomain:
-    return {
-        "catalog": AssistantDomain.CATALOG,
-        "warehouse": AssistantDomain.WAREHOUSE,
-        "attendance": AssistantDomain.ATTENDANCE,
-        "employees": AssistantDomain.EMPLOYEES,
-        "reports": AssistantDomain.REPORTS,
-        "administration": AssistantDomain.ADMINISTRATION,
-        "recipients": AssistantDomain.ADMINISTRATION,
-        "reminders": AssistantDomain.ADMINISTRATION,
-        "schedules": AssistantDomain.ADMINISTRATION,
-        "help": AssistantDomain.GENERAL,
-        "navigation": AssistantDomain.GENERAL,
-        "general": AssistantDomain.GENERAL,
-    }.get(contract.domain, AssistantDomain.UNSPECIFIED)
-
-
-def _convert_envelope(
-    envelope: GroqPlannerEnvelope | GeminiPlannerEnvelope,
+def assemble_route_decision(
+    envelope: PlannerRouteEnvelope,
     *,
     snapshot: PlannerContextSnapshot,
     capabilities: Sequence[PlannerCapability],
+    arguments: Mapping[str, object] | None = None,
 ) -> PlannerDecision:
-    """Convert untrusted wire data into the authoritative BarBot contract."""
+    """Resolve indices and derive risk, target and clarification locally."""
 
     contracts = {item.capability_id: item for item in capabilities[:50]}
-    contract = contracts.get(envelope.capability_id) if envelope.capability_id else None
-    if envelope.capability_id is not None and contract is None:
+    capability_id = None if envelope.capability_id == "none" else envelope.capability_id
+    contract = contracts.get(capability_id) if capability_id else None
+    if capability_id is not None and contract is None:
         raise ValueError("planner selected an unavailable capability")
-    if (
-        envelope.capability_id is not None
-        and envelope.capability_id not in snapshot.available_capability_ids
-    ):
+    if capability_id is not None and capability_id not in snapshot.available_capability_ids:
         raise ValueError("planner capability escaped the snapshot allowlist")
-    if contract is not None and envelope.domain is not _capability_domain(contract):
+    if contract is not None and envelope.domain is not _route_domain_for_capability(contract):
         raise ValueError("planner domain disagrees with capability")
     expected_actions = {
-        "catalog.search": PlannerInferredAction.SEARCH,
-        "catalog.get": PlannerInferredAction.GET,
-        "catalog.manage": PlannerInferredAction.MANAGE,
-        "warehouse.prepare_writeoff": PlannerInferredAction.WRITEOFF,
-        "warehouse.prepare_transfer": PlannerInferredAction.TRANSFER,
-        "warehouse.cancel_batch": PlannerInferredAction.CANCEL,
-        "warehouse.commit_batch": PlannerInferredAction.CONFIRM,
-        "reports.generate": PlannerInferredAction.GENERATE,
-        "reports.send": PlannerInferredAction.SEND,
+        "catalog.search": {PlannerRouteActionCode.SEARCH},
+        "catalog.get": {PlannerRouteActionCode.OPEN},
+        "catalog.manage": {
+            PlannerRouteActionCode.EDIT,
+            PlannerRouteActionCode.ADD,
+            PlannerRouteActionCode.REMOVE,
+            PlannerRouteActionCode.REPLACE,
+        },
+        "warehouse.prepare_writeoff": {PlannerRouteActionCode.CREATE},
+        "warehouse.prepare_transfer": {PlannerRouteActionCode.CREATE},
+        "warehouse.cancel_batch": {PlannerRouteActionCode.CANCEL},
+        "warehouse.commit_batch": {PlannerRouteActionCode.CONFIRM},
+        "reports.generate": {PlannerRouteActionCode.GENERATE},
+        "reports.send": {PlannerRouteActionCode.SEND},
     }
-    if contract is None:
-        if envelope.inferred_action is not PlannerInferredAction.UNSPECIFIED:
-            raise ValueError("planner supplied action without capability")
-    elif (
-        contract.capability_id in expected_actions
-        and envelope.inferred_action is not expected_actions[contract.capability_id]
+    if (
+        contract is not None
+        and contract.capability_id in expected_actions
+        and envelope.action_code not in expected_actions[contract.capability_id]
     ):
         raise ValueError("planner action disagrees with capability")
-    known_ids = _known_entity_ids(snapshot)
-    if envelope.target_entity_id and envelope.target_entity_id not in known_ids:
-        raise ValueError("planner invented an entity ID")
-    if any(value not in known_ids for value in envelope.referenced_candidate_ids):
-        raise ValueError("planner referenced an unavailable candidate ID")
 
-    arguments: dict[str, str] = {}
-    allowed_arguments = frozenset(contract.allowed_arguments if contract else ())
-    for item in envelope.argument_items:
-        if item.name in arguments:
-            raise ValueError("planner repeated an argument")
-        if contract is None or item.name not in allowed_arguments:
-            raise ValueError("planner returned an unknown argument")
-        arguments[item.name] = item.value
-    # Entity references are derived from the separately validated stable ID,
-    # never copied from a free-form provider argument.
-    if contract is not None and envelope.target_entity_id:
+    targets = planner_target_options(snapshot)
+    target: PlannerTargetOption | None = None
+    if envelope.target_index >= 0:
+        if envelope.target_index >= len(targets):
+            raise ValueError("planner target index is out of range")
+        target = targets[envelope.target_index]
+        if target.domain != envelope.domain.value:
+            raise ValueError("planner target belongs to another domain")
+    target_required = bool(
+        contract
+        and (
+            {"entity_ref", "target_ref"} & set(contract.required_arguments)
+            or (
+                contract.capability_id == "catalog.manage"
+                and envelope.action_code in {
+                    PlannerRouteActionCode.EDIT,
+                    PlannerRouteActionCode.REMOVE,
+                    PlannerRouteActionCode.REPLACE,
+                }
+            )
+        )
+    )
+    if target_required and target is None:
+        raise ValueError("planner omitted a required target")
+    if contract is None and target is not None:
+        raise ValueError("planner supplied target without capability")
+
+    resolved_arguments = dict(arguments or {})
+    if contract is not None:
+        unknown = set(resolved_arguments) - set(contract.allowed_arguments)
+        if unknown:
+            raise ValueError("local extractor returned an unknown argument")
+    if contract is not None and target is not None:
         if contract.capability_id in {"catalog.get", "attendance.get", "reports.status"}:
-            arguments["entity_ref"] = envelope.target_entity_id
+            resolved_arguments["entity_ref"] = target.stable_id
         elif contract.capability_id in {
-            "catalog.manage",
-            "users.change_role",
-            "attendance.force_close",
-            "warehouse.update_operation",
-            "warehouse.delete_operation",
-            "warehouse.close_shift",
-            "warehouse.open_correction",
-            "warehouse.commit_correction",
-            "reports.send",
-            "recipients.create_or_update",
-            "recipients.disable",
-            "reminders.update",
-            "schedules.create_or_update",
+            "catalog.manage", "users.change_role", "attendance.force_close",
+            "warehouse.update_operation", "warehouse.delete_operation",
+            "warehouse.close_shift", "warehouse.open_correction",
+            "warehouse.commit_correction", "reports.send",
+            "recipients.create_or_update", "recipients.disable",
+            "reminders.update", "schedules.create_or_update",
             "schedules.disable",
         }:
-            arguments["target_ref"] = envelope.target_entity_id
-    if contract is not None and not envelope.needs_clarification:
-        missing = set(contract.required_arguments) - set(arguments)
-        if missing:
-            raise ValueError("planner omitted a required argument")
-    if envelope.needs_clarification != bool(envelope.clarification_question):
-        raise ValueError("planner clarification fields disagree")
+            resolved_arguments["target_ref"] = target.stable_id
 
-    read_only = bool(contract and contract.read_only)
-    mutation = bool(contract and contract.mutation)
-    if contract is None:
-        # A no-capability decision is informational/clarifying, never mutation.
-        read_only, mutation = True, False
+    missing = (
+        set(contract.required_arguments) - set(resolved_arguments)
+        if contract is not None
+        else set()
+    )
+    if contract is not None:
+        stage_two_required = {
+            "warehouse.prepare_writeoff": {"product", "quantity", "unit"},
+            "warehouse.prepare_transfer": {"product", "quantity", "unit", "destination"},
+            "attendance.force_close": {"target_ref", "reason"},
+        }.get(contract.capability_id, set())
+        missing.update(
+            name for name in stage_two_required if not resolved_arguments.get(name)
+        )
+    needs_clarification = envelope.needs_clarification or bool(missing)
+    label = target.display_name if target is not None else "выбранной позиции"
+    if needs_clarification:
+        if contract is not None and contract.capability_id == "catalog.manage":
+            clarification = f"Что именно изменить в составе «{label}»?"
+        elif "query" in missing:
+            clarification = "Уточните, что именно нужно найти."
+        elif "destination" in missing:
+            clarification = "Уточните направление перемещения."
+        elif "quantity" in missing:
+            clarification = "Уточните количество."
+        elif "unit" in missing:
+            clarification = "Уточните единицу измерения."
+        elif "product" in missing:
+            clarification = "Уточните продукт."
+        elif "reason" in missing:
+            clarification = "Укажите причину действия."
+        else:
+            clarification = "Уточните недостающие параметры действия."
+    else:
+        clarification = None
+
+    read_only = bool(contract.read_only) if contract is not None else True
+    mutation = bool(contract.mutation) if contract is not None else False
+    if read_only == mutation:
+        raise ValueError("runtime capability risk is invalid")
     return PlannerDecision(
         dialogue_act=envelope.dialogue_act,
-        domain=envelope.domain,
-        capability_id=envelope.capability_id,
-        target_entity_id=envelope.target_entity_id,
-        arguments=arguments,
+        domain=_canonical_domain(envelope.domain),
+        capability_id=capability_id,
+        target_entity_id=target.stable_id if target is not None else None,
+        arguments=resolved_arguments,
         confidence=envelope.confidence_scaled,
-        needs_clarification=envelope.needs_clarification,
-        clarification_question=envelope.clarification_question,
+        needs_clarification=needs_clarification,
+        clarification_question=clarification,
         read_only=read_only,
         mutation=mutation,
-        # Provider-proposed context updates are deliberately absent. The
-        # orchestrator/tool result owns persistent context changes.
-        context_updates=PlannerContextUpdates(),
+        context_updates=PlannerContextUpdates(
+            current_domain=_canonical_domain(envelope.domain),
+            selected_entity_id=target.stable_id if target is not None else None,
+            selected_entity_name=target.display_name if target is not None else None,
+        ),
     )
 
 
-def convert_groq_envelope(
-    envelope: GroqPlannerEnvelope,
+def convert_groq_route(
+    envelope: GroqPlannerRouteEnvelope,
     *, snapshot: PlannerContextSnapshot,
     capabilities: Sequence[PlannerCapability],
+    arguments: Mapping[str, object] | None = None,
 ) -> PlannerDecision:
-    return _convert_envelope(envelope, snapshot=snapshot, capabilities=capabilities)
+    return assemble_route_decision(
+        envelope, snapshot=snapshot, capabilities=capabilities, arguments=arguments
+    )
 
 
-def convert_gemini_envelope(
-    envelope: GeminiPlannerEnvelope,
+def convert_gemini_route(
+    envelope: GeminiPlannerRouteEnvelope,
     *, snapshot: PlannerContextSnapshot,
     capabilities: Sequence[PlannerCapability],
+    arguments: Mapping[str, object] | None = None,
 ) -> PlannerDecision:
-    return _convert_envelope(envelope, snapshot=snapshot, capabilities=capabilities)
+    return assemble_route_decision(
+        envelope, snapshot=snapshot, capabilities=capabilities, arguments=arguments
+    )
 
 
 def _normalized_error(kind: ProviderErrorKind) -> ProviderPlanError:
@@ -429,7 +538,7 @@ def _provider_error_diagnostic(
 
 
 class _PlannerProviderBase:
-    envelope_type: type[GroqPlannerEnvelope] | type[GeminiPlannerEnvelope]
+    envelope_type: type[GroqPlannerRouteEnvelope] | type[GeminiPlannerRouteEnvelope]
     schema_name: str
     schema_mode: str
 
@@ -522,22 +631,23 @@ class _PlannerProviderBase:
 
 class GroqPlannerProvider(_PlannerProviderBase):
     provider_name = "groq"
-    envelope_type = GroqPlannerEnvelope
+    envelope_type = GroqPlannerRouteEnvelope
     schema_name = GROQ_PLANNER_SCHEMA_NAME
     schema_mode = "json_schema_strict"
 
     def __init__(self, transport: AssistantHttpTransport, *, api_key: str, model: str = "openai/gpt-oss-20b", connect_timeout_seconds: float = 3, read_timeout_seconds: float = 5, total_timeout_seconds: float = 8) -> None:
         super().__init__(transport, api_key=api_key, model=model, connect_timeout_seconds=connect_timeout_seconds, read_timeout_seconds=read_timeout_seconds, total_timeout_seconds=total_timeout_seconds)
 
-    async def plan(self, snapshot: PlannerContextSnapshot, message: str, allowed_capabilities: Sequence[PlannerCapability]) -> ProviderPlanResult:
+    async def plan(self, snapshot: PlannerContextSnapshot, message: str, allowed_capabilities: Sequence[PlannerCapability], *, extract_arguments: bool = True) -> ProviderPlanResult:
         started = monotonic()
         capabilities = tuple(allowed_capabilities[:50])
-        schema = groq_planner_wire_schema(capabilities)
+        targets = planner_target_options(snapshot)
+        schema = groq_planner_route_schema(capabilities, target_count=len(targets))
         payload: Mapping[str, object] = {
             "model": self.model,
             "messages": [
-                {"role": "system", "content": build_assistant_system_prompt()},
-                {"role": "user", "content": json.dumps(_safe_request_data(snapshot, message, capabilities), ensure_ascii=False, separators=(",", ":"))},
+                {"role": "system", "content": build_planner_route_system_prompt()},
+                {"role": "user", "content": json.dumps(_safe_route_request_data(snapshot, message, capabilities), ensure_ascii=False, separators=(",", ":"))},
             ],
             "temperature": 0,
             "max_completion_tokens": 800,
@@ -569,8 +679,18 @@ class GroqPlannerProvider(_PlannerProviderBase):
                 )
             outer = json.loads(response.body)
             raw = outer["choices"][0]["message"]["content"]
-            envelope = GroqPlannerEnvelope.model_validate_json(raw)
-            decision = convert_groq_envelope(envelope, snapshot=snapshot, capabilities=capabilities)
+            envelope = GroqPlannerRouteEnvelope.model_validate_json(raw)
+            arguments = (
+                local_stage_two_arguments(envelope.capability_id, message)
+                if extract_arguments and envelope.capability_id != "none"
+                else None
+            )
+            decision = convert_groq_route(
+                envelope,
+                snapshot=snapshot,
+                capabilities=capabilities,
+                arguments=arguments,
+            )
             return self._result(started, decision=decision, status=PlannerValidationStatus.PASSED)
         except asyncio.CancelledError:
             raise
@@ -614,20 +734,21 @@ class GroqPlannerProvider(_PlannerProviderBase):
 
 class GeminiPlannerProvider(_PlannerProviderBase):
     provider_name = "gemini"
-    envelope_type = GeminiPlannerEnvelope
+    envelope_type = GeminiPlannerRouteEnvelope
     schema_name = GEMINI_PLANNER_SCHEMA_NAME
     schema_mode = "response_json_schema"
 
     def __init__(self, transport: AssistantHttpTransport, *, api_key: str, model: str, connect_timeout_seconds: float = 3, read_timeout_seconds: float = 8, total_timeout_seconds: float = 10) -> None:
         super().__init__(transport, api_key=api_key, model=model, connect_timeout_seconds=connect_timeout_seconds, read_timeout_seconds=read_timeout_seconds, total_timeout_seconds=total_timeout_seconds)
 
-    async def plan(self, snapshot: PlannerContextSnapshot, message: str, allowed_capabilities: Sequence[PlannerCapability]) -> ProviderPlanResult:
+    async def plan(self, snapshot: PlannerContextSnapshot, message: str, allowed_capabilities: Sequence[PlannerCapability], *, extract_arguments: bool = True) -> ProviderPlanResult:
         started = monotonic()
         capabilities = tuple(allowed_capabilities[:50])
-        schema = gemini_planner_wire_schema(capabilities)
+        targets = planner_target_options(snapshot)
+        schema = gemini_planner_route_schema(capabilities, target_count=len(targets))
         payload: Mapping[str, object] = {
-            "system_instruction": {"parts": [{"text": build_assistant_system_prompt()}]},
-            "contents": [{"role": "user", "parts": [{"text": json.dumps(_safe_request_data(snapshot, message, capabilities), ensure_ascii=False, separators=(",", ":"))}]}],
+            "system_instruction": {"parts": [{"text": build_planner_route_system_prompt()}]},
+            "contents": [{"role": "user", "parts": [{"text": json.dumps(_safe_route_request_data(snapshot, message, capabilities), ensure_ascii=False, separators=(",", ":"))}]}],
             "generationConfig": {"temperature": 0, "responseMimeType": "application/json", "responseJsonSchema": schema, "maxOutputTokens": 800},
         }
         if len(json.dumps(payload, ensure_ascii=False).encode()) > MAX_PLANNER_REQUEST_BYTES:
@@ -640,8 +761,18 @@ class GeminiPlannerProvider(_PlannerProviderBase):
             )
             outer = json.loads(response.body)
             raw = outer["candidates"][0]["content"]["parts"][0]["text"]
-            envelope = GeminiPlannerEnvelope.model_validate_json(raw)
-            decision = convert_gemini_envelope(envelope, snapshot=snapshot, capabilities=capabilities)
+            envelope = GeminiPlannerRouteEnvelope.model_validate_json(raw)
+            arguments = (
+                local_stage_two_arguments(envelope.capability_id, message)
+                if extract_arguments and envelope.capability_id != "none"
+                else None
+            )
+            decision = convert_gemini_route(
+                envelope,
+                snapshot=snapshot,
+                capabilities=capabilities,
+                arguments=arguments,
+            )
             return self._result(started, decision=decision, status=PlannerValidationStatus.PASSED)
         except asyncio.CancelledError:
             raise
@@ -744,7 +875,15 @@ class MultiProviderPlanner:
     async def _call(self, provider: PlannerProvider, snapshot: PlannerContextSnapshot, text: str, capabilities: Sequence[PlannerCapability]) -> ProviderPlanResult:
         if not self.circuit.acquire(provider.provider_name):
             return ProviderPlanResult(provider=provider.provider_name, model=provider.model, error=ProviderPlanError.CIRCUIT_OPEN, latency_ms=0, schema_mode="skipped", validation_status=PlannerValidationStatus.PROVIDER_ERROR)
-        result = await provider.plan(snapshot, text, capabilities)
+        if isinstance(provider, _PlannerProviderBase):
+            result = await provider.plan(
+                snapshot,
+                text,
+                capabilities,
+                extract_arguments=self.mode != "shadow",
+            )
+        else:
+            result = await provider.plan(snapshot, text, capabilities)
         transient = result.error in _CIRCUIT_TRANSIENT_ERRORS
         if result.decision is not None:
             self.circuit.success(provider.provider_name)

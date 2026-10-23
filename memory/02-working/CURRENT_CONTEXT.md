@@ -28,6 +28,13 @@ both turns. Safe provider-error classification is being added without changing
 the schema. Exact correction quality and the original provider subcategory are
 unknown; one controlled correction re-smoke remains pending.
 
+Development from `7871802...` replaces the provider-generated monolithic
+decision with compact Stage 1 routing, server-owned target mapping and local
+policy assembly. Stage 2 uses deterministic parsing or bounded
+capability-specific contracts. Corpus v2 has nine route and four argument
+contract cases; live compact-route quality remains pending. Schema stays v14;
+catalog, seed and migrations are unchanged.
+
 Task: none
 State: empty
 Started: n/a

@@ -1,6 +1,6 @@
 """Versioned, bounded role instruction shared by text and voice AI flows."""
 
-ASSISTANT_SYSTEM_PROMPT_VERSION = "barbot-assistant-v4"
+ASSISTANT_SYSTEM_PROMPT_VERSION = "barbot-assistant-v5"
 
 
 def build_assistant_system_prompt() -> str:
@@ -38,4 +38,17 @@ def build_assistant_system_prompt() -> str:
         "Для поиска и честного not_found всегда верни очищенное название в query. "
         "Отвечай по-русски, кратко и по делу. Возвращай только JSON по выданной "
         "схеме."
+    )
+
+
+def build_planner_route_system_prompt() -> str:
+    """Return the compact Stage 1 routing contract, without execution authority."""
+
+    return (
+        build_assistant_system_prompt()
+        + " Определи только маршрут запроса. Выбери capability_id строго из "
+        "переданного списка или none. Сущность выбирай только по target_index "
+        "из переданного массива targets; -1 означает отсутствие цели. Не возвращай "
+        "stable ID, аргументы, текст уточнения, риск, права, подтверждение или данные "
+        "для выполнения. Эти решения принимает BarBot локально."
     )

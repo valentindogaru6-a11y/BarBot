@@ -7,64 +7,98 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.models.assistant import AssistantDomain
 from app.models.assistant_planner import AssistantDialogueAct, PlannerDecision
 
 
-class PlannerInferredAction(StrEnum):
-    UNSPECIFIED = "unspecified"
+class PlannerRouteDomain(StrEnum):
+    CATALOG = "catalog"
+    WAREHOUSE = "warehouse"
+    ATTENDANCE = "attendance"
+    REPORTS = "reports"
+    USERS = "users"
+    RECIPIENTS = "recipients"
+    REMINDERS = "reminders"
+    SCHEDULES = "schedules"
+    NAVIGATION = "navigation"
+    GENERAL = "general"
+
+
+class PlannerRouteActionCode(StrEnum):
     SEARCH = "search"
-    GET = "get"
-    MANAGE = "manage"
-    WRITEOFF = "writeoff"
-    TRANSFER = "transfer"
+    OPEN = "open"
     LIST = "list"
+    EXPLAIN = "explain"
+    CREATE = "create"
+    EDIT = "edit"
+    ADD = "add"
+    REMOVE = "remove"
+    REPLACE = "replace"
     GENERATE = "generate"
     SEND = "send"
-    CREATE_OR_UPDATE = "create_or_update"
-    DISABLE = "disable"
-    OPEN = "open"
+    START = "start"
     CLOSE = "close"
     CANCEL = "cancel"
     CONFIRM = "confirm"
+    CLARIFY = "clarify"
+    UNSUPPORTED = "unsupported"
 
 
-class PlannerNotesCode(StrEnum):
-    AMBIGUOUS = "ambiguous"
-    MISSING_ARGUMENT = "missing_argument"
-    CONTEXT_REFERENCE = "context_reference"
-    SAFE_FALLBACK = "safe_fallback"
+class PlannerRouteEnvelope(BaseModel):
+    """Compact Stage 1 output with no arguments, authority or stable IDs."""
 
-
-class PlannerArgumentItem(BaseModel):
-    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
-
-    name: str = Field(min_length=1, max_length=100)
-    value: str = Field(min_length=1, max_length=1_000)
-
-
-class _PlannerEnvelope(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     dialogue_act: AssistantDialogueAct
-    domain: AssistantDomain
-    capability_id: str | None = Field(max_length=100)
-    target_entity_id: str | None = Field(max_length=300)
-    confidence_scaled: int = Field(ge=0, le=10_000)
+    domain: PlannerRouteDomain
+    capability_id: str = Field(min_length=1, max_length=100)
+    target_index: int = Field(ge=-1, le=4)
+    action_code: PlannerRouteActionCode
     needs_clarification: bool
-    clarification_question: str | None = Field(max_length=500)
-    inferred_action: PlannerInferredAction
-    argument_items: tuple[PlannerArgumentItem, ...] = Field(max_length=20)
-    referenced_candidate_ids: tuple[str, ...] = Field(max_length=5)
-    provider_notes_code: PlannerNotesCode | None
+    confidence_scaled: int = Field(ge=0, le=10_000)
 
 
-class GroqPlannerEnvelope(_PlannerEnvelope):
-    """Flat strict envelope supported by Groq structured output."""
+class GroqPlannerRouteEnvelope(PlannerRouteEnvelope):
+    """Groq-specific Stage 1 wire boundary."""
 
 
-class GeminiPlannerEnvelope(_PlannerEnvelope):
-    """Gemini wire envelope; converted independently to canonical state."""
+class GeminiPlannerRouteEnvelope(PlannerRouteEnvelope):
+    """Gemini-specific Stage 1 wire boundary."""
+
+
+class CatalogIngredientOperation(StrEnum):
+    ADD = "add"
+    REMOVE = "remove"
+    REPLACE = "replace"
+
+
+class CatalogIngredientArguments(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    operation: CatalogIngredientOperation
+    ingredient_name: str = Field(max_length=200)
+    quantity_text: str = Field(max_length=50)
+    unit_text: str = Field(max_length=30)
+    replacement_name: str = Field(max_length=200)
+
+
+class WarehouseWriteoffArguments(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    product_text: str = Field(max_length=200)
+    quantity_text: str = Field(max_length=50)
+    unit_text: str = Field(max_length=30)
+    reason_text: str = Field(max_length=500)
+
+
+class WarehouseTransferArguments(WarehouseWriteoffArguments):
+    destination_text: str = Field(max_length=200)
+
+
+class AttendanceForceCloseArguments(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    target_index: int = Field(ge=-1, le=4)
+    reason_text: str = Field(max_length=500)
 
 
 class PlannerValidationStatus(StrEnum):

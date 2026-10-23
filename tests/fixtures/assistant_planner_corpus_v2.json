@@ -1,0 +1,21 @@
+{
+  "version": "bar-jarvis-two-stage-v2",
+  "methodology": "Offline contract corpus; no live accuracy claim",
+  "stage1_cases": [
+    {"text": "найди пф для облепихи", "dialogue_act": "new_command", "domain": "catalog", "capability_id": "catalog.search", "action_code": "search", "target_index": -1},
+    {"text": "измени состав", "dialogue_act": "follow_up", "domain": "catalog", "capability_id": "catalog.manage", "action_code": "edit", "target_index": 0},
+    {"text": "нет, я имел в виду изменить состав облепиховой пфки", "dialogue_act": "correction", "domain": "catalog", "capability_id": "catalog.manage", "action_code": "edit", "target_index": 0},
+    {"text": "добавь туда 100 мл апельсинового фреша", "dialogue_act": "clarification_answer", "domain": "catalog", "capability_id": "catalog.manage", "action_code": "add", "target_index": 0},
+    {"text": "спиши апельсин 200 грамм", "dialogue_act": "new_command", "domain": "warehouse", "capability_id": "warehouse.prepare_writeoff", "action_code": "create", "target_index": -1},
+    {"text": "расскажи, что такое списание", "dialogue_act": "new_command", "domain": "general", "capability_id": "none", "action_code": "explain", "target_index": -1},
+    {"text": "покажи открытые смены", "dialogue_act": "new_command", "domain": "attendance", "capability_id": "attendance.list_open", "action_code": "list", "target_index": -1},
+    {"text": "закрой смену Дмитро", "dialogue_act": "new_command", "domain": "attendance", "capability_id": "attendance.force_close", "action_code": "close", "target_index": 0},
+    {"text": "нет, просто покажи длительность", "dialogue_act": "correction", "domain": "attendance", "capability_id": "attendance.list_open", "action_code": "list", "target_index": 0}
+  ],
+  "stage2_cases": [
+    {"capability_id": "catalog.manage", "text": "добавь туда 100 мл апельсинового фреша", "expected": {"operation": "add", "ingredient_name": "апельсинового фреша", "quantity_text": "100", "unit_text": "мл", "replacement_name": ""}},
+    {"capability_id": "catalog.manage", "text": "замени лимон на лайм", "expected": {"operation": "replace", "ingredient_name": "лимон", "quantity_text": "", "unit_text": "", "replacement_name": "лайм"}},
+    {"capability_id": "warehouse.prepare_writeoff", "text": "спиши апельсин 200 грамм", "expected_quantity": "200"},
+    {"capability_id": "warehouse.prepare_transfer", "text": "перемести сахар 1 кг на кухню", "expected_quantity": "1", "expected_destination": "кухня"}
+  ]
+}

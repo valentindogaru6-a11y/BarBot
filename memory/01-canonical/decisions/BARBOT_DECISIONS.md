@@ -149,3 +149,13 @@ messages, bodies, prompts, identifiers, headers and secrets never cross the
 adapter boundary. A deterministic 400 request/schema failure is not provider
 transport health and cannot open the circuit. Shadow never falls back; AI-first
 fallback remains an explicit category policy and never executes side effects.
+
+## D19 — Route and argument extraction are separate trust boundaries
+
+Provider Stage 1 returns only a compact closed route and an index into a
+bounded display-only target list. BarBot maps that index to a stable ID and
+computes risk, permissions, flags, confirmation, revision, context updates and
+clarification text locally. Stage 2 uses deterministic parsing first and only
+small capability-specific closed schemas otherwise. A universal provider
+arguments dictionary and monolithic provider `PlannerDecision` are forbidden.
+Shadow measures Stage 1 only and has no extractor or fallback by default.

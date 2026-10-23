@@ -9,7 +9,8 @@ from app.config import Settings
 from app.models.assistant import AssistantIntentName
 from app.models.assistant_planner import PlannerCapability, PlannerContextSnapshot, PlannerDecision
 from app.services.assistant.orchestrator import AssistantOrchestrator
-from app.services.assistant.providers import GeminiIntentClient, HttpResponse, ProviderError, ProviderErrorKind
+from app.services.assistant.planner_providers import GeminiPlannerProvider
+from app.services.assistant.providers import HttpResponse
 
 
 def decision(**overrides):
@@ -130,11 +131,13 @@ class FakeTransport:
         self.calls.append((url,kwargs)); return self.response
 
 
-def test_provider_uses_strict_schema_and_rejects_invented_id():
-    transport = FakeTransport(decision(target_entity_id="invented").model_dump(mode="json"))
-    client = GeminiIntentClient(transport,api_key="secret",model="flash",timeout_seconds=5)
-    with pytest.raises(ProviderError) as caught: asyncio.run(client.plan("request",snapshot=snapshot(),capabilities=CAPS))
-    assert caught.value.kind is ProviderErrorKind.MALFORMED_RESPONSE
+def test_provider_uses_compact_strict_schema_and_rejects_out_of_range_target():
+    transport = FakeTransport({"dialogue_act":"new_command", "domain":"catalog",
+        "capability_id":"catalog.search", "target_index":4, "action_code":"search",
+        "needs_clarification":False, "confidence_scaled":9000})
+    client = GeminiPlannerProvider(transport,api_key="secret",model="flash")
+    result = asyncio.run(client.plan(snapshot(), "request", CAPS))
+    assert result.decision is None
     _, call = transport.calls[0]
     assert call["payload"]["generationConfig"]["responseJsonSchema"]["additionalProperties"] is False
     assert "secret" not in json.dumps(call["payload"])

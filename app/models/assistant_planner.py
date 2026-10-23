@@ -39,6 +39,18 @@ class PlannerCapability(BaseModel):
     allowed_arguments: tuple[str, ...] = Field(default=(), max_length=30)
 
 
+class PlannerTargetOption(BaseModel):
+    """Server-owned target mapping; stable_id is never serialized to a provider."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    stable_id: str = Field(min_length=1, max_length=300)
+    display_name: str = Field(min_length=1, max_length=200)
+    entity_kind: str = Field(min_length=1, max_length=40)
+    relation_label: str = Field(min_length=1, max_length=80)
+    domain: str = Field(min_length=1, max_length=40)
+
+
 class PlannerContextSnapshot(BaseModel):
     """Redacted state: never contains actor/chat identifiers or provider data."""
 
@@ -50,6 +62,7 @@ class PlannerContextSnapshot(BaseModel):
     last_successful_entity_id: str | None = Field(default=None, max_length=300)
     last_successful_entity_name: str | None = Field(default=None, max_length=500)
     candidate_entity_ids: tuple[str, ...] = Field(default=(), max_length=5)
+    target_options: tuple[PlannerTargetOption, ...] = Field(default=(), max_length=5)
     pending_clarification: str | None = Field(default=None, max_length=200)
     pending_action: str | None = Field(default=None, max_length=100)
     last_tool_operation: str | None = Field(default=None, max_length=100)

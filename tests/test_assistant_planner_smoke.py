@@ -12,7 +12,7 @@ from app.services.assistant import (
     PlannerSmokeCase,
     PlannerSmokeHarness,
 )
-from app.services.assistant import GeminiIntentClient, ProviderError
+from app.services.assistant import GeminiPlannerProvider, MultiProviderPlanner, ProviderError
 from app.services.assistant.providers import HttpResponse
 
 
@@ -127,13 +127,13 @@ def test_application_adapter_can_be_forced_to_zero_retries() -> None:
             return HttpResponse(429, b"")
 
     transport = Transport()
-    client = GeminiIntentClient(
+    provider = GeminiPlannerProvider(
         transport,
         api_key="test-secret",
         model="test-model",
-        timeout_seconds=1,
-        max_attempts=1,
+        total_timeout_seconds=1,
     )
+    client = MultiProviderPlanner(provider, mode="ai_first")
     harness = PlannerSmokeHarness(client, live_authorized=True)
     with pytest.raises(ProviderError):
         asyncio.run(

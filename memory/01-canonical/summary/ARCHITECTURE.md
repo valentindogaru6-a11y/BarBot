@@ -49,13 +49,14 @@ Importance: Critical
   executor or mutable service binding. Versioned telemetry contains only
   redacted decision comparisons, stable catalog/capability IDs and closed
   latency/error categories.
-- Planner orchestration depends on a provider-neutral contract. Groq and
-  Gemini own separate closed wire schemas/converters; both converge on the
-  canonical `PlannerDecision` before stable-ID, capability, risk and server
-  policy checks. Groq is the configured primary and Gemini the sequential
-  bounded fallback, but `local_first` remains the safe default. A process-local
-  circuit breaker contains repeated transient provider failures and owns no
-  warehouse or conversation state. This design is not production enablement.
+- Planner orchestration is two-stage. Providers return only a seven-field
+  closed route envelope with a server-mapped target index. Stable IDs,
+  arguments, risk, permissions, confirmation and revision never cross that
+  boundary. A local assembler derives authority and builds the canonical
+  `PlannerDecision`; Stage 2 prefers deterministic parsing and otherwise uses
+  only a closed capability-specific argument contract. Groq is primary and
+  Gemini the bounded sequential fallback; shadow invokes Stage 1 only and does
+  not fall back by default. This is not production enablement.
 - Bar Jarvis catalog requests follow one typed contract across `Local parser →
   AssistantIntent → Orchestrator → Catalog retrieval/tool → Persistent
   context → Renderer/callback`. The contract carries `domain`, action,

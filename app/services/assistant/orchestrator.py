@@ -173,9 +173,7 @@ class AssistantOrchestrator:
         self.general_chat_enabled = general_chat_enabled
         self.web_search_enabled = web_search_enabled
         self.planner_mode = planner_mode
-        self.planner_client = planner_client or (
-            intent_client if intent_client is not None and hasattr(intent_client, "plan") else None
-        )
+        self.planner_client = planner_client
         self.shadow_supervisor = shadow_supervisor or (
             ShadowPlannerSupervisor()
             if planner_mode == "shadow" and self.planner_client is not None

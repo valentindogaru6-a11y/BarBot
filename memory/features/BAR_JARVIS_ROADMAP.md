@@ -77,7 +77,9 @@ for individual cases, never an aggregate percentage.
 - **Scope:** versioned text corpora for catalog/context, warehouse commands and
   all 41 capabilities; typed intent/argument extraction; synonyms, colloquial
   forms, negative cases, ambiguity and recovery; update the language index from
-  measured evidence only.
+  measured evidence only. Route quality and capability-specific argument
+  extraction are scored separately; corpus v2 is an initial contract fixture,
+  not an owner-approved accuracy corpus.
 - **Dependencies:** stable capability inventory, typed local parser/intent
   contract, deterministic retrieval, persistent context, fake transports and
   owner-approved corpus governance.

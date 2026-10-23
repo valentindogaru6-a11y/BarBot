@@ -10,17 +10,32 @@ Importance: High
 
 ## AI-first planner foundation (development)
 
+The provider boundary is now explicitly two-stage. Stage 1 has seven required
+scalar fields and contains no nullable value, array, free object, stable ID,
+argument, risk, permission, confirmation or revision. Providers see bounded
+display labels and indices; the server resolves the index and locally builds
+the canonical `PlannerDecision`. Stage 2 prefers deterministic BarLexicon and
+warehouse Decimal parsing; remaining catalog ingredient, writeoff, transfer
+and attendance force-close schemas are closed and capability-specific. No
+extractor can execute a tool or mutation.
+
+Evaluation separates Stage 1 dialogue/domain/capability/target/action/
+clarification accuracy from Stage 2 argument, missing-field and unit/quantity
+validation. Corpus `bar-jarvis-two-stage-v2` contains nine route and four
+argument cases and makes no live accuracy claim. The compact route remains
+pending a separately authorized live smoke.
+
 The development planner boundary is provider-neutral. `GroqPlannerProvider`
 (`openai/gpt-oss-20b`) is the configured fast primary and
 `GeminiPlannerProvider` the sequential fallback, while `PlannerDecision`
-remains the only internal plan contract. Each adapter validates its own closed,
-flat wire envelope, converts allowlisted string arguments, validates stable IDs
-and then derives read/mutation risk from the runtime `PlannerCapability`.
+remains the only internal plan contract. Each adapter validates its own compact
+route envelope; local assembly resolves target indices and derives
+read/mutation risk from the runtime `PlannerCapability`.
 Provider data cannot assert confirmation, actor, role, permission, revision or
 context updates. Provider-generated payloads never reach an executor.
 
-The Groq strict schema is versioned, has no `$defs`, `$ref`, defaults or open
-objects, and makes nullable fields explicitly required. It receives no tools.
+The Groq strict route schema is versioned and has no nullable fields, arrays,
+`$defs`, `$ref`, defaults or open objects. It receives no tools.
 Fallback is sequential under one bounded deadline: shadow does not double-call
 by default; AI-first may fall back only for normalized transient/schema errors;
 auth/config failures do not retry. A process-local closed/open/half-open circuit

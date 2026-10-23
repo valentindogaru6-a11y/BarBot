@@ -99,6 +99,12 @@ Importance: High
   schema invariance offline, and distinguish invalid request schema from
   generated-output mismatch, unsupported parameters and refusals. Correction
   semantics remain pending until a separately authorized live re-smoke.
+- **A valid schema may still be too ambitious for constrained generation:**
+  the same 11-field monolithic correction contract returned
+  `json_validate_failed` on Groq 20B and 120B. A larger model did not change
+  the boundary. Keep routing compact, map targets by server-owned index and
+  validate arguments independently. The compact route still requires a
+  separately authorized live smoke; offline tests are not accuracy evidence.
 
 Revalidate runtime-dependent lessons before production action. Do not turn an
 owner observation into a measured infrastructure claim without evidence.

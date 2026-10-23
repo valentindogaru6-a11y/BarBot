@@ -15,11 +15,6 @@ import aiohttp
 from pydantic import ValidationError
 
 from app.models.assistant import AssistantIntent, AssistantIntentName
-from app.models.assistant_planner import (
-    PlannerCapability,
-    PlannerContextSnapshot,
-    PlannerDecision,
-)
 from app.services.assistant.system_prompt import (
     ASSISTANT_SYSTEM_PROMPT_VERSION,
     build_assistant_system_prompt,
@@ -431,87 +426,6 @@ class GeminiIntentClient(_RetryingProvider):
         self.transport = transport
         self._api_key = api_key
         self.model = model
-
-    async def plan(
-        self,
-        text: str,
-        *,
-        snapshot: PlannerContextSnapshot,
-        capabilities: Sequence[PlannerCapability],
-    ) -> PlannerDecision:
-        """Select one actor-filtered tool without receiving execution authority."""
-
-        allowed = tuple(capabilities[:50])
-        allowed_ids = {item.capability_id for item in allowed}
-        request_data = {
-            "request": text[:2_000],
-            "context": snapshot.model_dump(mode="json"),
-            "capabilities": [item.model_dump(mode="json") for item in allowed],
-        }
-        payload: Mapping[str, object] = {
-            "system_instruction": {"parts": [{"text": (
-                "You are the Bar Jarvis decision planner. Select only a supplied "
-                "capability and stable entity ID. Never claim confirmation or execution. "
-                "Corrections amend context and are not literal catalog searches."
-            )}]},
-            "contents": [{"role": "user", "parts": [{"text": json.dumps(
-                request_data, ensure_ascii=False, separators=(",", ":")
-            )}]}],
-            "generationConfig": {
-                "temperature": 0,
-                "responseMimeType": "application/json",
-                "responseJsonSchema": PlannerDecision.model_json_schema(),
-                "maxOutputTokens": 1024,
-            },
-        }
-        payload_size = len(json.dumps(payload, ensure_ascii=False).encode())
-        if payload_size > MAX_PLANNER_REQUEST_BYTES:
-            raise ProviderError("gemini", ProviderErrorKind.UNAVAILABLE)
-        logger.info(
-            "Assistant provider request provider_stage=planner "
-            "request_size_bucket=%s capability_count=%d candidate_count=%d",
-            _request_size_bucket(payload_size), len(allowed),
-            len(snapshot.candidate_entity_ids),
-        )
-        url = f"{GEMINI_API_ROOT}/{self.model}:generateContent"
-
-        async def request() -> HttpResponse:
-            return await self.transport.post_json(
-                url,
-                headers={"x-goog-api-key": self._api_key},
-                payload=payload,
-                timeout_seconds=self.timeout_seconds,
-                max_response_bytes=MAX_PROVIDER_RESPONSE_BYTES,
-            )
-
-        response = await self._request_with_retry(request)
-        try:
-            outer = json.loads(response.body)
-            raw = outer["candidates"][0]["content"]["parts"][0]["text"]
-            decision = PlannerDecision.model_validate_json(raw)
-            if decision.capability_id not in allowed_ids and decision.capability_id is not None:
-                raise ValueError("planner selected an unavailable capability")
-            known_ids = {
-                value for value in (
-                    snapshot.last_successful_entity_id,
-                    *snapshot.candidate_entity_ids,
-                ) if value
-            }
-            if decision.target_entity_id and decision.target_entity_id not in known_ids:
-                raise ValueError("planner invented an entity ID")
-            if decision.capability_id is not None:
-                contract = next(
-                    item for item in allowed
-                    if item.capability_id == decision.capability_id
-                )
-                if (
-                    decision.read_only != contract.read_only
-                    or decision.mutation != contract.mutation
-                ):
-                    raise ValueError("planner changed capability risk")
-            return decision
-        except (json.JSONDecodeError, KeyError, IndexError, TypeError, ValueError, ValidationError) as exc:
-            raise ProviderError("gemini", ProviderErrorKind.MALFORMED_RESPONSE) from exc
 
     async def classify(
         self,
