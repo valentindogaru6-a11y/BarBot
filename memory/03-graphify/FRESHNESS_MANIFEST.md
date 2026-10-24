@@ -33,6 +33,11 @@ being used for an operational decision.
 
 ## Current development checkpoint
 
+- 2026-10-24: Narrow v15 CHECK-validator hardening starts at `cef9a79...`.
+  Lexical extraction replaces spoofable SQL regex matching; schema DDL, target
+  v15, catalog/seed and migrations are unchanged. Evidence is temporary SQLite
+  and offline tests only; production/live facts remain pending revalidation.
+
 - 2026-10-24: Conversation Brain security fixes are based on `2d180750...`.
   The relevant contract is `features/BAR_JARVIS_CONVERSATION.md`: untrusted
   typed memory/tool data, canonical planner dispatch, chat-owned expiring

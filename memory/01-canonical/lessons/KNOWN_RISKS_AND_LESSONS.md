@@ -27,6 +27,13 @@ Importance: High
 - **Schema-validator false positives block release:** column names and a few
   SQL substrings do not prove security constraints. Compare PRAGMA metadata,
   indexes/FK actions and parsed CHECKs; test real weakened schemas individually.
+- **Quoted-identifier CHECK spoofing:** regex extraction accepted an absent
+  revision constraint when a FOREIGN KEY was named `"CHECK(revision>0)"`.
+  Tokenize SQLite DDL before extracting balanced real CHECK expressions; never
+  interpret strings, quoted identifiers or comments as constraints. Preserve
+  literal values and token boundaries during normalization. Parameterized
+  regressions cover revision, status/kind, token/content length and time checks;
+  the malformed reproduction accepts revision zero but must fail validation.
 - **Evaluation success must include semantic contracts:** a safety-only PASS
   hid route accuracy 0.0. Freeze completeness/coverage/metric thresholds, reject
   missing/non-finite values, expose failed metric names and test CLI exit codes.

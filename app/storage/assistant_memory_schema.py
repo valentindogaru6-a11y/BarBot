@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 import sqlite3
 
 
@@ -78,32 +77,98 @@ def assistant_memory_schema_is_absent(connection: sqlite3.Connection) -> bool:
     ).fetchone() is None
 
 
-def _sql(value: str) -> str:
-    value = re.sub(r"/\*.*?\*/|--[^\n]*", "", value, flags=re.S)
-    parts = re.split(r"('(?:''|[^'])*')", value)
-    return ''.join(part if index % 2 else re.sub(r'\s+|["`\[\]]', '', part).casefold()
-                   for index, part in enumerate(parts))
+SqlToken = tuple[str, str]
+_ASCII_LOWER = str.maketrans('ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz')
 
 
-def _checks(sql: str) -> tuple[str, ...]:
-    sql = re.sub(r"/\*.*?\*/|--[^\n]*", "", sql, flags=re.S)
-    result = []
-    for match in re.finditer(r"\bcheck\s*\(", sql, re.I):
-        start = match.end()
-        depth, quoted, index = 1, False, start
-        while index < len(sql) and depth:
-            char = sql[index]
-            if char == "'":
-                if quoted and index + 1 < len(sql) and sql[index + 1] == "'":
-                    index += 2
-                    continue
-                quoted = not quoted
-            elif not quoted:
-                depth += (char == '(') - (char == ')')
+def _tokens(sql: str) -> tuple[SqlToken, ...]:
+    """Lex DDL without interpreting quoted text or comments as SQL tokens."""
+    result: list[SqlToken] = []
+    index = 0
+    while index < len(sql):
+        char = sql[index]
+        if char.isspace():
             index += 1
-        if depth:
-            raise AssistantMemorySchemaError("Invalid memory CHECK expression")
-        result.append(_sql(sql[start:index - 1]))
+        elif sql.startswith('--', index):
+            end = sql.find('\n', index + 2)
+            index = len(sql) if end < 0 else end + 1
+        elif sql.startswith('/*', index):
+            end = sql.find('*/', index + 2)
+            if end < 0:
+                raise AssistantMemorySchemaError('Unterminated DDL comment')
+            index = end + 2
+        elif char in "'\"`[":
+            closing = ']' if char == '[' else char
+            kind = 'literal' if char == "'" else 'identifier'
+            value: list[str] = []
+            index += 1
+            while index < len(sql):
+                if sql[index] == closing:
+                    # SQLite escapes quote/backtick delimiters by doubling;
+                    # bracket identifiers end at the first closing bracket.
+                    if closing != ']' and sql[index:index + 2] == closing * 2:
+                        value.append(closing)
+                        index += 2
+                        continue
+                    index += 1
+                    break
+                value.append(sql[index])
+                index += 1
+            else:
+                raise AssistantMemorySchemaError('Unterminated quoted DDL token')
+            result.append((kind, ''.join(value)))
+        elif char.isalnum() or char in '_$' or ord(char) >= 128:
+            start = index
+            while index < len(sql) and (
+                sql[index].isalnum() or sql[index] in '_$' or ord(sql[index]) >= 128
+            ):
+                index += 1
+            result.append(('word', sql[start:index].translate(_ASCII_LOWER)))
+        else:
+            result.append(('symbol', char))
+            index += 1
+    return tuple(result)
+
+
+def _normalized(tokens: tuple[SqlToken, ...]) -> tuple[SqlToken, ...]:
+    # Identifier quoting/case is immaterial, but literals remain distinct and
+    # byte-exact. Token boundaries are retained ("a b" never becomes "ab").
+    # SQLite folds ASCII identifiers only; Unicode casefold could equate a
+    # distinct quoted name (and SQLite's fallback string literal) with a column.
+    return tuple(('word', value.translate(_ASCII_LOWER)) if kind == 'identifier' else (kind, value)
+                 for kind, value in tokens)
+
+
+def _expression(tokens: tuple[SqlToken, ...]) -> tuple[SqlToken, ...]:
+    """Remove only redundant parentheses enclosing the entire expression."""
+    while tokens and tokens[0] == ('symbol', '('):
+        depth = 0
+        for index, token in enumerate(tokens):
+            depth += (token == ('symbol', '(')) - (token == ('symbol', ')'))
+            if depth == 0:
+                break
+        if depth != 0 or index != len(tokens) - 1:
+            break
+        tokens = tokens[1:-1]
+    return _normalized(tokens)
+
+
+def _checks(sql: str) -> tuple[tuple[SqlToken, ...], ...]:
+    tokens = _tokens(sql)
+    result: list[tuple[SqlToken, ...]] = []
+    index = 0
+    while index < len(tokens) - 1:
+        if tokens[index:index + 2] != (('word', 'check'), ('symbol', '(')):
+            index += 1
+            continue
+        start = index + 2
+        depth, index = 1, start
+        while index < len(tokens) and depth:
+            depth += (tokens[index] == ('symbol', '(')) - (tokens[index] == ('symbol', ')'))
+            index += 1
+        if depth or index == start + 1:
+            raise AssistantMemorySchemaError('Invalid memory CHECK expression')
+        result.append(_expression(tokens[start:index - 1]))
     return tuple(sorted(result))
 
 
@@ -117,9 +182,11 @@ def _table_signature(connection: sqlite3.Connection, name: str) -> tuple:
         layout = tuple(tuple(r[2:]) for r in connection.execute(f'PRAGMA index_xinfo("{index_name}")'))
         sql_row = connection.execute("SELECT sql FROM sqlite_master WHERE name=?", (index_name,)).fetchone()
         identity = index_name if row[3] == 'c' else str(row[3])
-        predicate = ''
+        predicate = ()
         if row[4] and sql_row and sql_row[0]:
-            predicate = _sql(re.split(r'\bWHERE\b', sql_row[0], flags=re.I)[-1])
+            tokens = _tokens(sql_row[0])
+            where = tokens.index(('word', 'where'))
+            predicate = _expression(tokens[where + 1:])
         indexes.append((identity, int(row[2]), int(row[4]), columns, layout, predicate))
     row = connection.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (name,)).fetchone()
     return info, fks, tuple(sorted(indexes)), _checks(str(row[0])) if row else ()
@@ -147,7 +214,16 @@ def validate_assistant_memory_schema(connection: sqlite3.Connection) -> None:
     try:
         create_assistant_memory_schema(reference)
         for name in ('assistant_long_term_memories', 'assistant_memory_delete_previews'):
-            if _table_signature(connection, name) != _table_signature(reference, name):
+            actual = _table_signature(connection, name)
+            expected = _table_signature(reference, name)
+            remaining = list(actual[-1])
+            for number, invariant in enumerate(expected[-1], 1):
+                if invariant not in remaining:
+                    raise AssistantMemorySchemaError(
+                        f'Missing CHECK invariant #{number} in {name}'
+                    )
+                remaining.remove(invariant)
+            if actual != expected:
                 raise AssistantMemorySchemaError("Assistant memory schema invariants do not match v15")
     finally:
         reference.close()

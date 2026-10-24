@@ -51,6 +51,18 @@ defaults, PK/FK columns and actions, index columns/collation/uniqueness) and all
 parsed normalized CHECKs. It rejects extra memory tables/triggers and missing
 token/content/ownership/time/state invariants. No v1–v14 migration is rewritten.
 
+CHECK extraction uses a deterministic SQLite DDL lexer, not substring matching.
+Only unquoted CHECK keywords followed by an opening parenthesis count; literals,
+quoted identifiers (including doubled delimiters), line/block comments and nested
+parentheses are handled separately. Token-aware normalization preserves literal
+values and token boundaries while ignoring ASCII identifier case/quoting, whitespace
+and redundant outer expression parentheses. Quoted constraint names cannot supply
+missing revision, status/kind, token/content length or timestamp invariants.
+Canonical whole-DDL comparison is deliberately not used: harmless formatting and
+constraint naming may vary. PRAGMA metadata plus real normalized expressions
+remain authoritative. Missing-invariant diagnostics use only a server-owned
+table name and invariant ordinal. Validation stays read-only with no row probes.
+
 References resolve only to server-owned stable IDs. Pronouns do not require
 grammatical gender; first/second/last use bounded candidates; “туда же” requires
 a prior confirmed destination. Ambiguity produces one clarification, never a
