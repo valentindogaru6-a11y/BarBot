@@ -15,6 +15,20 @@ from app.services.assistant import (
 from app.services.auth_service import AuthService
 
 
+def test_duplicate_update_does_not_repeat_tool_but_new_update_is_allowed():
+    async def scenario():
+        coordinator=AssistantRequestCoordinator()
+        async with coordinator.claim(10,update_key=(10,1)) as acquired:
+            assert acquired
+        async with coordinator.claim(10,update_key=(10,1)) as acquired:
+            assert not acquired
+        async with coordinator.claim(10,update_key=(10,2)) as acquired:
+            assert acquired
+        async with coordinator.claim(20,update_key=(20,1)) as acquired:
+            assert acquired
+    asyncio.run(scenario())
+
+
 def _text_message(user_id: int):
     return SimpleNamespace(
         text="свободный AI запрос",

@@ -20,11 +20,11 @@ from app.services.assistant.evaluation import (
 from tests.fixtures.assistant_conversation_corpus_v1 import CORPUS, CORPUS_VERSION
 
 
-def main() -> int:
+def main(argv: list[str] | None = None, *, adapter=None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path)
     parser.add_argument("--allow-live", action="store_true")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     domains = {item.id: item.category for item in CAPABILITIES}
     turns = tuple(
         EvaluationTurn(
@@ -43,7 +43,7 @@ def main() -> int:
     )
     report = ConversationEvaluationRunner(
         corpus_version=CORPUS_VERSION, allow_live=args.allow_live
-    ).run(turns, ScriptedEvaluationAdapter(), output_path=args.output)
+    ).run(turns, adapter or ScriptedEvaluationAdapter(), output_path=args.output)
     print(
         f"mode={report['provider_mode']} dialogues={report['dialogue_count']} "
         f"turns={report['turn_count']} contract_pass={report['contract_pass']}"
@@ -52,6 +52,7 @@ def main() -> int:
         f"{name}:{value:.3f}"
         for name, value in sorted(report["metrics"].items())
     ))
+    print("failed_metrics=" + ",".join(report["failed_metrics"]))
     return 0 if report["contract_pass"] else 1
 
 

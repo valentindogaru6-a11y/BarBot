@@ -207,6 +207,8 @@ def _safe_route_request_data(
             "recent_turns": [
                 item.model_dump(mode="json") for item in snapshot.recent_turns
             ],
+            "owner_memories": [item.model_dump(mode="json") for item in snapshot.owner_memories],
+            "tool_results": [item.model_dump(mode="json") for item in snapshot.tool_results],
             "targets": [
                 {
                     "index": index,
@@ -640,6 +642,10 @@ class GroqPlannerProvider(_PlannerProviderBase):
 
     async def plan(self, snapshot: PlannerContextSnapshot, message: str, allowed_capabilities: Sequence[PlannerCapability], *, extract_arguments: bool = True) -> ProviderPlanResult:
         started = monotonic()
+        try:
+            snapshot = PlannerContextSnapshot.model_validate(snapshot.model_dump())
+        except (ValueError, ValidationError):
+            return self._result(started, error=ProviderPlanError.CONFIG, status=PlannerValidationStatus.POLICY_REJECTED)
         capabilities = tuple(allowed_capabilities[:50])
         targets = planner_target_options(snapshot)
         schema = groq_planner_route_schema(capabilities, target_count=len(targets))
@@ -743,6 +749,10 @@ class GeminiPlannerProvider(_PlannerProviderBase):
 
     async def plan(self, snapshot: PlannerContextSnapshot, message: str, allowed_capabilities: Sequence[PlannerCapability], *, extract_arguments: bool = True) -> ProviderPlanResult:
         started = monotonic()
+        try:
+            snapshot = PlannerContextSnapshot.model_validate(snapshot.model_dump())
+        except (ValueError, ValidationError):
+            return self._result(started, error=ProviderPlanError.CONFIG, status=PlannerValidationStatus.POLICY_REJECTED)
         capabilities = tuple(allowed_capabilities[:50])
         targets = planner_target_options(snapshot)
         schema = gemini_planner_route_schema(capabilities, target_count=len(targets))

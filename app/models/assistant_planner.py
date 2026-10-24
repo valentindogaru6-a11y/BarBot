@@ -53,6 +53,23 @@ class PlannerTargetOption(BaseModel):
     domain: str = Field(min_length=1, max_length=40)
 
 
+class PlannerMemoryData(BaseModel):
+    """Quoted user-confirmed facts; never part of the authority surface."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    trust: Literal["untrusted_user_confirmed_data"] = "untrusted_user_confirmed_data"
+    scope: Literal["user", "bar"] = "user"
+    kind: Literal["terminology", "product_alias", "user_preference", "workflow_preference", "standing_instruction", "business_fact"] = "business_fact"
+    content: str = Field(min_length=1, max_length=500)
+
+
+class PlannerToolData(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    trust: Literal["untrusted_tool_data"] = "untrusted_tool_data"
+    capability_id: str = Field(min_length=1, max_length=100)
+    summary: str = Field(max_length=500)
+
+
 class PlannerContextSnapshot(BaseModel):
     """Redacted state: never contains actor/chat identifiers or provider data."""
 
@@ -74,7 +91,8 @@ class PlannerContextSnapshot(BaseModel):
     last_tool_operation: str | None = Field(default=None, max_length=100)
     last_tool_summary: str | None = Field(default=None, max_length=500)
     recent_turns: tuple[PlannerTurn, ...] = Field(default=(), max_length=12)
-    owner_memories: tuple[str, ...] = Field(default=(), max_length=8)
+    owner_memories: tuple[PlannerMemoryData, ...] = Field(default=(), max_length=8)
+    tool_results: tuple[PlannerToolData, ...] = Field(default=(), max_length=2)
     revision: int = Field(default=0, ge=0)
     expires_at: float | None = Field(default=None, ge=0)
 

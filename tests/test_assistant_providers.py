@@ -241,7 +241,7 @@ def test_provider_rejects_action_outside_dynamic_schema() -> None:
 
 def test_system_prompt_is_short_versioned_and_contains_no_runtime_data() -> None:
     prompt = build_assistant_system_prompt()
-    assert ASSISTANT_SYSTEM_PROMPT_VERSION == "barbot-assistant-v5"
+    assert ASSISTANT_SYSTEM_PROMPT_VERSION == "barbot-assistant-v6"
     assert 50 < len(prompt.split()) < 300
     assert "Truffle" in prompt and "по-русски" in prompt
     assert "Telegram ID" not in prompt

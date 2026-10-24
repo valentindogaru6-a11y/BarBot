@@ -33,6 +33,14 @@ being used for an operational decision.
 
 ## Current development checkpoint
 
+- 2026-10-24: Conversation Brain security fixes are based on `2d180750...`.
+  The relevant contract is `features/BAR_JARVIS_CONVERSATION.md`: untrusted
+  typed memory/tool data, canonical planner dispatch, chat-owned expiring
+  callbacks, full v15 invariants and fail-closed scripted evaluation.
+  Development target is v15; prior v14 checkpoints below are historical.
+  Production/runtime facts and live/shadow accuracy still require separate
+  authorized verification. No rollout is implied by offline security tests.
+
 - Schema target remains v14. The planner foundation changes do
   not change catalog, warehouse seed or migrations.
 - Planner modes and the 17-case offline corpus are development evidence only;

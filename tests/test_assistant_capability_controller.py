@@ -103,13 +103,13 @@ def test_ai_first_uses_guarded_tool_loop_for_read_capability(tmp_path: Path) -> 
         message_id=7, answer=AsyncMock(),
     )
     asyncio.run(assistant._run_assistant(
-        message, SimpleNamespace(), text="что ты умеешь делать?",
+        message, SimpleNamespace(), text="дай краткую карту своих возможностей пожалуйста",
         catalog_path=catalog, auth_service=controller.access,
         orchestrator=orchestrator, warehouse_service=None,
         assistant_capability_controller=controller,
         assistant_access_policy=controller.access_policy,
     ))
-    assert planner.calls == 1
+    assert planner.calls == 2
     assert "Доступные вам функции" in message.answer.await_args.args[0]
 
 

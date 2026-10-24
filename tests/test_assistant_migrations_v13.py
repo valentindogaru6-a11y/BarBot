@@ -16,6 +16,7 @@ def _prepare_v12(path: Path) -> None:
     with sqlite3.connect(path) as connection:
         connection.execute("DROP INDEX ux_assistant_memory_active_content")
         connection.execute("DROP INDEX ix_assistant_memory_owner_active")
+        connection.execute("DROP TABLE assistant_memory_delete_previews")
         connection.execute("DROP TABLE assistant_long_term_memories")
         connection.execute("DROP TABLE assistant_action_proposals")
         connection.execute("DROP TABLE assistant_conversation_turns")

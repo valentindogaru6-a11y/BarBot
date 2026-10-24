@@ -5,6 +5,13 @@ Metadata: scope `working`; trust `working`; lifecycle `ephemeral`; last cleared
 
 ## Status
 
+Security-fix development on 2026-10-24 starts at
+`2d18075064966d0d54d51ddb73dac6486eb4d62c`. The five review findings concern
+memory trust/chat ownership, typed iterative planner dispatch, strict unreleased
+v15 validation and evaluation failure semantics. Evidence is offline only;
+production, provider health and live/shadow accuracy remain pending. Catalog,
+seed and legacy migrations are outside this change.
+
 Checkpoint 2026-10-22: AI-first planner foundation started from
 `a5482d033c9a480c544547459a71b39caf69b74f`. Safe default remains
 `local_first`; shadow/AI-first live coverage is pending. Offline corpus v1 has

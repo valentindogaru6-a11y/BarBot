@@ -17,6 +17,22 @@ Importance: High
 - **Long-term memory is a mutation:** only explicit owner instruction or a
   confirmed preview may write; ambiguous deletion/update must stop for exact
   selection.
+- **Confirmed memory is still untrusted data:** normalize and reject known
+  multilingual authority/secret/SQL/shell instructions before preview; carry
+  typed quoted records separately from runtime policy. No prompt or remembered
+  preference can create a capability, permission, target or confirmation.
+- **Planner dispatch must consume the canonical plan:** re-running regex on
+  raw text after planning loses the selected capability/arguments. Bound the real
+  iterative path, feed only typed inert results back, and stop at any preview.
+- **Schema-validator false positives block release:** column names and a few
+  SQL substrings do not prove security constraints. Compare PRAGMA metadata,
+  indexes/FK actions and parsed CHECKs; test real weakened schemas individually.
+- **Evaluation success must include semantic contracts:** a safety-only PASS
+  hid route accuracy 0.0. Freeze completeness/coverage/metric thresholds, reject
+  missing/non-finite values, expose failed metric names and test CLI exit codes.
+- **Memory callbacks need chat ownership:** actor/token alone is insufficient.
+  Save and separate delete previews bind owner plus source private chat,
+  revision and expiry, with access rechecked within the write transaction.
 
 - **Stale Telegram callbacks:** expired callbacks must stop safely and never
   retry business logic. Global error handling must not create a second action.

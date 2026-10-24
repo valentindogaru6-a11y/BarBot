@@ -3,7 +3,7 @@
 Scope: bounded multi-turn context, confirmed memory and guarded tool loop
 Trust: implemented and tested offline; live provider/shadow evidence pending
 Lifecycle: Development
-Last verified: 2026-10-23
+Last verified: 2026-10-24
 
 `message → ContextSnapshot → Stage 1 route → local validation → optional Stage
 2 extraction → server capability → result/preview → atomic context update`.
@@ -29,6 +29,28 @@ expiring preview; only its owner can confirm it after access recheck. Recall is
 read-only. Deletion has a separate preview/confirmation and ambiguous deletion
 requires exact selection. Duplicate confirmation is idempotent.
 
+Unreleased v15 binds every memory and deletion preview to both owner and source
+private chat. Save/cancel/delete callbacks contain only opaque tokens/revisions;
+expiry and ownership are checked transactionally, with a fresh runtime access
+check inside confirmation/deletion transactions. Deletion uses its own expiring
+preview token. Confirmation replay is idempotent within the original preview
+deadline; a replay cannot activate a cancelled record or cancel an active one.
+
+Memory is untrusted user-confirmed data. NFKC/casefold/Unicode-separator and
+punctuation normalization precedes multilingual authority/secret/instruction
+checks. SQL, shell, policy/role/confirmation changes and provider-supplied tool
+instructions are rejected without echoing content in diagnostics. Only an
+explicit user remember command starts the runtime preview path. Provider
+snapshots carry closed `PlannerMemoryData` records with a fixed untrusted-data
+marker; runtime policy/capabilities/targets are separate, server-owned fields.
+These input checks are defense in depth: server permissions and confirmation
+remain authoritative even when external or catalog data contains instructions.
+
+The v15 validator compares canonical PRAGMA metadata (types, nullability,
+defaults, PK/FK columns and actions, index columns/collation/uniqueness) and all
+parsed normalized CHECKs. It rejects extra memory tables/triggers and missing
+token/content/ownership/time/state invariants. No v1–v14 migration is rewritten.
+
 References resolve only to server-owned stable IDs. Pronouns do not require
 grammatical gender; first/second/last use bounded candidates; “туда же” requires
 a prior confirmed destination. Ambiguity produces one clarification, never a
@@ -39,10 +61,25 @@ immediately. A mutation produces an opaque preview/proposal then stops; existing
 confirmation, permission/revision recheck, idempotent execution and audit remain
 authoritative.
 
+`ai_first` dispatches the validated capability/domain/locally resolved target
+and capability-specific input model directly through the controller, without
+reclassifying raw text. The real loop makes at most two planner/tool calls;
+read results return as bounded typed untrusted data. A read result cannot
+escalate to a mutation, repeat a tool, or alter the runtime allowlist. A proposal
+or warehouse intake preview ends the loop immediately. Later provider failure
+retains successful local results/context. `local_first` and detached shadow
+remain separate. Short process-local update deduplication complements persistent
+proposal/intake idempotency; it is not a cross-process delivery guarantee.
+
 Corpus `bar-jarvis-conversation-v1` contains 60 dialogues and 180 user turns,
 including every 41 registered capabilities. The frozen runner labels its network-
 free deterministic result `offline_scripted`, reports expected/actual contracts
 and safety side-effect counts, and writes bounded JSON only to an explicit path.
 This validates the runner and application contracts, not provider accuracy.
+The frozen scripted contract requires exactly 60 dialogues/180 unique turns,
+all 41 capabilities, each of seven semantic/safety metrics at 1.0 and zero false
+mutations, unauthorized executions or side effects. Missing/non-finite/out-of-
+range metrics fail closed. JSON reports list failed metrics and the CLI exits
+with code 1 on contract failure; success exits 0.
 Live/shadow route, entity and reference quality remains `pending — requires
 controlled shadow evaluation`. Voice, web, images and video also remain pending.

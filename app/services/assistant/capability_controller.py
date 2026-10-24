@@ -7,8 +7,16 @@ import sqlite3
 import unicodedata
 from dataclasses import dataclass
 from typing import Any
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.assistant.orchestrator import AssistantToolAction
 
 from app.models.assistant_capabilities import ActionProposal
+from app.models.assistant_capabilities import CapabilityRisk
+from app.models.assistant import AssistantDomain
+from app.models.assistant_planner import PlannerContextSnapshot, PlannerDecision
+from app.models.catalog import Catalog
 from app.models.user import Role
 from app.services.access_service import AccessDeniedError, AccessService
 from app.services.assistant.capabilities import CapabilityBinding, CapabilityRegistry
@@ -39,6 +47,7 @@ class CapabilityDispatch:
     proposal: ActionProposal | None = None
     ui_action: str | None = None
     data: dict[str, Any] | None = None
+    tool_action: AssistantToolAction | None = None
 
 
 _CAPABILITY_FILLER_WORDS = frozenset(
@@ -588,6 +597,189 @@ class AssistantCapabilityController:
                 f"{overview['requirements_resolved']} из {overview['requirements_total']} выполнено.",
             )
         return None
+
+    def dispatch_plan(
+        self, decision: PlannerDecision, *, snapshot: PlannerContextSnapshot,
+        catalog: Catalog, actor_user_id: int, source_chat_id: int,
+        source_message_id: int, chat_type: str, explicit_action: str | None = None,
+    ) -> CapabilityDispatch:
+        """Dispatch validated typed input. Raw language never selects this route."""
+        from app.services.assistant.orchestrator import AssistantOrchestrator, AssistantToolRegistry, AssistantToolAction
+        from app.services.assistant.tools import AssistantReadOnlyTools
+        from app.services.assistant.retrieval import AssistantCatalogRetriever
+
+        self.access_policy.require_assistant_access(actor_user_id, chat_type=chat_type)
+        identifier = decision.capability_id
+        if identifier is None or identifier not in snapshot.available_capability_ids:
+            raise AccessDeniedError("Unavailable planned capability")
+        self._require(actor_user_id, identifier)
+        definition = self.registry.require(identifier)
+        if not all(self.flags.get(flag, True) for flag in definition.feature_flags):
+            raise AccessDeniedError('Planned feature is disabled')
+        if identifier not in self.bindings:
+            raise AccessDeniedError("Unbound planned capability")
+        domain = {
+            'catalog': 'catalog', 'warehouse': 'warehouse', 'attendance': 'attendance',
+            'employees': 'employees', 'reports': 'reports', 'recipients': 'administration',
+            'reminders': 'administration', 'schedules': 'administration', 'navigation': 'general', 'help': 'general',
+        }.get(definition.category, 'administration')
+        if decision.domain.value != domain:
+            raise ValueError("Planned domain mismatch")
+        if decision.read_only != (definition.risk_level is CapabilityRisk.READ) or decision.mutation == decision.read_only:
+            raise AccessDeniedError("Planned risk mismatch")
+        args = dict(decision.arguments)
+        if {'expected_revision', 'values'} & set(args):
+            raise AccessDeniedError('Planner cannot choose revisions or mutation values')
+        if identifier == 'capabilities.list':
+            args.setdefault('query', 'возможности')
+        target = decision.target_entity_id
+        allowed_targets = {option.stable_id for option in snapshot.target_options}
+        if not snapshot.target_options:
+            allowed_targets.update(snapshot.candidate_entity_ids)
+            if snapshot.last_successful_entity_id:
+                allowed_targets.add(snapshot.last_successful_entity_id)
+        if target is not None and target not in allowed_targets:
+            raise AccessDeniedError("Unknown planned target")
+        if target is not None and domain == 'catalog' and AssistantCatalogRetriever(catalog).by_key(target) is None:
+            raise AccessDeniedError("Catalog target is no longer available")
+        if args.get('entity_ref') is not None and args['entity_ref'] != target:
+            raise AccessDeniedError('Planned entity mismatch')
+        # These IDs are resolved by the server, never trusted as loose arguments.
+        if identifier == 'catalog.get':
+            if target is None:
+                raise ValueError("Catalog target is required")
+            if args.get('entity_ref', target) != target:
+                raise AccessDeniedError("Planned target mismatch")
+            args['entity_ref'] = target
+        if args.get('target_ref') is not None and args['target_ref'] != target:
+            raise AccessDeniedError("Planned target mismatch")
+        payload = definition.input_model.model_validate(args)
+        args = payload.model_dump(exclude_none=True)
+
+        if identifier in {'catalog.search', 'catalog.get'}:
+            tools = AssistantToolRegistry(catalog)
+            if identifier == 'catalog.get':
+                selected = tools.retriever.by_key(target)
+                assert selected is not None
+                option = next((option for option in snapshot.target_options if option.stable_id == target), None)
+                if option is not None and option.relation_label == 'candidate':
+                    candidates = tuple(result for option in snapshot.target_options
+                        if option.domain == 'catalog'
+                        and (result := tools.retriever.by_key(option.stable_id)) is not None)
+                    return CapabilityDispatch(identifier, 'Выберите точную карточку.', tool_action=AssistantToolAction(
+                        kind='find_tech_card', message='Выберите точную карточку.',
+                        search_results=candidates, candidate_ids=tuple(tools.retriever.key_for(result) for result in candidates),
+                        catalog_exact=False, domain=AssistantDomain.CATALOG,
+                    ))
+                from app.models.assistant import AssistantIntent
+                action = tools.execute(AssistantIntent(
+                    intent='find_tech_card', domain=AssistantDomain.CATALOG,
+                    query=selected.item.name[:200], selected_entity_id=target,
+                ))
+            else:
+                from app.models.assistant import AssistantIntent
+                action = tools.execute(AssistantIntent(intent='find_tech_card', domain=AssistantDomain.CATALOG, query=args['query'][:200]))
+            summary = action.message or 'Техкарта найдена.'
+            if action.catalog_exact and len(action.search_results) == 1:
+                item = action.search_results[0].item
+                summary = (f'Техкарта: {item.name}. ' + (item.description or '') + ' ' +
+                    ', '.join(f'{ingredient.name} {ingredient.amount} {ingredient.unit}' for ingredient in item.ingredients))[:500]
+            return CapabilityDispatch(identifier, summary, tool_action=action)
+
+        if identifier in {'warehouse.prepare_writeoff', 'warehouse.prepare_transfer'}:
+            expected = 'writeoff' if identifier.endswith('writeoff') else 'transfer'
+            if explicit_action != expected:
+                raise AccessDeniedError("Explicit warehouse action is required")
+            # Typed Decimal/unit/destination resolution continues in the existing
+            # intake service/FSM. This adapter never commits an operation.
+            intent = AssistantOrchestrator.planner_decision_to_intent(
+                decision.model_copy(update={'arguments': args})
+            ).model_copy(update={'confidence': decision.confidence})
+            action = AssistantToolRegistry(catalog).execute(intent)
+            return CapabilityDispatch(identifier, action.message or 'Проверьте складской черновик.', tool_action=action)
+
+        if identifier == 'capabilities.list':
+            return self._capabilities(actor_user_id, '')
+        if identifier == 'navigation.main':
+            return CapabilityDispatch(identifier, 'Главное меню', ui_action='main_menu')
+
+        ui_routes = {
+            'catalog.manage': 'catalog_manage', 'users.change_role': 'users_manage',
+            'attendance_reports.generate': 'attendance_xlsx', 'reports.generate': 'report_generate',
+            'reports.send': 'reports', 'recipients.create_or_update': 'recipients',
+            'recipients.disable': 'recipients', 'schedules.create_or_update': 'schedules',
+            'schedules.disable': 'schedules', 'warehouse.start_required_flow': 'required_writeoffs',
+            'warehouse.update_operation': 'warehouse_operations', 'warehouse.delete_operation': 'warehouse_operations',
+            'warehouse.close_shift': 'warehouse_close', 'warehouse.open_correction': 'warehouse_corrections',
+            'warehouse.commit_correction': 'warehouse_corrections',
+        }
+        if identifier in ui_routes:
+            return CapabilityDispatch(identifier, 'Продолжите действие в штатном интерфейсе с подтверждением.', ui_action=ui_routes[identifier])
+        if identifier in {'warehouse.commit_batch', 'warehouse.cancel_batch'}:
+            batch = self.operations.pending_batch(actor_user_id=actor_user_id) if self.operations else None
+            if batch is None:
+                return CapabilityDispatch(identifier, 'Активного складского черновика нет.')
+            return CapabilityDispatch(identifier, 'Проверьте складской черновик.', ui_action='warehouse_batch', data={'batch_id': int(batch['id'])})
+        if identifier in {'attendance.open_own', 'attendance.close_own'}:
+            active = self.attendance.status(actor_user_id) if self.attendance else None
+            if identifier == 'attendance.close_own' and active is None:
+                return CapabilityDispatch(identifier, 'Ваша персональная смена уже закрыта.')
+            if identifier == 'attendance.open_own' and active is not None:
+                return CapabilityDispatch(identifier, 'Ваша персональная смена уже открыта.')
+            return self._proposal(
+                identifier, 'Подтвердите изменение вашей персональной смены.',
+                actor=actor_user_id, chat=source_chat_id, message_id=source_message_id,
+                arguments={}, preview={'action': identifier},
+                target_type='attendance_session' if active else None,
+                target_id=str(active['id']) if active else None,
+                target_revision=int(active['revision']) if active else None,
+            )
+        if identifier == 'attendance.force_close':
+            if not args.get('reason') or target is None:
+                return CapabilityDispatch(identifier, 'Уточните сотрудника и обязательную причину.')
+            matches = [row for row in self.attendance.open_sessions(actor_user_id) if str(row['id']) == target]
+            if len(matches) != 1:
+                raise ValueError('Attendance target changed')
+            row = matches[0]
+            return self._proposal(identifier, 'Подтвердите принудительное закрытие смены.',
+                actor=actor_user_id, chat=source_chat_id, message_id=source_message_id,
+                arguments={'target_ref': target, 'expected_revision': int(row['revision']), 'reason': args['reason']},
+                preview={'reason': args['reason']}, target_type='attendance_session',
+                target_id=target, target_revision=int(row['revision']), reason=args['reason'])
+        if identifier == 'reminders.update':
+            return CapabilityDispatch(identifier, 'Измените настройки в штатном интерфейсе.', ui_action='reminders')
+
+        tools = AssistantReadOnlyTools(
+            catalog, self.access, attendance=self.attendance, operations=self.operations,
+            users=self.users, closing=self.closing, reports=self.reports,
+            recipients=self.recipients, reminders=self.reminders, schedules=self.schedules,
+            capabilities=self.registry, flags=self.flags,
+        )
+        read_routes = {
+            'users.list': tools.list_registered_users,
+            'users.list_bartenders': tools.list_registered_bartenders,
+            'users.get': tools.get_user_summary, 'attendance.get': tools.get_attendance_session,
+            'warehouse.list_operations': tools.list_shift_operations,
+            'warehouse.required_status': tools.get_required_writeoff_status,
+            'reports.status': tools.get_report_status,
+            'reports.history': tools.list_report_history,
+            'recipients.list': tools.list_report_recipients,
+            'reminders.get': tools.get_reminder_settings,
+            'schedules.list': tools.list_schedules,
+        }
+        if identifier in read_routes:
+            result = read_routes[identifier](actor_user_id, payload)
+            return CapabilityDispatch(identifier, result.message, data=result.data)
+        if identifier == 'attendance.status':
+            active = self.attendance.status(actor_user_id) if self.attendance else None
+            return CapabilityDispatch(identifier, 'Ваша смена открыта.' if active else 'Ваша смена закрыта.')
+        if identifier == 'attendance.list_open':
+            rows = tools.list_open_attendance_sessions(actor_user_id)
+            return CapabilityDispatch(identifier, 'Открытые смены:\n' + '\n'.join(row.employee for row in rows) if rows else 'Открытых смен нет.')
+        if identifier == 'warehouse.shift_summary':
+            shift = tools.get_current_shift_summary(actor_user_id)
+            return CapabilityDispatch(identifier, f'Текущая смена: {shift.location}, {shift.business_date}, {shift.status}.')
+        raise ValueError('No typed capability binding')
 
     def execute(
         self,

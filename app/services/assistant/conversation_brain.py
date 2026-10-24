@@ -6,7 +6,9 @@ import re
 import unicodedata
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Awaitable, Callable, Sequence
+from typing import Any, Awaitable, Callable, Sequence
+
+import asyncio
 
 from app.models.assistant import AssistantDomain
 from app.models.assistant_planner import (
@@ -14,6 +16,9 @@ from app.models.assistant_planner import (
     PlannerContextSnapshot,
     PlannerTargetOption,
     PlannerTurn,
+    PlannerMemoryData,
+    PlannerDecision,
+    PlannerToolData,
 )
 from app.services.assistant.context import AssistantConversationContext
 
@@ -95,7 +100,7 @@ def build_context_snapshot(
     capabilities: Sequence[PlannerCapability],
     targets: Sequence[PlannerTargetOption] = (),
     feature_flags: Sequence[str] = (),
-    owner_memories: Sequence[str] = (),
+    owner_memories: Sequence[PlannerMemoryData | str] = (),
 ) -> PlannerContextSnapshot:
     """Build a deterministic provider snapshot without actor/chat identifiers."""
 
@@ -117,7 +122,11 @@ def build_context_snapshot(
         last_tool_operation=(context.last_successful_capability or context.last_tool_name or None) if context else None,
         last_tool_summary=(context.last_tool_result_ref or None) if context else None,
         recent_turns=tuple(PlannerTurn(role=turn.role, text=turn.text[:1000]) for turn in turns),
-        owner_memories=tuple(" ".join(item.split())[:500] for item in owner_memories[:MAX_MEMORIES]),
+        owner_memories=tuple(
+            item if isinstance(item, PlannerMemoryData)
+            else PlannerMemoryData(content=" ".join(item.split())[:500])
+            for item in owner_memories[:MAX_MEMORIES]
+        ),
         revision=context.revision if context else 0,
         expires_at=context.expires_at if context else None,
     )
@@ -172,3 +181,67 @@ class ConversationToolLoop:
                 results.append(ToolLoopStep(capability_id, "preview prepared", False, proposal[:100]))
                 break
         return tuple(results)
+
+    async def run_iterative(
+        self, *, text: str, snapshot: PlannerContextSnapshot,
+        capabilities: Sequence[PlannerCapability],
+        plan: Callable[..., Awaitable[PlannerDecision]],
+        dispatch: Callable[[PlannerDecision, PlannerContextSnapshot], Awaitable[Any]],
+    ) -> tuple[tuple[Any, ...], str | None]:
+        """Two planner/tool steps, with inert typed results and no executor in input.
+
+        A read result cannot escalate to a mutation. Any preview stops the loop;
+        a later provider failure keeps the completed read result intact.
+        """
+        results: list[Any] = []
+        seen: set[tuple[str, str | None]] = set()
+        current = snapshot
+        allowed = tuple(capabilities)
+        for step in range(self.max_steps):
+            try:
+                # model_copy is intentionally followed by revalidation, including
+                # byte limits, before every provider call.
+                current = PlannerContextSnapshot.model_validate(current.model_dump())
+                decision = await plan(text, snapshot=current, capabilities=allowed)
+                if decision.capability_id is None:
+                    return tuple(results), decision.clarification_question
+                contract = next((c for c in allowed if c.capability_id == decision.capability_id), None)
+                if contract is None or decision.capability_id not in current.available_capability_ids:
+                    raise PermissionError('Unavailable planned tool')
+                if decision.read_only != contract.read_only or decision.mutation != contract.mutation:
+                    raise PermissionError('Planned tool risk mismatch')
+                allowed_targets = {option.stable_id for option in current.target_options}
+                if not current.target_options:
+                    allowed_targets.update(current.candidate_entity_ids)
+                    if current.last_successful_entity_id:
+                        allowed_targets.add(current.last_successful_entity_id)
+                if decision.target_entity_id is not None and decision.target_entity_id not in allowed_targets:
+                    raise PermissionError('Unknown planned target')
+                if decision.needs_clarification:
+                    return tuple(results), decision.clarification_question
+                key = (decision.capability_id, decision.target_entity_id)
+                if key in seen:
+                    break
+                seen.add(key)
+                result = await dispatch(decision, current)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                if results:
+                    break
+                raise
+            results.append(result)
+            if not contract.read_only:
+                break
+            allowed = tuple(cap for cap in capabilities if cap.read_only and cap.domain == contract.domain)
+            if not allowed:
+                break
+            current = current.model_copy(update={
+                'available_capability_ids': tuple(cap.capability_id for cap in allowed),
+                'tool_results': (*current.tool_results, PlannerToolData(
+                    capability_id=contract.capability_id, summary=result.message[:MAX_TOOL_RESULT_CHARS],
+                )),
+                'last_tool_operation': contract.capability_id,
+                'last_tool_summary': result.message[:MAX_TOOL_RESULT_CHARS],
+            })
+        return tuple(results), None

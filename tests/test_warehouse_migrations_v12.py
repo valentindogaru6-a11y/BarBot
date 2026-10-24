@@ -26,6 +26,7 @@ def test_v11_to_v12_and_rollback(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     with sqlite3.connect(path) as connection:
         connection.execute("DROP INDEX ux_assistant_memory_active_content")
         connection.execute("DROP INDEX ix_assistant_memory_owner_active")
+        connection.execute("DROP TABLE assistant_memory_delete_previews")
         connection.execute("DROP TABLE assistant_long_term_memories")
         connection.execute("DROP TABLE assistant_action_proposals")
         connection.execute("DROP TABLE assistant_conversation_turns")
@@ -43,6 +44,7 @@ def test_v11_to_v12_and_rollback(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     with sqlite3.connect(rollback) as connection:
         connection.execute("DROP INDEX ux_assistant_memory_active_content")
         connection.execute("DROP INDEX ix_assistant_memory_owner_active")
+        connection.execute("DROP TABLE assistant_memory_delete_previews")
         connection.execute("DROP TABLE assistant_long_term_memories")
         connection.execute("DROP TABLE assistant_action_proposals")
         connection.execute("DROP TABLE assistant_conversation_turns")
