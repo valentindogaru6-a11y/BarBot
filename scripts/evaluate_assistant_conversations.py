@@ -37,15 +37,20 @@ def main(argv: list[str] | None = None, *, adapter=None) -> int:
     try:
         args = parser.parse_args(argv)
         if args.mode == 'live_isolated':
-            from app.services.assistant.live_evaluation import LiveRunOptions,run_live,write_live_report,validate_report_output
+            from app.services.assistant.live_evaluation import LiveRunOptions,run_live,write_live_report,validate_report_output,budget_coverage
             from app.services.assistant.evaluation_environment import IsolatedEvaluationEnvironment
             from app.services.assistant.evaluation_budget import EvaluationSafetyError
             options = LiveRunOptions(args.mode,args.allow_live,args.max_provider_calls,
                 args.provider,args.disable_telegram_transport,args.model,args.gemini_fallback)
+            coverage = budget_coverage()
+            if type(args.max_provider_calls) is int and args.max_provider_calls < coverage['minimum']:
+                print('provider_budget_below_corpus_minimum minimum=17')
             options.validate(IsolatedEvaluationEnvironment)
             validate_report_output(args.output)
             if adapter is not None:
                 raise ValueError('live_adapter_injection_denied')
+            if args.max_provider_calls < coverage['estimated_normal']:
+                print('partial_coverage_risk=true minimum=17 estimated_normal=25')
             report,code = asyncio.run(run_live(options,settings_loader=_load_live_settings))
             write_live_report(report,args.output)
             print(f"mode=live_isolated calls={report['call_budget']['attempted']} "

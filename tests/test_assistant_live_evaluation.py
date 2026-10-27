@@ -174,14 +174,14 @@ def test_expected_is_only_scored_after_actual_and_never_in_provider_request():
 
 
 def test_budget_exhaustion_skips_without_semantic_failure_or_extra_http():
-    wire=Wire(route('catalog.search','catalog',action='search'))
+    wire=Wire(route('catalog.search','catalog',action='search'),route())
     corpus=(LiveCase(LiveInput('Q1','Q','найди пф для облепихи')),
             LiveCase(LiveInput('Q2','Q','покажи ещё раз')))
-    report,code=asyncio.run(run_live(options(max_provider_calls=1),settings_loader=settings,
+    report,code=asyncio.run(run_live(options(max_provider_calls=2),settings_loader=settings,
         transport_factory=lambda:wire,corpus=corpus))
-    assert code==3 and len(wire.requests)==1
-    assert report['skipped']==2 and report['metrics']['route'] is None
-    assert report['call_budget']['attempted']==1
+    assert code==3 and len(wire.requests)==2
+    assert report['skipped']==1 and report['metrics']['route'] is None
+    assert report['call_budget']['attempted']==2
 
 
 def test_real_fallback_uses_shared_budget_and_application_error_policy():

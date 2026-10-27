@@ -33,6 +33,15 @@ being used for an operational decision.
 
 ## Current development checkpoint
 
+- 2026-10-28: Development from `b0c2780...` hardens only isolated evaluation:
+  independent all-step readiness aggregation, structured authorization attempt
+  versus execution observations, and exclusive owned temporary DB identity
+  checks before/after opens. Regression risks: second-step failure masked by
+  successful read, alias/hardlink inode escape, and counters inferred from error
+  strings. Static budget estimates 17/25/34/68 are not live measurements.
+  Production composition/catalog/seed/migrations are unchanged; live quality
+  remains pending, and same-UID hostile filesystem races are not a remote sandbox.
+
 - 2026-10-27: Isolated evaluation development starts from `c1496bf...`.
   Distinct scripted/live-isolated/shadow modes, run-wide physical HTTP budget,
   owned temporary DB/services, explicit synthetic lifecycle actions and bounded

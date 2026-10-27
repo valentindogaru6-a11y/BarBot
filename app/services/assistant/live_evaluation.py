@@ -31,6 +31,19 @@ from app.services.assistant.evaluation_budget import (
 )
 from app.services.assistant.evaluation_corpus import LIVE_CORPUS, CORPUS_VERSION, LiveInput
 from app.services.assistant.evaluation_environment import IsolatedEvaluationEnvironment
+from app.services.assistant.evaluation_observer import FailureCategory, failure_counts, EvaluationDispatchDriver
+from app.services.assistant.capabilities import CAPABILITIES
+
+
+def budget_coverage(corpus=LIVE_CORPUS):
+    network = [case.request for case in corpus if case.request.action=='message'
+               and parse_memory_command(case.request.text) is None]
+    # Frozen-corpus illustration, not live evidence or planner input.
+    reads = {'A1','A2','B1','B2','B4','D5','Dsummary','D7'}
+    normal = sum(2 if item.case_id in reads else 1 for item in network)
+    return dict(minimum=len(network), estimated_normal=normal,
+                conservative_without_fallback=2*len(network),
+                conservative_with_fallback=4*len(network))
 
 
 @dataclass(frozen=True)
@@ -43,7 +56,7 @@ class LiveRunOptions:
     model: str | None = None
     gemini_fallback: bool = False
 
-    def validate(self, environment_factory):
+    def validate(self, environment_factory, corpus=LIVE_CORPUS):
         if (self.mode != 'live_isolated' or not self.allow_live or
             not self.telegram_transport_disabled or not callable(environment_factory) or
             self.provider not in ('groq','gemini') or
@@ -51,6 +64,8 @@ class LiveRunOptions:
             (self.gemini_fallback and self.provider != 'groq') or
             (self.model is not None and not re.fullmatch(r'[A-Za-z0-9_./-]{1,100}', self.model))):
             raise ValueError('invalid_live_configuration')
+        if self.max_provider_calls < budget_coverage(corpus)['minimum']:
+            raise ValueError('provider_budget_below_corpus_minimum')
 
 
 class LiveConversationEvaluationAdapter:
@@ -62,6 +77,34 @@ class LiveConversationEvaluationAdapter:
         self.env, self.planner = environment, planner
         self.memory_preview = self.deletion_preview = None
         self.sequence = self.tools_executed = 0
+        self.observer = environment.observer
+        self.dispatch_driver = environment.dispatch_driver or EvaluationDispatchDriver()
+
+    def _invoke(self, identifier, *, read_only, mutation, execute):
+        try:
+            definition = self.env.registry.require(identifier)
+        except (KeyError, ValueError):
+            definition = None
+        event = self.observer.begin(identifier, registered=definition is not None)
+
+        def authorize(current):
+            if definition is None:
+                current.denial_category = 'unknown_capability'
+                raise EvaluationSafetyError('unknown_capability')
+            try:
+                self.env.policy.require_assistant_access(self.env.owner, chat_type='private')
+                self.env.controller._require(self.env.owner, identifier)
+            except Exception:
+                current.denial_category = 'access_denied'
+                raise EvaluationSafetyError('access_denied') from None
+            current.access_authorized = True
+            current.risk_authorized = (read_only == (definition.risk_level.value == 0) and mutation != read_only
+                and all(self.env.controller.flags.get(flag, True) for flag in definition.feature_flags))
+            if not current.risk_authorized:
+                current.denial_category = 'risk_denied'
+                raise EvaluationSafetyError('risk_denied')
+
+        return self.dispatch_driver.dispatch(event, authorize, execute, self.observer)
 
     def _target_key(self, stable):
         # Fixture keys are derived from the real synthetic catalog, never from
@@ -154,8 +197,9 @@ class LiveConversationEvaluationAdapter:
                     executor = e.registry.bindings[proposal.capability_id].executor
                     if not callable(executor):
                         raise EvaluationSafetyError('unbound_executor')
-                    e.proposals.confirm(proposal.token,e.owner,e.chat,
-                        lambda row,connection:executor(row,e.owner,connection))
+                    self._invoke(proposal.capability_id, read_only=False, mutation=True,
+                        execute=lambda:e.proposals.confirm(proposal.token,e.owner,e.chat,
+                            lambda row,connection:executor(row,e.owner,connection)))
                 else:
                     e.proposals.cancel(proposal.token,e.owner,e.chat)
             if batch:
@@ -163,7 +207,8 @@ class LiveConversationEvaluationAdapter:
                 executor = e.registry.bindings[identifier].executor
                 if not callable(executor):
                     raise EvaluationSafetyError('unbound_executor')
-                executor(batch['id'],actor_user_id=e.owner)
+                self._invoke(identifier, read_only=False, mutation=True,
+                    execute=lambda:executor(batch['id'],actor_user_id=e.owner))
             if action == 'cancel_task':
                 e.memory.clear(e.owner,e.chat)
         elif action != 'assert_state':
@@ -174,6 +219,7 @@ class LiveConversationEvaluationAdapter:
         e = self.env
         e.validate_path(e.path)
         before = e.state()
+        event_start = len(self.observer.events)
         observation = dict(case_id=request.case_id,request_hash=hashlib.sha256(request.text.encode()).hexdigest()[:16],
             dialogue_act=None,domain=None,capability=None,target=None,clarification=False,
             preview=False,argument_ok=None,restart=None,error=None,skipped=False,
@@ -214,9 +260,10 @@ class LiveConversationEvaluationAdapter:
                     evidence = e.orchestrator.local_action_evidence(request.text)
                     explicit = ('writeoff' if evidence and evidence.value=='prepare_writeoff' else
                                 'transfer' if evidence and evidence.value=='prepare_transfer' else None)
-                    result = e.controller.dispatch_plan(decision,snapshot=current,catalog=e.storage.load(),
-                        actor_user_id=e.owner,source_chat_id=e.chat,source_message_id=self.sequence,
-                        chat_type='private',explicit_action=explicit)
+                    result = self._invoke(decision.capability_id, read_only=decision.read_only,
+                        mutation=decision.mutation, execute=lambda:e.controller.dispatch_plan(
+                            decision,snapshot=current,catalog=e.storage.load(),actor_user_id=e.owner,
+                            source_chat_id=e.chat,source_message_id=self.sequence,chat_type='private',explicit_action=explicit))
                     observation['tools'] += 1
                     self.tools_executed += 1
                     action = result.tool_action
@@ -259,6 +306,10 @@ class LiveConversationEvaluationAdapter:
         finally:
             observation['latency_ms'] = round((monotonic()-started)*1000,3)
         after = e.state()
+        if after['operations'] != before['operations'] or after['attendance_open'] != before['attendance_open']:
+            for event in self.observer.events[event_start:]:
+                if event.executor_invoked:
+                    event.side_effect_observed = True
         observation.update(operations=after['operations'],memory_active=after['memory_active'],
             memory_pending=after['memory_pending'],proposal_count=after['proposals_ready'])
         if request.action != 'confirm_proposal' and (
@@ -297,7 +348,7 @@ def score_observation(actual, expected):
 
 async def run_live(options: LiveRunOptions, *, settings_loader, transport_factory=AioHttpTransport,
                    environment_factory=IsolatedEvaluationEnvironment, corpus=LIVE_CORPUS):
-    options.validate(environment_factory)
+    options.validate(environment_factory, corpus)
     budget = PhysicalCallBudget(options.max_provider_calls)
     rows,observed = [],[]
     safety_error = None
@@ -320,15 +371,18 @@ async def run_live(options: LiveRunOptions, *, settings_loader, transport_factor
                 raise ValueError('invalid_model_configuration')
             provider = (GroqPlannerProvider(transport,api_key=key.get_secret_value(),model=model) if name=='groq' else
                         GeminiPlannerProvider(transport,api_key=key.get_secret_value(),model=model))
-            providers.append(ObservedPlannerProvider(provider,role))
+            providers.append(ObservedPlannerProvider(provider,role,observer=env.observer,
+                registered_capabilities=(item.id for item in CAPABILITIES)))
         planner = MultiProviderPlanner(*providers,mode='ai_first')
         adapter = LiveConversationEvaluationAdapter(env,planner)
         for case in corpus:
+            counts = failure_counts()
+            event_start = len(env.observer.events)
+            previous_results = [len(provider.results) for provider in providers]
             if safety_error:
-                rows.append(dict(case_id=case.request.case_id,skipped=True,error='safety_stop'))
+                rows.append(dict(case_id=case.request.case_id,skipped=True,error='safety_stop',failure_counts=counts))
                 continue
             try:
-                previous_results = [len(provider.results) for provider in providers]
                 actual = await adapter.evaluate(case.request)
             except EvaluationSafetyError as error:
                 false_mutations += error.effects
@@ -338,18 +392,30 @@ async def run_live(options: LiveRunOptions, *, settings_loader, transport_factor
                     'provider_endpoint_denied','temporary_db_path_denied','temporary_catalog_path_denied',
                     'telegram_transport_not_disabled','unknown_evaluation_action','invalid_model_metadata',
                 } else 'safety_contract_failure')
-                rows.append(dict(case_id=case.request.case_id,skipped=False,error='safety_contract_failure'))
-                continue
-            if actual['error'] not in (None,'memory_rejected','provider_call_budget_exhausted'):
-                turn_results = [result for provider,start in zip(providers,previous_results)
-                                for result in provider.results[start:]]
-                invalid_contract = (actual['error']=='local_contract_rejected' or any(
-                    result['validation'] in ('wire_invalid','canonical_invalid','policy_rejected')
-                    for result in turn_results))
-                actual['failure_class'] = 'contract' if invalid_contract else 'infrastructure'
-            scores = {} if actual['skipped'] else score_observation(actual,case.expected)
-            rows.append({**actual,'scores':scores})
+                counts[FailureCategory.SAFETY] += 1
+                actual = dict(case_id=case.request.case_id,skipped=False,error='safety_contract_failure')
+            turn_results = [result for provider,start in zip(providers,previous_results)
+                            for result in provider.results[start:]]
+            for result in turn_results:
+                for name,value in result['failures'].items():
+                    counts[name] += value
+            if actual.get('error')=='local_contract_rejected':
+                counts[FailureCategory.CONTRACT] += 1
+            counts[FailureCategory.BUDGET] = int(actual.get('error')=='provider_call_budget_exhausted')
+            if actual.get('error') not in (None,'memory_rejected','provider_call_budget_exhausted',
+                                          'local_contract_rejected','safety_contract_failure') and not any(counts.values()):
+                counts[FailureCategory.TRANSPORT] += 1
+            scores = {} if actual['skipped'] or counts[FailureCategory.SAFETY] else score_observation(actual,case.expected)
+            counts[FailureCategory.SEMANTIC] = sum(not value for value in scores.values())
+            if counts[FailureCategory.CONTRACT]:
+                actual['failure_class'] = 'contract'
+            elif counts[FailureCategory.TRANSPORT]:
+                actual['failure_class'] = 'infrastructure'
+            rows.append({**actual,'scores':scores,'failure_counts':counts,
+                         'authorization':env.observer.snapshot(event_start)})
         observed = [result for provider in providers for result in provider.results]
+        unauthorized_attempts, unauthorized_executions = env.observer.counts()
+        authorization = env.observer.snapshot()
     # All DB/files/services have been cleaned before the report is returned.
     metrics = {name:(sum(row['scores'][name] for row in rows if name in row.get('scores',{}))/
                sum(name in row.get('scores',{}) for row in rows)
@@ -361,7 +427,10 @@ async def run_live(options: LiveRunOptions, *, settings_loader, transport_factor
         return latencies[max(0,math.ceil(len(latencies)*fraction)-1)] if latencies else None
     calls = budget.report()
     canonical_completed = sum(result['validation']=='passed' for result in observed)
+    totals = {name:sum(row['failure_counts'][name] for row in rows) for name in failure_counts()}
     readiness = (not safety_error and not any(row.get('skipped') for row in rows) and
+        not any(totals[name] for name in failure_counts() if name != FailureCategory.SEMANTIC) and
+        not unauthorized_executions and
         all(row.get('error') in (None,'memory_rejected') for row in rows) and
         all(value is None or value >= .9 for value in metrics.values()) and all(row.get('scores',{}).get('operations_before_confirmation',True) for row in rows))
     head = subprocess.check_output(['git','rev-parse','HEAD'],text=True,cwd=Path(__file__).resolve().parents[3]).strip()
@@ -379,15 +448,19 @@ async def run_live(options: LiveRunOptions, *, settings_loader, transport_factor
                      p50=percentile(.5),p95=percentile(.95),maximum=max(latencies) if latencies else None),
         false_mutation_count=false_mutations,
         operations_before_confirmation=operations_before_confirmation,
-        unauthorized_execution_count=int(safety_error=='unauthorized_execution'),
+        unauthorized_attempt_count=unauthorized_attempts,
+        unauthorized_execution_count=unauthorized_executions,
+        authorization=authorization,failure_counts=totals,
+        budget_coverage=budget_coverage(corpus),
+        partial_coverage_risk=options.max_provider_calls < budget_coverage(corpus)['estimated_normal'],
         safety_error=safety_error,provider_validation=observed,
         provider_errors=dict(Counter(result['error'] for result in observed if result['error'])),
         errors=dict(Counter(row['error'] for row in rows if row.get('error'))),
         telegram_transport_calls=0,rows=rows,ready=readiness)
     if len(json.dumps(report).encode()) > 1_000_000:
         raise ValueError('report_size_limit')
-    contract_failure = any(row.get('failure_class')=='contract' for row in rows)
-    infrastructure_failure = any(row.get('failure_class')=='infrastructure' for row in rows)
+    contract_failure = totals[FailureCategory.CONTRACT] or totals[FailureCategory.SAFETY] or unauthorized_executions
+    infrastructure_failure = totals[FailureCategory.TRANSPORT]
     return report,(2 if safety_error or contract_failure else
                    3 if infrastructure_failure or any(row.get('skipped') for row in rows) else
                    0 if readiness else 1)

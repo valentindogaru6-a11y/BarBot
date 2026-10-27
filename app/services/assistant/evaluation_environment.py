@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 import sqlite3
 from pathlib import Path
-from tempfile import TemporaryDirectory
 
 from app.config import Settings
 from app.models.catalog import Catalog
@@ -33,6 +32,8 @@ from app.services.assistant.capability_controller import AssistantCapabilityCont
 from app.services.assistant.proposals import AssistantActionProposalService
 from app.services.assistant.orchestrator import AssistantOrchestrator
 from app.services.assistant.evaluation_budget import EvaluationSafetyError
+from app.services.assistant.evaluation_database import OwnedEvaluationDatabase
+from app.services.assistant.evaluation_observer import EvaluationAuthorizationObserver
 
 
 class IsolatedEvaluationEnvironment:
@@ -40,12 +41,21 @@ class IsolatedEvaluationEnvironment:
     chat = 1
     employee = 2
     telegram_transport_disabled = True
+    dispatch_driver = None
+
+    @property
+    def root(self):
+        return self._owned.root
+
+    @property
+    def path(self):
+        return self._owned.path
 
     def __enter__(self):
-        self._temporary = TemporaryDirectory(prefix='barbot-live-eval-')
-        self.root = Path(self._temporary.name)
+        self._owned = OwnedEvaluationDatabase()
+        self.observer = EvaluationAuthorizationObserver()
         try:
-            self.path = self.validate_path(self.root/'evaluation.db', must_be_new=True)
+            self._owned.install()
             UserDatabase(self.path).initialize()
             self.storage = JsonCatalogStorage(self.root/'catalog.json', self.root/'catalog-backups')
             self.storage.save(Catalog.model_validate({'version':1, 'categories':[{
@@ -72,23 +82,11 @@ class IsolatedEvaluationEnvironment:
                 raise EvaluationSafetyError('invalid_temporary_schema')
             return self
         except BaseException:
-            self._temporary.cleanup()
+            self._owned.close()
             raise
 
     def validate_path(self, path: Path, *, must_be_new=False) -> Path:
-        path = Path(path)
-        root = self.root.resolve(strict=True)
-        if self.root.is_symlink() or not path.is_absolute() or not path.is_relative_to(root):
-            raise EvaluationSafetyError('temporary_db_path_denied')
-        relative = path.relative_to(root)
-        current = root
-        for component in relative.parts:
-            current /= component
-            if component in ('.','..') or current.is_symlink():
-                raise EvaluationSafetyError('temporary_db_path_denied')
-        if path.resolve().parent != root or path.suffix != '.db' or (must_be_new and path.exists()):
-            raise EvaluationSafetyError('temporary_db_path_denied')
-        return path
+        return self._owned.validate_path(path, must_be_new=must_be_new)
 
     def recreate(self):
         """Repositories are connection-per-call; no live SQLite handles survive."""
@@ -131,7 +129,7 @@ class IsolatedEvaluationEnvironment:
                            self.long_memory.database,self.proposals.repository,self.users.database):
             if self.validate_path(repository.path) != self.path:
                 raise EvaluationSafetyError('temporary_db_path_denied')
-        connection = sqlite3.connect(self.path.as_uri()+'?mode=ro',uri=True)
+        connection = sqlite3.connect(self.path)
         try:
             connection.execute('PRAGMA query_only=ON')
             def count(table, where='1'):
@@ -148,4 +146,4 @@ class IsolatedEvaluationEnvironment:
             connection.close()
 
     def __exit__(self, *args):
-        self._temporary.cleanup()
+        self._owned.close()

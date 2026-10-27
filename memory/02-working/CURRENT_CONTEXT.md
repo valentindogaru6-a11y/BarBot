@@ -5,6 +5,11 @@ Metadata: scope `working`; trust `working`; lifecycle `ephemeral`; last cleared
 
 ## Status
 
+Live harness hardening starts from `b0c2780...`: independent provider-step
+failure aggregation, owned temporary SQLite identity, authorization observation
+and explicit partial budget policy. This is development-only, with synthetic
+fixtures/fake HTTP; live provider quality and production facts remain pending.
+
 Isolated live evaluation development starts from `c1496bf...`. It composes real
 services on fresh synthetic temporary v15, without Telegram or production
 startup. The physical HTTP budget spans the entire run. Scripted evaluation is

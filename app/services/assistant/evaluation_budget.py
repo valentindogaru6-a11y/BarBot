@@ -93,6 +93,9 @@ class BudgetedEvaluationTransport:
         started = monotonic()
         try:
             response = await self.transport.post_json(url, headers=headers, payload=payload, **kwargs)
+            from app.services.assistant.evaluation_observer import PROVIDER_STEP
+            if (step := PROVIDER_STEP.get()) is not None and 200 <= response.status < 300:
+                step.inspect_response(provider, response.body)
             row['status'] = response.status
             row['response_bytes'] = len(response.body)
             row['category'] = ('success' if 200 <= response.status < 300 else
@@ -128,18 +131,29 @@ class BudgetedEvaluationTransport:
 class ObservedPlannerProvider:
     """Observe canonical adapter validation, not provider bodies or prompts."""
 
-    def __init__(self, provider, role: str):
+    def __init__(self, provider, role: str, *, observer=None, registered_capabilities=()):
+        from app.services.assistant.evaluation_observer import EvaluationAuthorizationObserver
         self.provider = provider
         self.provider_name, self.model = provider.provider_name, provider.model
         self.role, self.results = role, []
+        self.observer = observer or EvaluationAuthorizationObserver()
+        self.registered_capabilities = frozenset(registered_capabilities)
 
     async def plan(self, snapshot, text, capabilities):
+        from app.services.assistant.evaluation_observer import PROVIDER_STEP, ProviderStepObservation
+        from app.services.assistant.planner_providers import planner_target_options
+        available = frozenset(cap.capability_id for cap in capabilities)
+        targets = planner_target_options(snapshot)
+        step = ProviderStepObservation(available, self.registered_capabilities or available,
+            len(targets), self.observer, tuple(target.domain for target in targets))
+        step_token = PROVIDER_STEP.set(step)
         token = CALL_ROLE.set(self.role)
         try:
             result = await self.provider.plan(snapshot, text, capabilities)
             self.results.append(dict(provider=self.provider_name, model=self.model,
                 validation=result.validation_status.value,
-                error=result.error.value if result.error else None))
+                error=result.error.value if result.error else None, failures=step.failures(result)))
             return result
         finally:
             CALL_ROLE.reset(token)
+            PROVIDER_STEP.reset(step_token)

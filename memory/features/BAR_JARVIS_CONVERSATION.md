@@ -114,3 +114,23 @@ retry is zero. Budget exhaustion skips further network work without counting
 skipped turns as semantic failures. Output is opt-in, bounded and privacy-safe.
 Live provider health/quality remains pending: fake HTTP tests do not establish
 live accuracy. See [evaluation run contract](../../docs/assistant_live_evaluation.md).
+
+### Live harness validity hardening
+
+From base `b0c2780...`, every reached provider step contributes independent typed
+validation/transport/contract counters. Preserving a successful read never
+erases a later wire/canonical/authority violation: readiness is false, exit 2.
+Transport failures require infrastructure review; semantic mismatch stays exit 1.
+Authorization observations separate blocked attempts from executor invocations
+without server-side authorization; unsafe invocation is a fatal safety event.
+
+The harness exclusively creates its own fixed DB in an unpredictable 0700 root,
+pins inode/device and checks regular/0600/nlink=1 before and after SQLite open
+and before restart. No caller path, hardlink or URI is accepted. All connections
+are scoped and closed; cleanup refuses a replaced root. Same-UID hostile races
+are outside the remote-provider model, not claimed impossible.
+
+Corpus estimates remain static: 17 minimum, about 25 normal, 34 conservative
+without fallback/68 with it. CLI rejects below-minimum budgets before keys;
+17–24 marks partial coverage risk. Budget is never raised automatically and
+skipped mandatory cases cannot pass. Live provider quality remains pending.

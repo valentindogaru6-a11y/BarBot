@@ -29,6 +29,22 @@ root запрещены; все repository paths проверяются до ч�
 Fixtures создаются repository/service APIs, не ручными SQL mutations.
 SQL inspection ограничена read-only агрегатами состояния.
 
+DB path не принимается от caller/CLI. Harness создаёт непредсказуемый root
+0700, затем фиксированный `evaluation.db` через `O_EXCL|O_NOFOLLOW`, mode 0600.
+Проверяются regular file, UID, `st_nlink == 1`, pinned device/inode, identity и
+mode root. Evaluation-only SQLite connection guard проверяет identity до и
+сразу после каждого open, а также перед recreate. Все services получают эту
+БД; scoped guard использует ContextVar и не меняет production composition.
+Разрешён только owned DB и безопасный `:memory:` reference штатного validator;
+SQLite URI, внешние пути и alias filenames запрещены. WAL/SHM/journal проходят
+проверку regular/no-hardlink внутри root. Connections закрываются при cleanup;
+удаление root разрешено только при совпадении его исходной identity.
+
+Python sqlite3 path API не даёт абсолютной атомарности path validation/open.
+Pre/post inode checks обнаруживают подмену, но враждебная same-user filesystem
+race не входит в удалённую provider threat model. Provider не имеет filesystem
+tools. Нельзя трактовать эту защиту как sandbox против процесса с тем же UID.
+
 Telegram transport отсутствует. Нет Telegram Update, Bot или production
 container. Прямые reads используют настоящие capability bindings. Mutations
 останавливаются на draft/proposal или штатном UI preview contract. Только
@@ -51,6 +67,14 @@ retry через этот transport расходует отдельный slot. 
 Разрешены только Groq LLM chat completions и Gemini generateContent. Multipart,
 Telegram, STT и Search запрещены. Бюджет 1–1000. Timeout, cancellation и HTTP
 error также расходуют attempt; budget exhausted не вызывает transport.
+
+Статическая оценка всего corpus: minimum 17, иллюстративно около 25, conservative
+34 без fallback и до 68 с fallback. Это не live measurement. Default budget
+не изменён: CLI по-прежнему требует explicit `--max-provider-calls`.
+Значение ниже 17 отклоняется до keys/network с exit 3. Значения 17–24 разрешены
+как bounded partial run с предупреждением и `partial_coverage_risk=true`.
+Рекомендуемый отдельно разрешаемый controlled budget: 34 без fallback, 68 с
+fallback. Ни warning, ни рекомендация не увеличивают фактический лимит.
 
 ## Будущий запуск — сейчас не выполнять
 
@@ -82,6 +106,28 @@ memory/restart/proposal contracts. Denominator содержит только ass
 attempts/completed/failed, provider/model/stage distribution, fallback/retry,
 HTTP и canonical completion, normalized errors и turn latency average/p50/p95/max.
 HTTP 200 не означает canonical или semantic PASS.
+
+Каждый достигнутый provider step независимо от `actual.error` добавляет closed
+категории `provider_transport_errors`, `provider_contract_failures`,
+`wire_validation_failures`, `canonical_validation_failures`,
+`unknown_capability_failures`, `target_validation_failures`,
+`safety_contract_failures`, `semantic_mismatches`, `budget_skips`.
+Они присутствуют на turn и run уровнях. Успешный read остаётся в observation,
+но последующий invalid step даёт readiness false/exit 2. Transport failure,
+даже сохранённый read/fallback result, требует infrastructure review/exit 3.
+Валидный, но неверный semantic route даёт exit 1. Safety/contract имеет
+приоритет над infrastructure и budget. Skipped mandatory cases запрещают PASS.
+
+Evaluation authorization observer используется реальным runner на границе
+authorization/dispatch/registered confirmation executor. Он хранит только
+registered capability либо `unknown`, registry/access/risk booleans, факт
+invocation, business side-effect observation и closed denial category.
+`unauthorized_attempt_count` считает заблокированные unknown/unavailable/denied
+запросы, а `unauthorized_execution_count` — фактическую invocation без успешной
+server-side authorization. Последнее фатально и даёт exit 2. Счётчики выводятся
+из structured events, не из строк exceptions. Arguments, IDs и text не входят
+в event. Business side effects здесь — operations/attendance; разрешённые
+draft/proposal previews сами по себе не означают unsafe execution.
 
 Exit: 0 — завершённый run с readiness contracts; 1 — semantic readiness ниже
 90% либо неуспешный actual; 2 — safety/contract failure; 3 — configuration,
