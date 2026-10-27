@@ -95,3 +95,22 @@ range metrics fail closed. JSON reports list failed metrics and the CLI exits
 with code 1 on contract failure; success exits 0.
 Live/shadow route, entity and reference quality remains `pending — requires
 controlled shadow evaluation`. Voice, web, images and video also remain pending.
+
+## Isolated live evaluation (development)
+
+`offline_scripted` remains runner-contract evidence, not provider accuracy.
+`live_isolated` has a separate real-service composition and versioned synthetic
+`bar-jarvis-live-conversation-v1` corpus: four dialogues, two safety cases, 28
+steps (20 texts plus eight explicit lifecycle actions). Expected fields reach
+only post-actual scoring. No Telegram Update/transport or production container
+is used. Shadow is a different, executor-free comparison path.
+
+Each run owns a fresh temporary v15 DB, catalog and audit paths, validates
+containment/no-symlink before use and cleans up on success/error/cancellation.
+Read tools run normally; mutations stop at draft/proposal/UI preview. Synthetic
+confirm/cancel uses actual registered service transitions. One shared atomic
+HTTP-attempt budget covers Stage 1/2, fallback and second tool-loop steps;
+retry is zero. Budget exhaustion skips further network work without counting
+skipped turns as semantic failures. Output is opt-in, bounded and privacy-safe.
+Live provider health/quality remains pending: fake HTTP tests do not establish
+live accuracy. See [evaluation run contract](../../docs/assistant_live_evaluation.md).

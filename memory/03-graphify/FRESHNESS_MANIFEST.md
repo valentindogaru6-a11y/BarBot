@@ -33,6 +33,13 @@ being used for an operational decision.
 
 ## Current development checkpoint
 
+- 2026-10-27: Isolated evaluation development starts from `c1496bf...`.
+  Distinct scripted/live-isolated/shadow modes, run-wide physical HTTP budget,
+  owned temporary DB/services, explicit synthetic lifecycle actions and bounded
+  reporting are covered offline. Production composition, catalog/seed and
+  migrations remain unchanged. No live evaluation has been run; provider
+  quality, completion and latency remain pending owner-authorized measurement.
+
 - 2026-10-27: Based on `18e94c4...`, only CHECK-expression normalization is
   changed from quadratic to O(n) time/O(n) auxiliary memory: one matching-stack
   pass, indexed boundaries, one final slice, no recursion. Correctness, counted

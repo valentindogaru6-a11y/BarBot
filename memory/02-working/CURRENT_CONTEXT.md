@@ -5,6 +5,12 @@ Metadata: scope `working`; trust `working`; lifecycle `ephemeral`; last cleared
 
 ## Status
 
+Isolated live evaluation development starts from `c1496bf...`. It composes real
+services on fresh synthetic temporary v15, without Telegram or production
+startup. The physical HTTP budget spans the entire run. Scripted evaluation is
+kept separate; live provider quality remains pending. No provider API call or
+production action is part of this development task.
+
 Security-fix development on 2026-10-24 starts at
 `2d18075064966d0d54d51ddb73dac6486eb4d62c`. The five review findings concern
 memory trust/chat ownership, typed iterative planner dispatch, strict unreleased

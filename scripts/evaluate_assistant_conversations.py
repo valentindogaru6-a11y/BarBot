@@ -1,8 +1,9 @@
-"""Run the frozen offline-scripted assistant corpus without network access."""
+"""Offline scripted evaluation or explicitly authorized isolated live evaluation."""
 
 from __future__ import annotations
 
 import argparse
+import asyncio
 from pathlib import Path
 import sys
 
@@ -21,10 +22,47 @@ from tests.fixtures.assistant_conversation_corpus_v1 import CORPUS, CORPUS_VERSI
 
 
 def main(argv: list[str] | None = None, *, adapter=None) -> int:
-    parser = argparse.ArgumentParser()
+    class SafeParser(argparse.ArgumentParser):
+        def error(self, message):
+            raise ValueError('invalid_cli_configuration')
+    parser = SafeParser()
     parser.add_argument("--output", type=Path)
     parser.add_argument("--allow-live", action="store_true")
-    args = parser.parse_args(argv)
+    parser.add_argument('--mode', choices=('offline_scripted','live_isolated'),default='offline_scripted')
+    parser.add_argument('--provider', choices=('groq','gemini'))
+    parser.add_argument('--model')
+    parser.add_argument('--max-provider-calls',type=int)
+    parser.add_argument('--disable-telegram-transport',action='store_true')
+    parser.add_argument('--gemini-fallback',action='store_true')
+    try:
+        args = parser.parse_args(argv)
+        if args.mode == 'live_isolated':
+            from app.services.assistant.live_evaluation import LiveRunOptions,run_live,write_live_report,validate_report_output
+            from app.services.assistant.evaluation_environment import IsolatedEvaluationEnvironment
+            from app.services.assistant.evaluation_budget import EvaluationSafetyError
+            options = LiveRunOptions(args.mode,args.allow_live,args.max_provider_calls,
+                args.provider,args.disable_telegram_transport,args.model,args.gemini_fallback)
+            options.validate(IsolatedEvaluationEnvironment)
+            validate_report_output(args.output)
+            if adapter is not None:
+                raise ValueError('live_adapter_injection_denied')
+            report,code = asyncio.run(run_live(options,settings_loader=_load_live_settings))
+            write_live_report(report,args.output)
+            print(f"mode=live_isolated calls={report['call_budget']['attempted']} "
+                  f"completed={report['completed']} skipped={report['skipped']} ready={report['ready']}")
+            return code
+        if (args.allow_live or args.provider or args.model or args.max_provider_calls is not None
+            or args.disable_telegram_transport or args.gemini_fallback
+            or (adapter is not None and adapter.mode != 'offline_scripted')):
+            raise ValueError('mode_mismatch')
+    except Exception:
+        print('evaluation_configuration_or_infrastructure_failure')
+        return 3
+    except BaseException as error:
+        if isinstance(error,(KeyboardInterrupt,SystemExit,asyncio.CancelledError)):
+            raise
+        print('evaluation_safety_contract_failure')
+        return 2
     domains = {item.id: item.category for item in CAPABILITIES}
     turns = tuple(
         EvaluationTurn(
@@ -54,6 +92,11 @@ def main(argv: list[str] | None = None, *, adapter=None) -> int:
     ))
     print("failed_metrics=" + ",".join(report["failed_metrics"]))
     return 0 if report["contract_pass"] else 1
+
+
+def _load_live_settings():
+    from app.config import Settings
+    return Settings()
 
 
 if __name__ == "__main__":
