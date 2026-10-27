@@ -140,17 +140,26 @@ def _normalized(tokens: tuple[SqlToken, ...]) -> tuple[SqlToken, ...]:
 
 
 def _expression(tokens: tuple[SqlToken, ...]) -> tuple[SqlToken, ...]:
-    """Remove only redundant parentheses enclosing the entire expression."""
-    while tokens and tokens[0] == ('symbol', '('):
-        depth = 0
-        for index, token in enumerate(tokens):
-            depth += (token == ('symbol', '(')) - (token == ('symbol', ')'))
-            if depth == 0:
-                break
-        if depth != 0 or index != len(tokens) - 1:
-            break
-        tokens = tokens[1:-1]
-    return _normalized(tokens)
+    """Strip whole-expression parentheses in O(n) time/space, without recursion."""
+    matching_close = [-1] * len(tokens)
+    opened: list[int] = []
+    for index, token in enumerate(tokens):
+        if token == ('symbol', '('):
+            opened.append(index)
+        elif token == ('symbol', ')'):
+            if not opened:
+                raise AssistantMemorySchemaError('Unbalanced CHECK expression')
+            matching_close[opened.pop()] = index
+    if opened:
+        raise AssistantMemorySchemaError('Unbalanced CHECK expression')
+
+    left, right = 0, len(tokens) - 1
+    while left <= right and tokens[left] == ('symbol', '(') and matching_close[left] == right:
+        left += 1
+        right -= 1
+    if left > right:
+        raise AssistantMemorySchemaError('Empty CHECK expression')
+    return _normalized(tokens[left:right + 1])
 
 
 def _checks(sql: str) -> tuple[tuple[SqlToken, ...], ...]:

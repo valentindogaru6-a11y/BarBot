@@ -34,6 +34,13 @@ Importance: High
   literal values and token boundaries during normalization. Parameterized
   regressions cover revision, status/kind, token/content length and time checks;
   the malformed reproduction accepts revision zero but must fail validation.
+- **CHECK normalization must stay linear:** repeatedly scanning/slicing one
+  outer parenthesis pair at a time was quadratic. Build matching-close indices
+  once with an iterative stack, move left/right boundaries, then slice once.
+  Test token-position visits and copied positions (including through slices),
+  not fragile timing ratios; deep nesting must not use recursion. The five
+  security findings were already closed before this narrow complexity fix;
+  live provider quality remains pending.
 - **Evaluation success must include semantic contracts:** a safety-only PASS
   hid route accuracy 0.0. Freeze completeness/coverage/metric thresholds, reject
   missing/non-finite values, expose failed metric names and test CLI exit codes.

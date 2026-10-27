@@ -33,6 +33,14 @@ being used for an operational decision.
 
 ## Current development checkpoint
 
+- 2026-10-27: Based on `18e94c4...`, only CHECK-expression normalization is
+  changed from quadratic to O(n) time/O(n) auxiliary memory: one matching-stack
+  pass, indexed boundaries, one final slice, no recursion. Correctness, counted
+  token visits and deep nesting supplement existing spoof/migration tests.
+  The five security findings remain closed, not re-audited here. Schema DDL,
+  target v15, catalog/seed and migrations stay unchanged; live provider quality
+  and all runtime facts remain pending separately authorized verification.
+
 - 2026-10-24: Narrow v15 CHECK-validator hardening starts at `cef9a79...`.
   Lexical extraction replaces spoofable SQL regex matching; schema DDL, target
   v15, catalog/seed and migrations are unchanged. Evidence is temporary SQLite
