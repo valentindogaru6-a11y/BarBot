@@ -1,10 +1,8 @@
 """Evaluation-only fixtures, created through services in the owned temp root."""
 
 from datetime import UTC, datetime, timedelta
-from contextlib import closing
 import hashlib
 import json
-import sqlite3
 
 from app.models.catalog import Catalog
 from app.models.user import Role
@@ -106,12 +104,9 @@ def populate(e):
 
 
 def protected_fingerprint(e):
-    """No row contents/actor identifiers escape this hash of sensitive state."""
-    e.validate_path(e.path)
-    with closing(sqlite3.connect(e.path)) as connection:
-        connection.execute('PRAGMA query_only=ON')
-        tables = ('users','warehouse_shift_sessions','warehouse_report_recipients',
-                  'warehouse_reminder_settings','warehouse_delivery_schedules','warehouse_report_deliveries',
-                  'warehouse_delivery_jobs')
-        values = [connection.execute(f'SELECT * FROM {table} ORDER BY rowid').fetchall() for table in tables]
-    return hashlib.sha256(json.dumps(values,default=str).encode()).hexdigest()
+    """Legacy preservation score uses only the observer's safe projections."""
+    from app.services.assistant.evaluation_business_state import category
+    snapshot=e.business.snapshot()
+    rows={table:repr(values) for table,values in snapshot.tables.items()
+          if category(table) in ('users','attendance','recipients','reminders','schedules','jobs','deliveries')}
+    return hashlib.sha256(json.dumps(rows,sort_keys=True).encode()).hexdigest()

@@ -146,5 +146,12 @@ Importance: High
   validate arguments independently. The compact route still requires a
   separately authorized live smoke; offline tests are not accuracy evidence.
 
+Evaluation regression: UI preview flags are not a DB mutation oracle. Read-only
+cases must detect unrequested drafts/proposals and transient writes using safe
+before/after state plus a statement ledger. Attribute route failures to expected
+domain; actual-domain denominators can hide a broken capability group. Domain
+gates require the metrics actually tested by the suite and explicit zero safety
+counters. Offline evidence does not establish live provider quality.
+
 Revalidate runtime-dependent lessons before production action. Do not turn an
 owner observation into a measured infrastructure claim without evidence.

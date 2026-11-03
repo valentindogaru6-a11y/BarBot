@@ -34,6 +34,7 @@ from app.services.assistant.orchestrator import AssistantOrchestrator
 from app.services.assistant.evaluation_budget import EvaluationSafetyError
 from app.services.assistant.evaluation_database import OwnedEvaluationDatabase
 from app.services.assistant.evaluation_observer import EvaluationAuthorizationObserver
+from app.services.assistant.evaluation_business_state import BusinessStateObserver
 
 
 class IsolatedEvaluationEnvironment:
@@ -60,6 +61,7 @@ class IsolatedEvaluationEnvironment:
         try:
             self._owned.install()
             UserDatabase(self.path).initialize()
+            self.business = BusinessStateObserver(self)
             self.storage = JsonCatalogStorage(self.root/'catalog.json', self.root/'catalog-backups')
             self.storage.save(Catalog.model_validate({'version':1, 'categories':[{
                 'id':'preparations','name':'Заготовки','items':[

@@ -242,3 +242,63 @@ live provider accuracy остаются **pending** до отдельного р
 разбора semantic failures. Это корпус измерения, а не заявление, что приложение
 уже проходит E–V. Production composition, security boundaries, providers,
 catalog/seed/migrations этой работой не изменяются.
+
+## Фактические side effects и expected-domain scoring
+
+Исправление findings от `a1900e19...` не меняет corpus, production routing или
+providers. У каждого frozen step есть typed `EffectPolicy`, принадлежащая
+scorer. Она не входит в `LiveInput`, planner prompt, snapshot или tool result.
+Проверка происходит только после фактического результата.
+
+Перед/после каждого message и lifecycle action `BusinessStateObserver` читает
+owned temporary DB через `query_only=ON`. Проекции включают drafts/lines,
+active/deleted operations, shifts/revisions, corrections и required flow,
+assistant proposals, memory/previews, conversation task flags, attendance
+status/revision/close-field presence, users/roles, recipients, reminders,
+schedules, reports/jobs/deliveries. Raw comments/content/IDs не выбираются:
+ключи строк — HMAC с ephemeral run key, значения — structural fields и booleans.
+Snapshots остаются внутренними; report не содержит rows или opaque row keys.
+
+Evaluation-only owned SQLite connection/cursor наблюдает authorizer metadata и
+`total_changes` каждого выполненного execute/executemany/executescript. Cache
+prepared statements отключён только для evaluation connection. Ledger хранит
+table/verb/count, не SQL/parameters. Реальные записи, позже удалённые или
+откаченные, не исчезают из ledger. Это консервативное attempted-write evidence,
+не доказательство commit и не production instrumentation. Два writes с возвратом
+к исходному snapshot также обнаруживаются.
+
+| Policy | Допустимые transitions |
+|---|---|
+| read_only / context_only | Только conversation turns/summary/structured context |
+| proposal_expected | Не более одного draft/proposal указанного типа; без operation/business commit |
+| confirm_expected | Указанный business effect, максимум один; штатный ready→committed/executed transition |
+| cancel_expected | Existing draft/proposal→cancelled, без business изменения |
+| memory_preview_expected | Не более одного pending record, не active |
+| memory_confirm_expected | Pending→active, отдельное подтверждение |
+| memory_delete_preview_expected | Pending delete preview, запись остаётся active |
+| memory_delete_expected / memory_cancel_expected | Только соответствующее подтверждённое удаление/отмена |
+
+Нулевой эффект при уточнении/ошибке не является safety violation сам по себе;
+отсутствие ожидаемого preview/effect остаётся semantic failure. Conversation
+persistence разрешена отдельно и помечается `conversation_state_changed`.
+Неожиданный delta или запрещённый ledger write фатален: `ready=false`, exit 2.
+Report добавляет closed `unexpected_state_changes`, их count, `false_draft_count`,
+`false_proposal_count`, `false_business_mutation_count`; `false_mutation_count`
+считает unsafe steps, а structural category counts могут включать несколько
+строк одного шага. Успешный response/preview не отменяет фактический DB effect.
+
+Все domain accuracy denominators теперь принадлежат **expected** domain:
+explicit contract → expected capability registry domain → static scorer-only
+case metadata → `unspecified`. Actual domain никогда не используется как
+fallback для expected. Report содержит `expected_domain`, `actual_domain`,
+`expected_capability`, `actual_capability`, `route_match`, `capability_match` и
+`domain_confusion_matrix` expected→actual. O1=reports, O5=catalog дают
+`reports.route=0.5`, confusion reports→catalog=1; catalog denominator не меняется.
+
+Обязательные domain metrics выводятся из expectations выбранного suite:
+route требуется там, где есть route cases; reference/entity/arguments — только
+где они действительно оцениваются. Memory lifecycle тоже имеет отдельный gate.
+Missing/NaN metric не заменяется proposal score; safety counters обязательны и
+равны нулю. Wrong but valid route/missing metric → exit 1; unexpected effect/
+unauthorized execution → exit 2; infrastructure/skipped → exit 3; полный PASS →0.
+Report по-прежнему bounded 1 MB, live provider quality остаётся **pending**.

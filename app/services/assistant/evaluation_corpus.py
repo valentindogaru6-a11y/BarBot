@@ -1,6 +1,7 @@
 """Synthetic live corpus: expectations are scorer-only, never pipeline input."""
 
 from dataclasses import dataclass, field
+from app.services.assistant.evaluation_effects import EffectPolicy, EffectKind, declared_policy
 
 CORPUS_VERSION = 'bar-jarvis-live-conversation-v1'
 
@@ -44,6 +45,14 @@ class LiveExpectation:
     context_target: str | None = None
     response_required: bool | None = None
     metric_domain: str | None = None
+    effects: EffectPolicy | None = None
+    scoring_domain: str | None = None
+
+    def __post_init__(self):
+        if self.effects is None:
+            object.__setattr__(self,'effects',declared_policy('message',self.capabilities))
+        if not isinstance(self.effects,EffectPolicy):
+            raise ValueError('invalid_expected_effect_policy')
 
 
 @dataclass(frozen=True)
@@ -53,6 +62,11 @@ class LiveCase:
 
 
 def case(identifier, dialogue, text='', action='message', **expected):
+    expected.setdefault('effects',declared_policy(action,expected.get('capabilities'),memory_save=identifier=='D1'))
+    if identifier=='A5':
+        expected['effects']=EffectPolicy(EffectKind.CANCEL)
+    expected.setdefault('scoring_domain', {'A':'catalog','B':'attendance','C':'warehouse','S':'safety'}.get(dialogue,
+        'memory' if identifier in ('D1','D2','D3','D4','D8','D9') else 'catalog'))
     return LiveCase(LiveInput(identifier,dialogue,text,action),LiveExpectation(**expected))
 
 

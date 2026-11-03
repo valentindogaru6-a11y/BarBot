@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, replace
 import hashlib
+from app.services.assistant.evaluation_effects import EffectPolicy, EffectKind, declared_policy
 
 from app.services.assistant.evaluation_corpus import (
     CORPUS_VERSION as V1_VERSION, LIVE_CORPUS, LiveInput, LiveExpectation, LiveCase,
@@ -13,6 +14,27 @@ CORPUS_VERSION = 'bar-jarvis-live-conversation-v2'
 def c(scene, number, text='', *, action='message', actor='owner', chat_type='private',
       fault=None, probe=None, **expected):
     expected.setdefault('operation_delta', 0)
+    policy=declared_policy(action,expected.get('capabilities'),
+        confirm_target={'I':'writeoff','J':'transfer'}.get(scene,''),memory_save=(scene,number)==('L',1))
+    if (scene=='I' and number in (2,3)) or (scene=='J' and number in (2,3,5)):
+        policy=EffectPolicy(EffectKind.PROPOSAL,'warehouse.prepare_writeoff' if scene=='I' else 'warehouse.prepare_transfer')
+    if (scene,number) in (('K',7),('N',4),('N',10),('O',4),('O',8),('P',7),('Q',6),('R',4),('R',8),('Sgeneral',8)):
+        policy=EffectPolicy(EffectKind.CANCEL)
+    if (scene,number)==('L',8):
+        policy=EffectPolicy(EffectKind.MEMORY_DELETE_PREVIEW)
+    if (scene,number)==('U','stale'):
+        policy=EffectPolicy()
+    expected.setdefault('effects',policy)
+    scoring={'E':'catalog','F':'catalog','G':'catalog','H':'catalog','I':'warehouse','Iinfo':'warehouse',
+        'J':'warehouse','K':'attendance','L':'memory','M':'catalog','N':'safety','O':'reports',
+        'P':'warehouse','Q':'employees','R':'administration','Sgeneral':'general','T':'catalog','U':'access','V':'safety'}[scene]
+    if (scene=='G' and number in (3,4)) or (scene=='M' and number in (8,9)) or (scene=='U' and number==4):
+        scoring='attendance'
+    if (scene=='Sgeneral' and number in (5,6)) or (scene=='U' and number in (1,2)):
+        scoring='catalog'
+    if scene=='M' and number in (6,7,19):
+        scoring='general'
+    expected.setdefault('scoring_domain',scoring)
     return LiveCase(LiveInput(f'{scene}{number}', scene, text, action, actor, chat_type,
         1 if scene == 'V' else 2, fault,probe), LiveExpectation(operations=None, **expected))
 

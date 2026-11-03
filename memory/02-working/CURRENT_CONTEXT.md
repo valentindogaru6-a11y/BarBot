@@ -5,6 +5,12 @@ Metadata: scope `working`; trust `working`; lifecycle `ephemeral`; last cleared
 
 ## Status
 
+Focused scoring fix from `a1900e19...`: close the invisible-draft oracle gap
+with actual DB snapshots/statement ledger and scorer-owned allowed transitions;
+attribute accuracy/confusion to expected domains with required metric gates.
+Scope is evaluation only; corpus semantics and production behavior unchanged.
+Live provider quality remains pending.
+
 Corpus-v2 evaluation development from `bd73be96...`: smoke remains frozen v1;
 core and extended add seeded natural-language scenarios with real synthetic
 services, per-domain readiness and explicit lifecycle/fault controls. Only

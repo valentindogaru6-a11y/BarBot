@@ -157,3 +157,19 @@ inside the owned temporary root; no production paths or Telegram transport.
 Live results and unimplemented conversational behavior remain **pending**.
 The harness measures real outcomes and does not improve production NLU to pass.
 See [coverage/readiness/budgets](../../docs/assistant_live_evaluation.md).
+
+### Live scoring side-effect/domain correction
+
+From `a1900e19...`, readiness observes actual safe structural snapshots of the
+owned temporary DB plus SQLite statement mutation metadata. A create/delete or
+write/revert cannot disappear behind a successful response or unchanged final
+snapshot. Scorer-owned typed policies permit only the declared read/context,
+proposal, confirm/cancel or memory transition; unexpected writes are fatal
+exit 2. Raw rows, statements, comments, memory content and actor IDs are not
+exported. The ledger conservatively retains writes even if rolled back.
+
+Accuracy denominators use expected domain/capability, never actual routing.
+Confusion expected→actual is separate. Required domain metrics come from actual
+suite expectations; missing/NaN route cannot be hidden by proposal=1.0. Safety
+counters are mandatory zero. Live quality remains pending; this is offline
+measurement-integrity evidence only.

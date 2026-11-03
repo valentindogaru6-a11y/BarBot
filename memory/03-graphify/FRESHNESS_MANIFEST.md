@@ -1,5 +1,11 @@
 # Freshness Manifest
 
+Scoring slice revalidated 2026-11-03 from `a1900e19...`: actual temp-DB structural
+snapshots/statement ledger, typed allowed transitions, expected-domain metrics
+and confusion matrix. P1/P2 are covered by offline regressions. Corpus counts,
+production composition, catalog, seed and migrations are unchanged. Live
+provider quality/runtime facts remain pending separate authorized verification.
+
 Relevant evaluation slice reviewed 2026-11-03 from `bd73be96...`: live corpus v2
 and selectable/seeded suites are offline development evidence only. Synthetic
 target remains v15; production composition, catalog, seed and migrations are

@@ -10,6 +10,7 @@ import weakref
 from contextvars import ContextVar
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from app.services.assistant.evaluation_business_state import MUTATION_LEDGER, Mutation
 
 from app.services.assistant.evaluation_budget import EvaluationSafetyError
 
@@ -20,8 +21,65 @@ _USERS = 0
 _SAVED_CONNECT = sqlite3.connect
 
 
+class _OwnedCursor(sqlite3.Cursor):
+    def execute(self, *args, **kwargs):
+        return self.connection.observe_statement(lambda:super(_OwnedCursor,self).execute(*args,**kwargs))
+
+    def executemany(self, *args, **kwargs):
+        return self.connection.observe_statement(lambda:super(_OwnedCursor,self).executemany(*args,**kwargs))
+
+    def executescript(self, *args, **kwargs):
+        return self.connection.observe_statement(lambda:super(_OwnedCursor,self).executescript(*args,**kwargs))
+
+
 class _OwnedConnection(sqlite3.Connection):
-    pass
+    """Observe only owned main DB statements, without SQL/parameter capture."""
+    def install_observer(self):
+        self._targets=None
+        def authorize(action,table,column,database,source):
+            verbs={sqlite3.SQLITE_INSERT:'insert',sqlite3.SQLITE_UPDATE:'update',sqlite3.SQLITE_DELETE:'delete'}
+            if self._targets is not None and database=='main' and action in verbs:
+                self._targets.add((table,verbs[action]))
+            ddl=(sqlite3.SQLITE_CREATE_TABLE,sqlite3.SQLITE_DROP_TABLE,sqlite3.SQLITE_ALTER_TABLE,
+                 sqlite3.SQLITE_CREATE_INDEX,sqlite3.SQLITE_DROP_INDEX,sqlite3.SQLITE_CREATE_TRIGGER,
+                 sqlite3.SQLITE_DROP_TRIGGER,sqlite3.SQLITE_CREATE_VIEW,sqlite3.SQLITE_DROP_VIEW)
+            if self._targets is not None and (action in ddl or
+                (action==sqlite3.SQLITE_PRAGMA and table in ('user_version','journal_mode') and column is not None)):
+                self._targets.add(('schema','ddl'))
+            return sqlite3.SQLITE_OK
+        self.set_authorizer(authorize)
+
+    def observe_statement(self, execute):
+        ledger=MUTATION_LEDGER.get()
+        if ledger is None or not hasattr(self,'_targets'):
+            return execute()
+        previous=self._targets
+        self._targets=set()
+        before=self.total_changes
+        cursor=None
+        try:
+            cursor=execute()
+            return cursor
+        finally:
+            changes=self.total_changes-before
+            if changes:
+                count=cursor.rowcount if cursor is not None and cursor.rowcount>0 else changes
+                ledger.extend(Mutation(table,verb,count) for table,verb in sorted(self._targets))
+            elif ('schema','ddl') in self._targets:
+                ledger.append(Mutation('schema','ddl',1))
+            self._targets=previous
+
+    def cursor(self, factory=_OwnedCursor):
+        return super().cursor(factory)
+
+    def execute(self,*args,**kwargs):
+        return self.cursor().execute(*args,**kwargs)
+
+    def executemany(self,*args,**kwargs):
+        return self.cursor().executemany(*args,**kwargs)
+
+    def executescript(self,*args,**kwargs):
+        return self.cursor().executescript(*args,**kwargs)
 
 
 def _guarded_connect(database, *args, **kwargs):
@@ -34,6 +92,7 @@ def _guarded_connect(database, *args, **kwargs):
         owner.validate_path(database)
     owner.validate_identity()
     kwargs['factory'] = _OwnedConnection
+    kwargs['cached_statements'] = 0  # authorizer metadata for every execution
     connection = owner.sqlite_open(database, *args, **kwargs)
     try:
         owner.validate_identity()
@@ -41,6 +100,8 @@ def _guarded_connect(database, *args, **kwargs):
         connection.close()
         raise
     owner.connections.add(connection)
+    if database != ':memory:':
+        connection.install_observer()
     return connection
 
 

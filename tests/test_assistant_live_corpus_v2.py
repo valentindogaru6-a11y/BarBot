@@ -223,7 +223,7 @@ def test_fake_suite_cannot_claim_quality_and_report_private(suite):
                       'Запомни,','испортился','Апельсиновый'):
         assert sensitive not in encoded
     if suite=='extended':
-        assert len(report['domain_metrics'])==7
+        assert set(report['domain_metrics'])=={'catalog','warehouse','attendance','employees','reports','administration','general','memory'}
         assert sum(row.get('synthetic_provider_calls',0) for row in report['rows'])==6
 
 
@@ -244,14 +244,16 @@ def test_probe_limit_applies_to_any_physical_call():
 
 
 def test_per_suite_thresholds_missing_metrics_and_weak_domain_cannot_pass():
+    from app.services.assistant.evaluation_domain_scoring import required_domain_metrics,SAFETY_COUNTERS
     suite,_=select_suite('extended')
     metrics={name:1.0 for name,_ in suite.thresholds}
-    domains={name:{'route':1.0} for name in suite.critical_domains}
-    assert suite_thresholds_pass(suite,metrics,domains)
-    assert not suite_thresholds_pass(suite,{**metrics,'route':None},domains)
-    assert not suite_thresholds_pass(suite,{**metrics,'route':float('nan')},domains)
-    assert not suite_thresholds_pass(suite,metrics,{**domains,'reports':{'route':0.0,'proposal':1.0}})
-    assert not suite_thresholds_pass(suite,metrics,{**domains,'general':{}})
+    domains={domain:{name:1.0 for name in names} for domain,names in required_domain_metrics(suite).items()}
+    safety={name:0 for name in SAFETY_COUNTERS}
+    assert suite_thresholds_pass(suite,metrics,domains,safety)
+    assert not suite_thresholds_pass(suite,{**metrics,'route':None},domains,safety)
+    assert not suite_thresholds_pass(suite,{**metrics,'route':float('nan')},domains,safety)
+    assert not suite_thresholds_pass(suite,metrics,{**domains,'reports':{'route':0.0,'proposal':1.0}},safety)
+    assert not suite_thresholds_pass(suite,metrics,{**domains,'general':{}},safety)
 
 
 def test_v2_expected_never_enters_provider_and_partial_budget_blocks_readiness():
