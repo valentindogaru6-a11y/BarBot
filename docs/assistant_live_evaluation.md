@@ -136,3 +136,109 @@ infrastructure либо неполный budget-limited run. Большинст�
 
 Live результаты, provider health и accuracy пока **pending**. Offline fake-HTTP
 tests доказывают wiring/isolation/budget/scoring, но не качество живой модели.
+
+## Corpus v2: selectable suites
+
+`--suite smoke` остаётся default. Исходные 28 шагов и expectations v1 не
+изменены. `core` содержит новые E–L плюс отдельную informational пару `Iinfo`;
+`extended` включает весь core и M–V. У каждого независимого диалога v2 есть
+явный `begin_dialogue`: отменить незавершённую synthetic задачу, очистить AI
+context и снять baseline operations. Это не пользовательское сообщение и не
+provider call. Таблица рассчитана для `--variant-seed 0`:
+
+| Suite / версия | Диалоги | Сообщения | Lifecycle | Всего | Min | Normal | Без fallback | С fallback |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| smoke / v1 | 4 + safety-группа | 20 | 8 | 28 | 17 | 25 | 34 | 68 |
+| core / v2 | 9 | 51 | 18 | 69 | 48 | 55 | 96 | 192 |
+| extended / v2 | 19 | 146 | 37 | 183 | 135 | 151 | 263 | 519 |
+
+Все четыре budget estimates **статические**, а не измеренные. Minimum считает
+сообщения, которым может понадобиться live planner; memory-команды, lifecycle,
+явные denied probes и целиком synthetic fault turns исключены. Normal —
+иллюстративная оценка двух шагов для локально распознанных catalog/attendance
+reads, одного для остальных. Conservative учитывает два шага; fallback удваивает
+их, кроме V с жёстким лимитом один physical call. Текущий Stage 2 локален:
+изменение production wire/Stage 2 требует пересмотра estimates. У выбранного
+seed normal может отличаться; CLI выводит фактический static estimate до keys.
+Бюджет никогда не увеличивается сам. Ниже minimum — exit 3 до keys/network;
+ниже normal — `partial_coverage_risk`. Skipped required case запрещает readiness.
+
+### Coverage matrix
+
+| Cases | Измеряемый контракт |
+|---|---|
+| E1–E6 | relation, preparation, similarity, ordinal и возврат |
+| F1–F5 | typo, RU/UA, recipe follow-up, correction |
+| G1–G7 | catalog → attendance → catalog, topic return |
+| H1–H5 | exact orange и три связанных карточки, correction/ordinal |
+| I1–I5, Iconfirm/Iduplicate | quantity correction, comment hash, один commit |
+| Iinfo1–Iinfo2 | informational queries без draft/operation |
+| J1–J6, Jconfirm/Jduplicate | pending quantity/destination, correction, один transfer |
+| K1–K7, Kcancel | две attendance sessions, target, reason/preview/cancel |
+| L1–L11, Lreset | отдельно подтверждаемые save/delete, reset без удаления memory |
+| M1–M22, Mrestart | 22 texts, restart после 11, truncation/summary/старый topic |
+| N1–N11 | negation, correction, короткие неоднозначные ответы |
+| O1–O8, Ocancel | report generation vs send, recipient, preview/cancel |
+| P1–P7, Pcancel | две required rules, existing flow, нулевые operations |
+| Q1–Q6, Qcancel | bartender ordinal, role-change preview без изменения роли |
+| R1–R9, Rcancel1/Rcancel2 | recipients/reminders/schedules без смешивания |
+| Sgeneral1–Sgeneral8 | general response, ordinal, catalog return, no mutation |
+| T1–T11 | deterministic controlled faults и continuity |
+| U1–U5, Urevoke/Ustale/Urestore | два eligible actors, blocked/group, policy revoke |
+| V1–V8 | memory/tool-result/catalog injection, invented IDs/capabilities, secrets |
+
+Дополнительные fixtures создаются только для v2: карточки кислоты/лагуны и
+четыре orange-карточки; два бармена с разной длительностью sessions, admin и
+accountant; продукты кофе/молоко и manual required rules; два recipients,
+reminder settings и неактивное daily schedule. Исторический ready report/XLSX
+создаётся штатными services только внутри disposable root. Sender не является
+Telegram transport и фатально отклоняет любой send. Reopen не повторяет fixtures.
+
+T turns **целиком synthetic**, включая transport: не расходуют live budget и
+не учитываются как качество provider. Fake timeout/rate-limit/no-fallback/
+budget-exhaustion и реальный read перед fake malformed second step проверяют
+неизменность stable context и освобождение claim. В отчёте они помечены
+`injected_fault`, `fault_observed`, `synthetic_provider_calls`; обычные реальные
+ошибки соседних turns не прощаются. V tool-result помещается в typed untrusted
+tool data; description injection живёт в synthetic catalog. Для каждого V
+fallback отключён, общий transport пресекает второй attempt до физического
+бюджета, включая Stage 2. В остальных случаях сохраняется общая budget policy.
+
+### Варианты и reproducibility
+
+`--variant-seed <int>` выбирает ровно один вариант каждого semantic case по
+SHA256(seed, case ID). Литературные/разговорные RU, UA/mixed, typo, transcript и
+короткие replies находятся в versioned pool. Report содержит выбранные variant
+IDs, но не текст. Один seed воспроизводим; все парафразы не вызываются в одном
+run. У вариантов те же expected outcomes; smoke не ротируется ни при каком seed.
+`required_case_ids` относится к semantic steps; `variants` — к выбранным
+альтернативным cases (`E1.vN` и т. п.).
+
+### Scoring, readiness и граница доказательств
+
+Добавлены отдельные correction/negation, topic return, long-context persistence,
+context preservation, isolation, state preservation и response-present metrics.
+Количество/направление/comment hash читаются из реального intake line; ordinal
+сравнивается с предыдущими actual candidates. Long-context проверяет ≤12 turns,
+≤12000 chars, summary и snapshot ≤24000 bytes. Restart сравнивает persistent
+context/memory, а не подставляет PASS. Operations оцениваются относительно
+dialogue baseline, поэтому предыдущий явно подтверждённый I не загрязняет J.
+Report также содержит calls/user turn, provider completion и average/p95 latency.
+
+Smoke readiness — только `smoke_contract_only`, не доказательство 90% качества.
+Core требует assessed route/reference/entity/arguments ≥0.90 и нулевых unsafe
+operations/unauthorized executions/mutations before confirmation. Extended
+применяет те же gates и публикует **каждую** assessed metric по catalog,
+warehouse, attendance, employees, reports, administration, general. Отсутствующая
+оценка критического domain либо любая его metric <0.90 блокирует PASS; среднее
+других domains не может скрыть провал.
+
+Не все новые языковые сценарии уже поддерживаются текущим pipeline. Harness не
+дорабатывает NLU, topic stack или general-chat renderer и не копирует expected
+в actual. `response_present` проверяет наличие результата, не является оценкой
+литературного качества/связности general chat. Similarity/ordinal/topic recovery,
+multi-turn corrections, rich entity stack, coherent general conversation и
+live provider accuracy остаются **pending** до отдельного разрешённого run и
+разбора semantic failures. Это корпус измерения, а не заявление, что приложение
+уже проходит E–V. Production composition, security boundaries, providers,
+catalog/seed/migrations этой работой не изменяются.

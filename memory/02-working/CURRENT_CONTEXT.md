@@ -5,6 +5,12 @@ Metadata: scope `working`; trust `working`; lifecycle `ephemeral`; last cleared
 
 ## Status
 
+Corpus-v2 evaluation development from `bd73be96...`: smoke remains frozen v1;
+core and extended add seeded natural-language scenarios with real synthetic
+services, per-domain readiness and explicit lifecycle/fault controls. Only
+corpus/harness/tests/docs change. Live accuracy, provider health and unsupported
+dialogue behaviors remain pending. No production or external API actions.
+
 Live harness hardening starts from `b0c2780...`: independent provider-step
 failure aggregation, owned temporary SQLite identity, authorization observation
 and explicit partial budget policy. This is development-only, with synthetic

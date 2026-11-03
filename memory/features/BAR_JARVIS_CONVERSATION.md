@@ -134,3 +134,26 @@ Corpus estimates remain static: 17 minimum, about 25 normal, 34 conservative
 without fallback/68 with it. CLI rejects below-minimum budgets before keys;
 17–24 marks partial coverage risk. Budget is never raised automatically and
 skipped mandatory cases cannot pass. Live provider quality remains pending.
+
+### Versioned live corpus v2
+
+Development from `bd73be96...` adds `--suite smoke|core|extended` and seeded
+paraphrase rotation. Smoke retains the original v1 texts/expectations exactly;
+core has 9 dialogues/51 messages/18 lifecycle actions; extended has 19/146/37.
+E–L measures lookup/reference/typo/topic/correction/intake/attendance/memory;
+M–V adds long context, negation, reports, required flow, roles, administration,
+general chat, controlled fake failures, isolation and injection probes.
+
+Seed chooses one alternate semantic case, never extra calls for every paraphrase.
+Expected reaches only post-actual scorer. Core requires assessed route/reference/
+entity/arguments ≥0.90, zero unsafe mutations/executions; extended cannot average
+away a failing critical domain. Smoke is infrastructure/contract evidence only.
+Static budget estimates at seed 0: smoke 17/25/34/68, core 48/55/96/192,
+extended 135/151/263/519 (minimum/normal/no-fallback/fallback). No automatic
+budget increase. Synthetic T faults are marked separately from provider quality;
+V is capped at one physical call, fallback off. Fixtures and reports exist only
+inside the owned temporary root; no production paths or Telegram transport.
+
+Live results and unimplemented conversational behavior remain **pending**.
+The harness measures real outcomes and does not improve production NLU to pass.
+See [coverage/readiness/budgets](../../docs/assistant_live_evaluation.md).

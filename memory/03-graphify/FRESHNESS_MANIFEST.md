@@ -1,5 +1,12 @@
 # Freshness Manifest
 
+Relevant evaluation slice reviewed 2026-11-03 from `bd73be96...`: live corpus v2
+and selectable/seeded suites are offline development evidence only. Synthetic
+target remains v15; production composition, catalog, seed and migrations are
+unchanged. Live results/quality remain pending; revalidate suite/version/seed
+and physical budget before any separately authorized live run. Runtime facts
+and production permissions were not inspected or changed.
+
 Metadata: scope `BarBot`; trust `mixed`; lifecycle `active`; last reviewed
 `2026-10-23` during two-stage planner development based on starting HEAD
 `7871802965d3fa4700e982551b744f370f44f25b`.

@@ -42,6 +42,9 @@ class IsolatedEvaluationEnvironment:
     employee = 2
     telegram_transport_disabled = True
     dispatch_driver = None
+    profile = 'smoke'
+    chat_type = 'private'
+    pilot_revoked = False
 
     @property
     def root(self):
@@ -92,10 +95,11 @@ class IsolatedEvaluationEnvironment:
         """Repositories are connection-per-call; no live SQLite handles survive."""
         self.validate_path(self.path)
         settings = Settings(_env_file=None,bot_token='synthetic',warehouse_enabled=True,
-            ai_assistant_enabled=True,ai_access_mode='pilot_allowlist',ai_pilot_user_ids='1',
+            ai_assistant_enabled=True,ai_access_mode='pilot_allowlist',
+            ai_pilot_user_ids=('11' if self.pilot_revoked else '1,11,12') if self.profile != 'smoke' else '1',
             groq_api_key=None,gemini_api_key=None)
         self.users = UserService(UserDatabase(self.path))
-        self.access = AuthService(frozenset({self.owner}), self.users)
+        self.access = AuthService(frozenset({1,11,12}) if self.profile != 'smoke' else frozenset({1}), self.users)
         self.attendance = WarehouseAttendanceService(WarehouseAttendanceDatabase(self.path),self.access)
         self.operations = WarehouseOperationsService(WarehouseOperationsDatabase(self.path),self.access)
         self.memory = PersistentAssistantConversationMemory(AssistantConversationDatabase(self.path))
@@ -113,9 +117,23 @@ class IsolatedEvaluationEnvironment:
             external[identifier] = CapabilityBinding(identifier,self.orchestrator,self.operations,'warehouse intake','CapabilityDispatch')
         for identifier,executor in (('warehouse.commit_batch',self.operations.commit_batch),('warehouse.cancel_batch',self.operations.cancel_batch)):
             external[identifier] = CapabilityBinding(identifier,self.orchestrator,self.operations,'warehouse confirmation','CapabilityDispatch',executor)
+        extra = {}
+        if self.profile != 'smoke':
+            from app.services.assistant.evaluation_fixtures import bind_services
+            extra = bind_services(self)
         self.controller = AssistantCapabilityController(self.registry,self.proposals,self.access,self.policy,
             flags={'ai_assistant_enabled':True,'warehouse_enabled':True},users=self.users,
-            attendance=self.attendance,operations=self.operations,admin=self.admin,external_bindings=external)
+            attendance=self.attendance,operations=self.operations,admin=self.admin,external_bindings=external,**extra)
+
+    def configure(self, profile):
+        if profile not in ('smoke','core','extended') or self.profile != 'smoke':
+            raise ValueError('invalid_fixture_profile')
+        if profile != 'smoke':
+            self.profile = profile
+            from app.services.assistant.evaluation_fixtures import populate
+            self.recreate()
+            populate(self)
+            self.catalog_digest = self.digest()
 
     def digest(self):
         if self.storage.path != self.root/'catalog.json' or self.storage.path.is_symlink():

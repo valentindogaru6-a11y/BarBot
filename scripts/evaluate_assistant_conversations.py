@@ -34,6 +34,8 @@ def main(argv: list[str] | None = None, *, adapter=None) -> int:
     parser.add_argument('--max-provider-calls',type=int)
     parser.add_argument('--disable-telegram-transport',action='store_true')
     parser.add_argument('--gemini-fallback',action='store_true')
+    parser.add_argument('--suite',choices=('smoke','core','extended'))
+    parser.add_argument('--variant-seed',type=int)
     try:
         args = parser.parse_args(argv)
         if args.mode == 'live_isolated':
@@ -41,16 +43,21 @@ def main(argv: list[str] | None = None, *, adapter=None) -> int:
             from app.services.assistant.evaluation_environment import IsolatedEvaluationEnvironment
             from app.services.assistant.evaluation_budget import EvaluationSafetyError
             options = LiveRunOptions(args.mode,args.allow_live,args.max_provider_calls,
-                args.provider,args.disable_telegram_transport,args.model,args.gemini_fallback)
-            coverage = budget_coverage()
+                args.provider,args.disable_telegram_transport,args.model,args.gemini_fallback,
+                args.suite or 'smoke',args.variant_seed if args.variant_seed is not None else 0)
+            from app.services.assistant.evaluation_corpus_v2 import select_suite
+            suite,_ = select_suite(options.suite,options.variant_seed)
+            coverage = budget_coverage(suite.cases)
+            print('static_budget_estimate suite='+suite.name+' '+
+                ' '.join(f'{name}={value}' for name,value in coverage.items()))
             if type(args.max_provider_calls) is int and args.max_provider_calls < coverage['minimum']:
-                print('provider_budget_below_corpus_minimum minimum=17')
+                print(f"provider_budget_below_corpus_minimum minimum={coverage['minimum']}")
             options.validate(IsolatedEvaluationEnvironment)
             validate_report_output(args.output)
             if adapter is not None:
                 raise ValueError('live_adapter_injection_denied')
             if args.max_provider_calls < coverage['estimated_normal']:
-                print('partial_coverage_risk=true minimum=17 estimated_normal=25')
+                print(f"partial_coverage_risk=true minimum={coverage['minimum']} estimated_normal={coverage['estimated_normal']}")
             report,code = asyncio.run(run_live(options,settings_loader=_load_live_settings))
             write_live_report(report,args.output)
             print(f"mode=live_isolated calls={report['call_budget']['attempted']} "
@@ -58,6 +65,7 @@ def main(argv: list[str] | None = None, *, adapter=None) -> int:
             return code
         if (args.allow_live or args.provider or args.model or args.max_provider_calls is not None
             or args.disable_telegram_transport or args.gemini_fallback
+            or args.suite is not None or args.variant_seed is not None
             or (adapter is not None and adapter.mode != 'offline_scripted')):
             raise ValueError('mode_mismatch')
     except Exception:

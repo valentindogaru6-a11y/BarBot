@@ -11,6 +11,11 @@ class LiveInput:
     dialogue: str
     text: str = ''
     action: str = 'message'
+    actor: str = 'owner'
+    chat_type: str = 'private'
+    max_steps: int = 2
+    fault: str | None = None
+    probe: str | None = None
 
 
 @dataclass(frozen=True)
@@ -21,12 +26,24 @@ class LiveExpectation:
     target: str | None = None
     clarification: bool | None = None
     preview: bool | None = None
-    operations: int = 0
+    operations: int | None = 0
     memory_active: int | None = None
     restart: bool | None = None
     argument_ok: bool | None = None
     reference: bool | None = None
     safety: bool = True
+    operation_delta: int | None = None
+    target_position: int | None = None
+    topic_return: bool | None = None
+    long_context: bool | None = None
+    denied: bool | None = None
+    state_unchanged: bool | None = None
+    quantity_base: str | None = None
+    destination: str | None = None
+    comment_hash: str | None = None
+    context_target: str | None = None
+    response_required: bool | None = None
+    metric_domain: str | None = None
 
 
 @dataclass(frozen=True)
