@@ -188,6 +188,17 @@ class ConversationToolLoop:
         plan: Callable[..., Awaitable[PlannerDecision]],
         dispatch: Callable[[PlannerDecision, PlannerContextSnapshot], Awaitable[Any]],
     ) -> tuple[tuple[Any, ...], str | None]:
+        from app.services.assistant.planner_policy import planner_request
+        with planner_request():
+            return await self._run_iterative(text=text, snapshot=snapshot,
+                capabilities=capabilities, plan=plan, dispatch=dispatch)
+
+    async def _run_iterative(
+        self, *, text: str, snapshot: PlannerContextSnapshot,
+        capabilities: Sequence[PlannerCapability],
+        plan: Callable[..., Awaitable[PlannerDecision]],
+        dispatch: Callable[[PlannerDecision, PlannerContextSnapshot], Awaitable[Any]],
+    ) -> tuple[tuple[Any, ...], str | None]:
         """Two planner/tool steps, with inert typed results and no executor in input.
 
         A read result cannot escalate to a mutation. Any preview stops the loop;
@@ -223,6 +234,8 @@ class ConversationToolLoop:
                 if key in seen:
                     break
                 seen.add(key)
+                from app.services.assistant.planner_policy import mark_tool_boundary
+                mark_tool_boundary()
                 result = await dispatch(decision, current)
             except asyncio.CancelledError:
                 raise

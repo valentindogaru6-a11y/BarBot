@@ -101,6 +101,7 @@ def _request_size_bucket(size: int) -> str:
 
 
 class ProviderErrorKind(StrEnum):
+    BUSY = "busy"
     AUTH = "auth"
     BILLING = "billing"
     CONFIG = "config"
@@ -126,6 +127,7 @@ class ProviderError(RuntimeError):
 class HttpResponse:
     status: int
     body: bytes
+    retry_after_seconds: float | None = None
 
 
 class AssistantHttpTransport(Protocol):
@@ -189,9 +191,21 @@ class AioHttpTransport:
             sock_read=read_timeout_seconds,
         )
         async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.post(url, headers=headers, json=payload) as response:
+            async with session.post(url, headers=headers, json=payload, allow_redirects=False) as response:
                 body = await self._read_limited(response, max_response_bytes)
-                return HttpResponse(response.status, body)
+                retry_after = None
+                if response.status == 429:
+                    from email.utils import parsedate_to_datetime
+                    from time import time
+                    import math
+                    value = response.headers.get("Retry-After", "")
+                    try:
+                        delay = float(value) if value.strip().replace('.', '', 1).isdigit() else parsedate_to_datetime(value).timestamp() - time()
+                        if math.isfinite(delay):
+                            retry_after = min(900., max(0., delay))
+                    except (ValueError, TypeError, OverflowError):
+                        pass
+                return HttpResponse(response.status, body, retry_after)
 
     async def post_multipart(
         self,

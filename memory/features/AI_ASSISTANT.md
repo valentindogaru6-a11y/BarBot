@@ -28,9 +28,9 @@ validation. Corpus `bar-jarvis-two-stage-v2` contains nine route and four
 argument cases and makes no live accuracy claim. The compact route remains
 pending a separately authorized live smoke.
 
-The development planner boundary is provider-neutral. `GroqPlannerProvider`
-(`openai/gpt-oss-20b`) is the configured fast primary and
-`GeminiPlannerProvider` the sequential fallback, while `PlannerDecision`
+The development planner boundary is provider-neutral. `GeminiPlannerProvider`
+is the default primary; `GroqPlannerProvider` is a conditional availability
+fallback candidate, disabled by default, while `PlannerDecision`
 remains the only internal plan contract. Each adapter validates its own compact
 route envelope; local assembly resolves target indices and derives
 read/mutation risk from the runtime `PlannerCapability`.
@@ -40,11 +40,42 @@ context updates. Provider-generated payloads never reach an executor.
 The Groq strict route schema is versioned and has no nullable fields, arrays,
 `$defs`, `$ref`, defaults or open objects. It receives no tools.
 Fallback is sequential under one bounded deadline: shadow does not double-call
-by default; AI-first may fall back only for normalized transient/schema errors;
+by default; AI-first may fall back only for normalized availability errors;
 auth/config failures do not retry. A process-local closed/open/half-open circuit
 breaker suppresses repeatedly unhealthy providers without touching business
 data. This composition is development evidence only: production promotion,
-provider quality and live accuracy remain `pending`.
+broader provider quality and production promotion remain `pending`.
+
+### Gemini-first policy (from `197a765...`)
+
+Owner-approved paced six-case bake-off at that HEAD selected Gemini fast:
+canonical/semantic 6/6, target/reference 3/3, no 429/timeouts, median 904 ms,
+p95 1703 ms. This is six diagnostic cases, not a >=90% production-corpus claim.
+Groq 20B stopped after two contract failures (1/3 canonical); 120B had 5/6
+canonical (83.3%, below the 90% contract threshold). Pacing removed observed
+429s in this sample but did not remove `json_validate_failed`; exact historical
+RPM/TPM cause is not established. These results are prior live evidence, not a
+new live run in the policy implementation task.
+
+`AI_PLANNER_FALLBACK_ENABLED=false` is the safe default. Missing Groq key/model
+does not block a disabled planner fallback; voice/STT has independent Groq
+requirements. Fallback is at most one availability attempt, never auth/config,
+schema/semantic/authority errors, overload, or after a tool/proposal boundary.
+Both converters validate before execution; local imperative evidence remains
+necessary for mutations. Failure can clarify or return a deterministic local
+result, never re-enter an unbounded legacy provider chain.
+
+Application admission, not provider fan-out, handles spam: common text/voice
+claim, bounded logical concurrency, per-user cooldown, accepted-update TTL
+dedupe and immediate busy (no queue). Shared physical concurrency is one;
+Gemini starts are >=10 seconds apart, Groq >=15; 429 cooldown >=90 seconds,
+bounded Retry-After <=900. A logical scope has <=2 physical attempts, <=1 per
+provider across the two-step loop, with one deadline. Attempt telemetry has no
+actor identifiers or request content. Completed local reads survive exhaustion.
+
+Production remains `local_first`; next phase is separately authorized owner-only
+Gemini shadow. `ai_first`, broad staff access, Groq fallback enablement and larger
+live evaluation remain pending. No config or runtime change is authorized by memory.
 
 The first controlled Groq planner smoke established a strict-schema PASS for
 the initial catalog lookup. Its second correction call returned HTTP 400, but

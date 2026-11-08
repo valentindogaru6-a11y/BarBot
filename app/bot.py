@@ -157,6 +157,13 @@ def build_assistant_clients(
         or settings.ai_web_search_enabled
     ):
         provider_transport = transport or AioHttpTransport()
+        from app.services.assistant.planner_policy import PlannerAttemptPolicy, GovernedPlannerTransport
+        attempt_policy = PlannerAttemptPolicy(
+            intervals={'gemini': settings.gemini_planner_min_interval_seconds,
+                       'groq': settings.groq_planner_min_interval_seconds},
+            cooldowns={'gemini': settings.gemini_planner_cooldown_seconds,
+                       'groq': settings.groq_planner_cooldown_seconds},
+        )
         if settings.ai_voice_enabled:
             assert settings.groq_api_key is not None
             speech_client = GroqSpeechToTextClient(
@@ -167,20 +174,28 @@ def build_assistant_clients(
             )
         assert settings.gemini_api_key is not None
         intent_client = GeminiIntentClient(
-            provider_transport,
+            GovernedPlannerTransport(provider_transport, attempt_policy, transport_trace=True),
             api_key=settings.gemini_api_key.get_secret_value(),
             model=settings.gemini_fast_model,
             timeout_seconds=settings.ai_request_timeout_seconds,
+            max_attempts=1,
         )
         planner_providers = {}
         if (
             settings.groq_api_key is not None
             and settings.groq_api_key.get_secret_value().strip()
+            and ('groq' == settings.ai_planner_primary_provider or
+                 settings.ai_planner_fallback_enabled)
         ):
             planner_providers["groq"] = GroqPlannerProvider(
                 provider_transport,
                 api_key=settings.groq_api_key.get_secret_value(),
-                model=settings.groq_planner_model,
+                model=(settings.groq_planner_fallback_model.strip()
+                    if settings.ai_planner_fallback_provider == 'groq'
+                    else settings.groq_planner_model),
+                connect_timeout_seconds=settings.groq_planner_connect_seconds,
+                read_timeout_seconds=settings.groq_planner_read_seconds,
+                total_timeout_seconds=settings.groq_planner_total_seconds,
             )
         if (
             settings.gemini_api_key is not None
@@ -189,12 +204,14 @@ def build_assistant_clients(
             planner_providers["gemini"] = GeminiPlannerProvider(
                 provider_transport,
                 api_key=settings.gemini_api_key.get_secret_value(),
-                model=settings.gemini_fast_model,
+                model=settings.gemini_planner_model,
+                connect_timeout_seconds=settings.gemini_planner_connect_seconds,
+                read_timeout_seconds=settings.gemini_planner_read_seconds,
+                total_timeout_seconds=settings.gemini_planner_total_seconds,
             )
         primary = planner_providers.get(settings.ai_planner_primary_provider)
-        fallback = planner_providers.get(settings.ai_planner_fallback_provider)
-        if primary is None and settings.ai_planner_mode == "local_first":
-            primary, fallback = fallback, None
+        fallback = (planner_providers.get(settings.ai_planner_fallback_provider)
+            if settings.ai_planner_fallback_enabled else None)
         if primary is not None:
             planner_client = MultiProviderPlanner(
                 primary,
@@ -203,6 +220,7 @@ def build_assistant_clients(
                 total_deadline_seconds=(
                     settings.ai_planner_total_deadline_seconds
                 ),
+                attempt_policy=attempt_policy,
             )
         if settings.ai_web_search_enabled:
             search_client = GeminiGroundedSearchClient(
@@ -282,7 +300,10 @@ async def main() -> None:
     assistant_orchestrator, assistant_speech_client = build_assistant_clients(
         settings
     )
-    assistant_request_coordinator = AssistantRequestCoordinator()
+    assistant_request_coordinator = AssistantRequestCoordinator(
+        max_concurrency=settings.ai_request_global_concurrency,
+        user_cooldown_seconds=settings.ai_request_user_cooldown_seconds,
+    )
     assistant_conversation_memory = PersistentAssistantConversationMemory(
         AssistantConversationDatabase(settings.database_path),
         ttl_seconds=settings.ai_conversation_ttl_seconds,
@@ -489,6 +510,7 @@ async def main() -> None:
             close_bot_session=False,
         )
     finally:
+        await assistant_request_coordinator.shutdown()
         await assistant_orchestrator.shutdown()
         await stop_reminder_worker(reminder_task)
         await stop_reminder_worker(schedule_task)

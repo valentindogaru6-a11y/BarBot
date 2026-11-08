@@ -47,6 +47,9 @@ from app.services.assistant.providers import (
 )
 from app.services.assistant.planner_arguments import local_stage_two_arguments
 from app.services.assistant.system_prompt import build_planner_route_system_prompt
+from app.services.assistant.planner_policy import (
+    ATTEMPT_ROLE, CURRENT_REQUEST, GovernedPlannerTransport, PlannerBusy, planner_request,
+)
 
 GROQ_CHAT_COMPLETIONS_URL = "https://api.groq.com/openai/v1/chat/completions"
 GEMINI_API_ROOT = "https://generativelanguage.googleapis.com/v1beta/models"
@@ -400,6 +403,7 @@ def convert_gemini_route(
 
 def _normalized_error(kind: ProviderErrorKind) -> ProviderPlanError:
     return {
+        ProviderErrorKind.BUSY: ProviderPlanError.BUSY,
         ProviderErrorKind.AUTH: ProviderPlanError.AUTH,
         ProviderErrorKind.BILLING: ProviderPlanError.QUOTA,
         ProviderErrorKind.CONFIG: ProviderPlanError.CONFIG,
@@ -700,6 +704,8 @@ class GroqPlannerProvider(_PlannerProviderBase):
             return self._result(started, decision=decision, status=PlannerValidationStatus.PASSED)
         except asyncio.CancelledError:
             raise
+        except PlannerBusy:
+            return self._result(started, error=ProviderPlanError.BUSY, status=PlannerValidationStatus.PROVIDER_ERROR)
         except (asyncio.TimeoutError, TimeoutError):
             diagnostic = _provider_error_diagnostic(
                 status=None,
@@ -855,10 +861,8 @@ _FALLBACK_ERRORS = frozenset({
     ProviderPlanError.NETWORK,
     ProviderPlanError.RATE_LIMIT,
     ProviderPlanError.SERVER_ERROR,
-    ProviderPlanError.GENERATED_OUTPUT_SCHEMA_MISMATCH,
-    ProviderPlanError.MODEL_REFUSAL,
-    ProviderPlanError.MALFORMED_RESPONSE,
     ProviderPlanError.CIRCUIT_OPEN,
+    ProviderPlanError.DEADLINE,
 })
 
 _CIRCUIT_TRANSIENT_ERRORS = frozenset({
@@ -872,7 +876,7 @@ _CIRCUIT_TRANSIENT_ERRORS = frozenset({
 class MultiProviderPlanner:
     """Expose canonical decisions while keeping provider wire formats private."""
 
-    def __init__(self, primary: PlannerProvider | None, fallback: PlannerProvider | None = None, *, mode: str = "local_first", total_deadline_seconds: float = 12, shadow_fallback_enabled: bool = False, circuit_breaker: PlannerCircuitBreaker | None = None) -> None:
+    def __init__(self, primary: PlannerProvider | None, fallback: PlannerProvider | None = None, *, mode: str = "local_first", total_deadline_seconds: float = 12, shadow_fallback_enabled: bool = False, circuit_breaker: PlannerCircuitBreaker | None = None, attempt_policy=None) -> None:
         if mode not in {"local_first", "shadow", "ai_first"}:
             raise ValueError("unknown planner mode")
         self.primary = primary
@@ -881,48 +885,104 @@ class MultiProviderPlanner:
         self.total_deadline_seconds = total_deadline_seconds
         self.shadow_fallback_enabled = shadow_fallback_enabled
         self.circuit = circuit_breaker or PlannerCircuitBreaker()
+        self.attempt_policy = attempt_policy
+        if attempt_policy is not None:
+            for provider in (primary, fallback):
+                if isinstance(provider, _PlannerProviderBase):
+                    provider.transport = GovernedPlannerTransport(provider.transport, attempt_policy)
 
     async def _call(self, provider: PlannerProvider, snapshot: PlannerContextSnapshot, text: str, capabilities: Sequence[PlannerCapability]) -> ProviderPlanResult:
         if not self.circuit.acquire(provider.provider_name):
             return ProviderPlanResult(provider=provider.provider_name, model=provider.model, error=ProviderPlanError.CIRCUIT_OPEN, latency_ms=0, schema_mode="skipped", validation_status=PlannerValidationStatus.PROVIDER_ERROR)
-        if isinstance(provider, _PlannerProviderBase):
-            result = await provider.plan(
-                snapshot,
-                text,
-                capabilities,
-                extract_arguments=self.mode != "shadow",
-            )
-        else:
-            result = await provider.plan(snapshot, text, capabilities)
+        try:
+            if isinstance(provider, _PlannerProviderBase):
+                result = await provider.plan(
+                    snapshot, text, capabilities, extract_arguments=self.mode != "shadow",
+                )
+            else:
+                result = await provider.plan(snapshot, text, capabilities)
+        except BaseException:
+            # Release a half-open probe even on cancellation/unexpected errors.
+            self.circuit.failure(provider.provider_name, transient=False)
+            raise
+        transport = getattr(provider, 'transport', None)
+        row = None
+        if isinstance(transport, GovernedPlannerTransport):
+            row, transport.last_row = transport.last_row, None
+            if row is not None:
+                row['validation'] = result.validation_status.value
+                row['category'] = result.error.value if result.error else 'success'
         transient = result.error in _CIRCUIT_TRANSIENT_ERRORS
         if result.decision is not None:
             self.circuit.success(provider.provider_name)
         else:
             self.circuit.failure(provider.provider_name, transient=transient)
+        if row is not None:
+            row['circuit'] = self.circuit.state(provider.provider_name).value
+            transport.policy.emit(row)
         return result
 
     async def plan(self, text: str, *, snapshot: PlannerContextSnapshot, capabilities: Sequence[PlannerCapability]) -> PlannerDecision:
+        with planner_request():
+            return await self._plan(text, snapshot=snapshot, capabilities=capabilities)
+
+    def _trace_abort(self, provider, category):
+        transport = getattr(provider, 'transport', None)
+        if isinstance(transport, GovernedPlannerTransport):
+            row, transport.last_row = transport.last_row, None
+            if row is not None:
+                row['category'] = category
+                row['circuit'] = self.circuit.state(provider.provider_name).value
+                transport.policy.emit(row)
+
+    async def _plan(self, text: str, *, snapshot: PlannerContextSnapshot, capabilities: Sequence[PlannerCapability]) -> PlannerDecision:
         providers = [provider for provider in (self.primary, self.fallback) if provider is not None]
         if not providers:
             raise ProviderError("planner", ProviderErrorKind.UNAVAILABLE)
         if self.mode == "shadow" and not self.shadow_fallback_enabled:
             providers = providers[:1]
         started = monotonic()
+        state = CURRENT_REQUEST.get()
+        assert state is not None
+        if state.deadline is None:
+            state.deadline = started + self.total_deadline_seconds
         last: ProviderPlanResult | None = None
         for index, provider in enumerate(providers):
-            remaining = self.total_deadline_seconds - (monotonic() - started)
+            if index and (state.boundary_crossed or snapshot.tool_results or snapshot.pending_action):
+                break
+            remaining = state.deadline - monotonic()
             if remaining <= 0:
                 break
+            role_token = ATTEMPT_ROLE.set(('fallback' if index else 'primary', last.error.value if index and last and last.error else None))
             try:
                 async with asyncio.timeout(remaining):
                     last = await self._call(provider, snapshot, text, capabilities)
             except asyncio.CancelledError:
+                self._trace_abort(provider, 'cancelled')
                 raise
             except TimeoutError:
+                self.circuit.failure(provider.provider_name, transient=True)
+                self._trace_abort(provider, 'deadline')
                 last = ProviderPlanResult(provider=provider.provider_name, model=provider.model, error=ProviderPlanError.DEADLINE, latency_ms=max(0, round((monotonic() - started) * 1_000)), schema_mode="deadline", validation_status=PlannerValidationStatus.PROVIDER_ERROR)
+            finally:
+                ATTEMPT_ROLE.reset(role_token)
             if last.decision is not None:
+                # A planner never supplies imperative evidence or permissions.
+                if last.decision.mutation and self.mode != 'shadow':
+                    from app.services.assistant.planner_policy import mutation_evidence
+                    if not mutation_evidence(text):
+                        raise ValueError('Planner mutation requires local action evidence')
                 return last.decision
             if last.error not in _FALLBACK_ERRORS or index + 1 >= len(providers):
                 break
-        kind = ProviderErrorKind.TIMEOUT if last and last.error in {ProviderPlanError.TIMEOUT, ProviderPlanError.DEADLINE} else ProviderErrorKind.UNAVAILABLE
+        if last and last.error is ProviderPlanError.BUSY:
+            raise PlannerBusy()
+        kind = (ProviderErrorKind.TIMEOUT if last and last.error in {ProviderPlanError.TIMEOUT, ProviderPlanError.DEADLINE}
+            else ProviderErrorKind.AUTH if last and last.error in {ProviderPlanError.AUTH, ProviderPlanError.QUOTA}
+            else ProviderErrorKind.MALFORMED_RESPONSE if last and last.error in {
+                ProviderPlanError.MALFORMED_RESPONSE, ProviderPlanError.GENERATED_OUTPUT_SCHEMA_MISMATCH,
+                ProviderPlanError.INVALID_SCHEMA, ProviderPlanError.UNKNOWN_BAD_REQUEST,
+            }
+            else ProviderErrorKind.CONFIG if last and last.error in {ProviderPlanError.CONFIG, ProviderPlanError.UNSUPPORTED_PARAMETER}
+            else ProviderErrorKind.UNAVAILABLE)
         raise ProviderError(last.provider if last else "planner", kind)

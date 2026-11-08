@@ -656,6 +656,9 @@ class AssistantCapabilityController:
         payload = definition.input_model.model_validate(args)
         args = payload.model_dump(exclude_none=True)
 
+        from app.services.assistant.planner_policy import mark_tool_boundary
+        mark_tool_boundary()
+
         if identifier in {'catalog.search', 'catalog.get'}:
             tools = AssistantToolRegistry(catalog)
             if identifier == 'catalog.get':

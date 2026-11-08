@@ -206,7 +206,10 @@ class AssistantOrchestrator:
     ) -> PlannerDecision:
         """Evaluate a plan without returning or executing it."""
 
-        return await self.plan(text, snapshot=snapshot, capabilities=capabilities)
+        from app.services.assistant.planner_policy import CURRENT_REQUEST, planner_request
+        parent = CURRENT_REQUEST.get()
+        with planner_request(fresh=True, provider_allowed=parent.provider_allowed if parent else True):
+            return await self.plan(text, snapshot=snapshot, capabilities=capabilities)
 
     @staticmethod
     def shadow_local_decision(
@@ -500,6 +503,12 @@ class AssistantOrchestrator:
                             "Уточните, что именно нужно изменить в выбранной позиции."
                         ),
                     )
+                # Never re-enter the legacy Gemini intent adapter after the
+                # bounded planner chain. That would be a hidden extra attempt.
+                return self.local_intent(text) or AssistantIntent(
+                    intent=AssistantIntentName.CLARIFY,
+                    clarification="Уточните действие или используйте меню BarBot.",
+                )
         local = self.local_intent(text)
         if local is not None:
             if self.planner_mode == "shadow" and planner_snapshot is not None:
@@ -510,6 +519,14 @@ class AssistantOrchestrator:
                     capabilities=planner_capabilities,
                     local=self.shadow_local_decision(local),
                 )
+            return local
+        if self.planner_mode == 'shadow' and planner_snapshot is not None:
+            local = AssistantIntent(intent=AssistantIntentName.CLARIFY,
+                clarification='Уточните запрос или используйте меню BarBot.')
+            self.start_shadow(shadow_text or text,
+                user_key=shadow_key if shadow_key is not None else object(),
+                snapshot=planner_snapshot, capabilities=planner_capabilities,
+                local=self.shadow_local_decision(local, route_category='local_clarification'))
             return local
         if self.intent_client is None:
             raise AssistantUnavailableError("intent provider is disabled")

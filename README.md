@@ -252,13 +252,34 @@ capability. The safe default is `local_first`; planner output cannot assert
 authority/confirmation, invent stable IDs, or bypass existing FSM, proposal,
 access, and warehouse imperative-evidence boundaries.
 
-Planner HTTP formats are provider-specific. Groq is the configured primary and
-Gemini the sequential fallback, but both must first validate a closed wire
+Planner HTTP formats are provider-specific. Gemini fast is the configured primary;
+Groq is a conditional availability fallback, **disabled by default**. Both validate a closed wire
 envelope and convert it to BarBot's canonical `PlannerDecision`. Risk,
 permissions, stable references and confirmation remain server-owned. Shadow
 does not call the fallback by default; AI-first fallback shares one bounded
 deadline and never retries business execution. Provider promotion and live
-accuracy remain separate controlled-pilot decisions.
+accuracy remain separate controlled-pilot decisions. No schema/auth/config/semantic
+failure enables fallback. Timeout/network/429/5xx/open availability circuit may
+enable one fallback only before any executed tool, draft or proposal. Production
+stays local-first; the next separately authorized pilot is owner-only Gemini shadow.
+
+Planner admission uses immediate busy responses (no waiting queue or overflow tasks),
+two provider-backed logical requests globally, one text/voice request per user,
+a two-second per-user cooldown and ten-minute/1024-entry accepted-update suppression.
+Limits are process-local, not durable exactly-once delivery. Existing warehouse
+source-message idempotency and confirmation stay authoritative across restarts.
+Deterministic local requests can bypass provider admission, but that claim cannot
+make HTTP requests. Voice must first acquire admission before transcription.
+
+Shared physical concurrency is one; start-to-start intervals are ten seconds for
+Gemini and fifteen for Groq. A 429 starts at least ninety seconds of cooldown;
+Retry-After is bounded to 900 seconds. Busy/cooldown never spills into Groq.
+Each logical planner scope permits at most one primary and one fallback physical
+attempt across the two-step loop, under one twelve-second deadline. A completed
+read is kept if no further physical attempt is available. Each provider retries
+zero times. Shadow gets a fresh, independently supervised, executor-free scope.
+Attempt diagnostics contain opaque correlation tokens and closed categories,
+not prompts, actor/chat IDs, targets, keys or responses.
 
 ```dotenv
 AI_ASSISTANT_ENABLED=false
@@ -269,9 +290,26 @@ AI_VOICE_ENABLED=false
 AI_GENERAL_CHAT_ENABLED=false
 AI_WEB_SEARCH_ENABLED=false
 AI_PLANNER_MODE=local_first
-AI_PLANNER_PRIMARY_PROVIDER=groq
-AI_PLANNER_FALLBACK_PROVIDER=gemini
+AI_PLANNER_PRIMARY_PROVIDER=gemini
+AI_PLANNER_FALLBACK_PROVIDER=groq
+AI_PLANNER_FALLBACK_ENABLED=false
 AI_PLANNER_TOTAL_DEADLINE_SECONDS=12
+GEMINI_PLANNER_MODEL=gemini-3.5-flash-lite
+GROQ_PLANNER_FALLBACK_MODEL=openai/gpt-oss-120b
+GEMINI_PLANNER_CONNECT_SECONDS=3
+GEMINI_PLANNER_READ_SECONDS=4
+GEMINI_PLANNER_TOTAL_SECONDS=5
+GROQ_PLANNER_CONNECT_SECONDS=3
+GROQ_PLANNER_READ_SECONDS=5
+GROQ_PLANNER_TOTAL_SECONDS=8
+GEMINI_PLANNER_MIN_INTERVAL_SECONDS=10
+GROQ_PLANNER_MIN_INTERVAL_SECONDS=15
+GEMINI_PLANNER_COOLDOWN_SECONDS=90
+GROQ_PLANNER_COOLDOWN_SECONDS=90
+AI_PLANNER_PHYSICAL_CONCURRENCY=1
+AI_REQUEST_GLOBAL_CONCURRENCY=2
+AI_REQUEST_USER_COOLDOWN_SECONDS=2
+AI_REQUEST_QUEUE_POLICY=immediate_busy
 GROQ_API_KEY=
 GROQ_STT_MODEL=whisper-large-v3-turbo
 GROQ_PLANNER_MODEL=openai/gpt-oss-20b

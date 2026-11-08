@@ -110,6 +110,7 @@ class PlannerValidationStatus(StrEnum):
 
 
 class ProviderPlanError(StrEnum):
+    BUSY = "busy"
     AUTH = "auth"
     QUOTA = "quota"
     CONFIG = "config"

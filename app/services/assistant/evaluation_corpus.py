@@ -47,6 +47,9 @@ class LiveExpectation:
     metric_domain: str | None = None
     effects: EffectPolicy | None = None
     scoring_domain: str | None = None
+    informational: bool = False
+    quantity_text: str | None = None
+    unit_text: str | None = None
 
     def __post_init__(self):
         if self.effects is None:

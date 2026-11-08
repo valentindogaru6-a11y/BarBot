@@ -26,10 +26,10 @@ def required_domain_metrics(suite):
         if domain in ('safety','access','unspecified'):
             continue
         names=set()
-        if e.domain is not None or e.capabilities is not None:names.add('route')
+        if e.domain is not None or e.capabilities is not None or e.informational:names.add('route')
         if e.target is not None or e.target_position is not None:names.add('entity_resolution')
         if e.reference:names.add('contextual_reference')
-        if e.argument_ok is not None or any(getattr(e,k) is not None for k in ('quantity_base','destination','comment_hash')):
+        if e.argument_ok is not None or e.quantity_text is not None or any(getattr(e,k) is not None for k in ('quantity_base','destination','comment_hash')):
             names.add('argument_extraction')
         if e.memory_active is not None:names.add('memory_lifecycle')
         if e.restart is not None:names.add('restart_persistence')

@@ -98,6 +98,15 @@ controlled shadow evaluation`. Voice, web, images and video also remain pending.
 
 ## Isolated live evaluation (development)
 
+Current provider policy is documented in [AI assistant](AI_ASSISTANT.md#gemini-first-policy-from-197a765):
+Gemini primary, conditional Groq fallback disabled by default, application
+admission before network and shared physical pacing. The prior six-case paced
+comparison does not establish corpus-wide accuracy. Owner-only shadow is the
+next separate live stage; AI-first promotion remains pending. Evaluation treats
+gram aliases as equivalent only within the mass dimension; informational
+writeoff explanations may use general/warehouse domains, but never a mutation
+capability, preview or business side effect. Expectations remain scorer-only.
+
 `offline_scripted` remains runner-contract evidence, not provider accuracy.
 `live_isolated` has a separate real-service composition and versioned synthetic
 `bar-jarvis-live-conversation-v1` corpus: four dialogues, two safety cases, 28

@@ -28,8 +28,9 @@ def test_ai_defaults_are_disabled_and_do_not_require_keys() -> None:
     assert settings.ai_conversation_max_turns == 12
     assert settings.ai_conversation_max_chars == 12000
     assert settings.ai_web_search_max_provider_calls_per_update == 1
-    assert settings.ai_planner_primary_provider == "groq"
-    assert settings.ai_planner_fallback_provider == "gemini"
+    assert settings.ai_planner_primary_provider == "gemini"
+    assert settings.ai_planner_fallback_provider == "groq"
+    assert settings.ai_planner_fallback_enabled is False
     assert settings.ai_planner_total_deadline_seconds == 12
     assert settings.groq_planner_model == "openai/gpt-oss-20b"
 
@@ -163,6 +164,8 @@ def test_enabled_groq_primary_planner_requires_groq_key(mode) -> None:
             ai_access_mode="role_based",
             ai_text_enabled=True,
             ai_planner_mode=mode,
+            ai_planner_primary_provider="groq",
+            ai_planner_fallback_provider="gemini",
             gemini_api_key="gemini",
         )
 

@@ -269,6 +269,8 @@ def _latency_bucket(elapsed: float) -> str:
 
 
 def _provider_error_text(error: ProviderError) -> str:
+    if error.kind is ProviderErrorKind.BUSY:
+        return AI_REQUEST_BUSY_TEXT
     if error.kind is ProviderErrorKind.RATE_LIMIT:
         return AI_RATE_LIMIT_TEXT
     if error.kind in {ProviderErrorKind.TIMEOUT, ProviderErrorKind.SERVER, ProviderErrorKind.UNAVAILABLE}:
@@ -342,6 +344,10 @@ async def _run_assistant(
 ) -> None:
     user_id = message.from_user.id if message.from_user is not None else None
     if user_id is None:
+        return
+    from app.services.assistant.orchestrator import MAX_ASSISTANT_TEXT_LENGTH
+    if len(' '.join(text.split())) > MAX_ASSISTANT_TEXT_LENGTH:
+        await message.answer('Сформулируйте запрос короче и конкретнее.')
         return
     planner_mode = getattr(orchestrator, "planner_mode", "local_first")
     # Runtime entry points always inject and recheck the unified policy. Keeping
@@ -610,10 +616,31 @@ async def _run_assistant(
             )
         except asyncio.CancelledError:
             raise
-        except Exception:
+        except Exception as exc:
             logger.info('Assistant planned request rejected')
-            await message.answer('Запрос не удалось безопасно выполнить. Уточните действие или используйте меню.')
-            return
+            local = orchestrator.local_intent(text)
+            safe_availability = isinstance(exc, ProviderError) and exc.kind in {
+                ProviderErrorKind.TIMEOUT, ProviderErrorKind.UNAVAILABLE, ProviderErrorKind.RATE_LIMIT, ProviderErrorKind.BUSY,
+            }
+            local_id = {
+                AssistantIntentName.FIND_TECH_CARD: 'catalog.search',
+                AssistantIntentName.PREPARE_WRITEOFF: 'warehouse.prepare_writeoff',
+                AssistantIntentName.PREPARE_TRANSFER: 'warehouse.prepare_transfer',
+            }.get(local.intent) if local else None
+            if local_id and (local_id == 'catalog.search' or safe_availability):
+                from app.services.assistant.capability_controller import CapabilityDispatch
+                # Dispatch a locally derived intent through the same rendering /
+                # warehouse intake services. Contract failures never make drafts.
+                assistant_capability_controller._require(user_id, local_id)
+                assistant_capability_controller.access_policy.require_assistant_access(user_id, chat_type=message.chat.type)
+                if assistant_access_policy is not None:
+                    assistant_access_policy.require_assistant_access(user_id, chat_type=message.chat.type)
+                completed = (CapabilityDispatch(local_id, 'Локальный результат.', tool_action=registry.execute(local)),)
+                clarification = None
+            else:
+                await message.answer(AI_REQUEST_BUSY_TEXT if isinstance(exc, ProviderError) and exc.kind is ProviderErrorKind.BUSY
+                    else 'Запрос не удалось безопасно выполнить. Уточните действие или используйте меню.')
+                return
         for dispatch in completed:
             action = dispatch.tool_action
             if action is None:
@@ -1753,6 +1780,8 @@ async def handle_assistant_text(
         return
     async with assistant_request_coordinator.claim(
         message.from_user.id, update_key=(message.chat.id, int(getattr(message, 'message_id', 0))),
+        allow_local=(callable(getattr(assistant_orchestrator, 'local_intent', None))
+            and assistant_orchestrator.local_intent(message.text or '') is not None),
     ) as acquired:
         if not acquired:
             await message.answer(AI_REQUEST_BUSY_TEXT)

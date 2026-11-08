@@ -8,6 +8,16 @@ Evidence: regression tests, Git history, rollout docs, owner observations
 Depends on: callbacks, SQLite/WAL, workers, XLSX, imports, VPS environment
 Importance: High
 
+- **Provider failover is not backpressure:** busy/cooldown requests must not fan
+  out to another provider. Count at the physical HTTP boundary and share limits
+  across users; keep claims/cancellation/shutdown bounded. A tool/proposal
+  boundary forbids fallback. Groq schema failures still occurred in paced tests;
+  it remains a conditional candidate, not a healthy default reserve.
+- **Scoring equivalence is dimensional:** gram/грамм/g are equivalent mass
+  aliases, not a reason to accept volume/count. Informational warehouse-domain
+  answers can be read-only; actual effects and runtime risk, not domain alone,
+  decide safety. Six diagnostic cases do not prove broad live accuracy.
+
 - **Conversation state separation:** successful entity/task facts must remain
   separate from failed attempts, candidates and active proposals. Provider
   failure must not erase the last stable selection.

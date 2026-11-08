@@ -5,6 +5,15 @@ Metadata: scope `working`; trust `working`; lifecycle `ephemeral`; last cleared
 
 ## Status
 
+Gemini-first resilience development starts at `197a765...`: explicit disabled
+Groq fallback, shared physical admission/pacing, bounded logical text/voice
+requests and privacy-safe attempt traces. Six-case paced bake-off selected
+Gemini fast (6/6 canonical/semantic); Groq 20B/120B remain below contract gates.
+That small prior sample is not a production-quality percentage. Production
+remains local-first; owner-only Gemini shadow, Groq fallback enablement and
+AI-first are pending separate review/authorization. No live/provider/production
+actions belong to this implementation task; catalog/seed/schema stay unchanged.
+
 Focused scoring fix from `a1900e19...`: close the invisible-draft oracle gap
 with actual DB snapshots/statement ledger and scorer-owned allowed transitions;
 attribute accuracy/confusion to expected domains with required metric gates.

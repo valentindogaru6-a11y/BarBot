@@ -1,5 +1,12 @@
 # Freshness Manifest
 
+Provider-policy slice revalidated 2026-11-09 from `197a765...`: Gemini-first,
+disabled conditional Groq fallback, process-local admission and physical pacing,
+one logical deadline and safe local/clarification termination. Prior six-case
+paced results select a candidate only; owner-only shadow and broader live
+quality remain pending. This development changes composition/config defaults,
+not the real environment, production state, catalog, seed or schema/migrations.
+
 Scoring slice revalidated 2026-11-03 from `a1900e19...`: actual temp-DB structural
 snapshots/statement ledger, typed allowed transitions, expected-domain metrics
 and confusion matrix. P1/P2 are covered by offline regressions. Corpus counts,

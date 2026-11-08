@@ -200,8 +200,8 @@ def test_primary_success_skips_fallback():
 
 
 @pytest.mark.parametrize("error", [ProviderPlanError.TIMEOUT, ProviderPlanError.RATE_LIMIT,
-                                    ProviderPlanError.SERVER_ERROR, ProviderPlanError.MALFORMED_RESPONSE])
-def test_transient_or_wire_failure_uses_one_fallback(error):
+                                    ProviderPlanError.SERVER_ERROR, ProviderPlanError.NETWORK])
+def test_only_availability_failure_uses_one_fallback(error):
     primary, fallback = FakeProvider("groq", [outcome("groq", error)]), FakeProvider("gemini", [outcome("gemini")])
     asyncio.run(MultiProviderPlanner(primary, fallback, mode="ai_first").plan("x", snapshot=snapshot(), capabilities=CAPS))
     assert (primary.calls, fallback.calls) == (1, 1)

@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 from pathlib import Path
 from typing import Literal
 
@@ -92,9 +93,26 @@ class Settings(BaseSettings):
     ai_general_chat_enabled: bool = False
     ai_web_search_enabled: bool = False
     ai_planner_mode: Literal["local_first", "shadow", "ai_first"] = "local_first"
-    ai_planner_primary_provider: Literal["groq", "gemini"] = "groq"
-    ai_planner_fallback_provider: Literal["groq", "gemini"] = "gemini"
+    ai_planner_primary_provider: Literal["groq", "gemini"] = "gemini"
+    ai_planner_fallback_provider: Literal["groq", "gemini"] = "groq"
+    ai_planner_fallback_enabled: bool = False
     ai_planner_total_deadline_seconds: int = Field(default=12, ge=1, le=30)
+    gemini_planner_model: str = Field(default="gemini-3.5-flash-lite", min_length=1, max_length=100)
+    groq_planner_fallback_model: str | None = Field(default="openai/gpt-oss-120b", max_length=100)
+    gemini_planner_connect_seconds: float = Field(default=3, gt=0, le=3)
+    gemini_planner_read_seconds: float = Field(default=4, gt=0, le=4)
+    gemini_planner_total_seconds: float = Field(default=5, gt=0, le=5)
+    groq_planner_connect_seconds: float = Field(default=3, gt=0, le=3)
+    groq_planner_read_seconds: float = Field(default=5, gt=0, le=5)
+    groq_planner_total_seconds: float = Field(default=8, gt=0, le=8)
+    gemini_planner_min_interval_seconds: float = Field(default=10, ge=10, le=300)
+    groq_planner_min_interval_seconds: float = Field(default=15, ge=15, le=300)
+    gemini_planner_cooldown_seconds: float = Field(default=90, ge=90, le=900)
+    groq_planner_cooldown_seconds: float = Field(default=90, ge=90, le=900)
+    ai_planner_physical_concurrency: Literal[1] = 1
+    ai_request_global_concurrency: int = Field(default=2, ge=1, le=8)
+    ai_request_user_cooldown_seconds: float = Field(default=2, ge=1, le=60)
+    ai_request_queue_policy: Literal["immediate_busy"] = "immediate_busy"
     groq_api_key: SecretStr | None = None
     groq_stt_model: str = Field(
         default="whisper-large-v3-turbo",
@@ -162,6 +180,7 @@ class Settings(BaseSettings):
         "groq_planner_model",
         "gemini_fast_model",
         "gemini_strong_model",
+        "gemini_planner_model",
     )
     @classmethod
     def reject_blank_model_names(cls, value: str) -> str:
@@ -169,6 +188,16 @@ class Settings(BaseSettings):
         if not cleaned:
             raise ValueError("AI model name must not be blank")
         return cleaned
+
+    @field_validator('gemini_planner_model', 'groq_planner_fallback_model')
+    @classmethod
+    def validate_planner_model_path(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        if value and not re.fullmatch(r'[A-Za-z0-9_./-]{1,100}', value):
+            raise ValueError('Invalid planner model name')
+        return value
 
     @field_validator("catalog_path", "database_path")
     @classmethod
@@ -242,10 +271,13 @@ class Settings(BaseSettings):
                 "AI_GENERAL_CHAT_ENABLED/AI_WEB_SEARCH_ENABLED требуют "
                 "AI_ASSISTANT_ENABLED"
             )
-        if not self.ai_assistant_enabled:
-            return self
         if self.ai_planner_primary_provider == self.ai_planner_fallback_provider:
             raise ValueError("AI planner primary и fallback должны различаться")
+        if self.ai_planner_fallback_enabled and self.ai_planner_fallback_provider == 'groq':
+            if not self.groq_planner_fallback_model or not self.groq_planner_fallback_model.strip():
+                raise ValueError("Groq fallback model name must not be blank")
+        if not self.ai_assistant_enabled:
+            return self
         if (
             self.ai_general_chat_enabled or self.ai_web_search_enabled
         ) and not (self.ai_text_enabled or self.ai_voice_enabled):
@@ -262,7 +294,6 @@ class Settings(BaseSettings):
         active_input = self.ai_text_enabled or self.ai_voice_enabled
         if (
             active_input
-            and self.ai_planner_mode in {"shadow", "ai_first"}
             and self.ai_planner_primary_provider == "groq"
             and (
                 self.groq_api_key is None
@@ -272,7 +303,6 @@ class Settings(BaseSettings):
             raise ValueError("GROQ_API_KEY обязателен для выбранного AI planner")
         if (
             active_input
-            and self.ai_planner_mode in {"shadow", "ai_first"}
             and self.ai_planner_primary_provider == "gemini"
             and (
                 self.gemini_api_key is None
@@ -282,7 +312,7 @@ class Settings(BaseSettings):
             raise ValueError("GEMINI_API_KEY обязателен для выбранного AI planner")
         if (
             active_input
-            and self.ai_planner_mode == "ai_first"
+            and self.ai_planner_fallback_enabled
             and self.ai_planner_fallback_provider == "groq"
             and (
                 self.groq_api_key is None

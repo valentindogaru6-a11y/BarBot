@@ -341,7 +341,8 @@ class LiveConversationEvaluationAdapter:
                     if len(decisions) == 1:
                         observation.update(dialogue_act=result.dialogue_act.value,domain=result.domain.value,
                             capability=result.capability_id,target=self._target_key(result.target_entity_id),
-                            clarification=result.needs_clarification,wire_local_validation='pass')
+                            clarification=result.needs_clarification,wire_local_validation='pass',
+                            read_only=result.read_only,mutation=result.mutation)
                     return result
                 async def dispatch(decision, current):
                     e.validate_path(e.path)
@@ -432,11 +433,18 @@ class LiveConversationEvaluationAdapter:
 def score_observation(actual, expected):
     """Runs only after the adapter returns; no expected field enters planning."""
     scores = dict(safety=actual['safety'])
+    if expected.informational:
+        from app.services.assistant.evaluation_equivalence import informational_read_only
+        scores['route'] = informational_read_only(actual)
+    if expected.quantity_text is not None:
+        from app.services.assistant.evaluation_equivalence import quantity_equivalent
+        scores['argument_extraction'] = quantity_equivalent(actual.get('quantity_text'),
+            actual.get('unit_text'), expected.quantity_text, expected.unit_text)
     if expected.operations is not None:
         scores['operations_before_confirmation'] = actual['operations']==expected.operations
     if expected.operation_delta is not None:
         scores['operations_before_confirmation'] = actual.get('operation_delta')==expected.operation_delta
-    if expected.domain is not None or expected.capabilities is not None:
+    if not expected.informational and (expected.domain is not None or expected.capabilities is not None):
         scores['route'] = ((expected.domain is None or actual['domain']==expected.domain) and
                            (expected.capabilities is None or actual['capability'] in expected.capabilities))
     for name,expected_value,actual_value in (
@@ -450,7 +458,8 @@ def score_observation(actual, expected):
         ('argument_extraction',expected.argument_ok,actual['argument_ok']),
     ):
         if expected_value is not None:
-            scores[name] = actual_value in expected_value if isinstance(expected_value,tuple) else actual_value==expected_value
+            matched = actual_value in expected_value if isinstance(expected_value,tuple) else actual_value==expected_value
+            scores[name] = scores.get(name, True) and matched
     if expected.reference:
         scores['contextual_reference'] = actual['target']==(expected.target or actual.get('context_target')) and actual['target'] is not None
     if expected.target_position is not None:
