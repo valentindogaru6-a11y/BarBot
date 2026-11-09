@@ -202,7 +202,11 @@ def test_planned_mutation_stops_at_proposal_and_confirm_is_idempotent(runtime):
 
 
 def test_warehouse_planned_draft_still_uses_existing_intake(runtime,warehouse,monkeypatch):
-    _,_,service=warehouse
+    users,_,service=warehouse
+    # Handler, permission preflight and intake must represent the same actor.
+    from app.models.user import Role
+    users.ensure_user(10)
+    users.set_role(10,Role.BARTENDER,actor_user_id=1)
     controller=runtime[1]
     bindings=controller.bindings
     bindings['warehouse.prepare_writeoff']=CapabilityBinding('warehouse.prepare_writeoff',object(),service,'intake','intake')
@@ -210,7 +214,7 @@ def test_warehouse_planned_draft_still_uses_existing_intake(runtime,warehouse,mo
     # The real intake service owns idempotency and product/unit resolution.
     prepared=[]
     async def intake(message,state,svc,raw):
-        prepared.append(svc.prepare_batch(actor_user_id=20,source_chat_id=message.chat.id,
+        prepared.append(svc.prepare_batch(actor_user_id=message.from_user.id,source_chat_id=message.chat.id,
             source_message_id=message.message_id,raw_text=raw))
     monkeypatch.setattr(assistant,'prepare_intake_message',intake)
     planner=Planner(decision('warehouse.prepare_writeoff',domain='warehouse',mutation=True,

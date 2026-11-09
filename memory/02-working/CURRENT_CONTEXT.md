@@ -5,6 +5,15 @@ Metadata: scope `working`; trust `working`; lifecycle `ephemeral`; last cleared
 
 ## Status
 
+Focused mutation-language hardening starts at `96f50da...`: close cancelled
+writeoff preparation, signed-number coercion and malformed-decimal prefix
+acceptance. Shared closed local dispositions gate handlers/planners; pending
+typed fields reuse conversation JSON. Entire new AI batches fail closed on
+numeric invalidity/ambiguity, while ordinary product-resolution and warehouse
+confirmation rules remain authoritative. This task has no live API, production,
+systemd, schema/catalog/seed change, push or deployment. Full validation and a
+separate adversarial re-test are required; no live-quality percentage is claimed.
+
 Focused corrections from `c298961...` address exactly four review findings:
 terminal refusal fail-closed, HTTP status authority over diagnostic body,
 consumer-specific active key/model composition and real-runner typed quantity

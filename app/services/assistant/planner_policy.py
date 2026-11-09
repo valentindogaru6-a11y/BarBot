@@ -53,9 +53,11 @@ def mark_tool_boundary():
 def mutation_evidence(text):
     """Questions/explanations are not authority, even if a model labels them so."""
     import re
-    from app.services.assistant.bar_language import normalize_bar_text, parse_bar_request
-    if parse_bar_request(text).mutation:
-        return True
+    from app.services.assistant.bar_language import normalize_bar_text
+    from app.services.assistant.mutation_language import parse_mutation
+    parsed = parse_mutation(text)
+    if parsed is not None:
+        return parsed.allowed
     return bool(re.match(
         r"^(?:пожалуйста\s+)?(?:измени|изменить|добавь|добавить|удали|удалить|убери|"
         r"замени|заменить|закрой|закрыть|открой|открыть|создай|создать|отправь|"

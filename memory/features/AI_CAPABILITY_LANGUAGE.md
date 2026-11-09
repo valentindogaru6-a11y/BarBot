@@ -94,6 +94,17 @@ size, scoring rules and reproducible results exist, coverage remains `pending`.
 
 ## Verified warehouse language
 
+Offline hardening from `96f50da...` is covered in
+`tests/test_assistant_mutation_language.py`. Writeoff/transfer retain typed
+`proceed/cancel/corrected/ambiguous/invalid` disposition, whole Decimal tokens
+and explicit missing fields. RU/UA action cancellation blocks preparation;
+descriptive comment negation does not. Explicit last-value corrections create
+one draft only; ambiguous corrections, ranges and malformed/signed quantities
+create none. Multiline numeric invalidity rejects the whole new AI batch.
+Pending quantity/unit/destination answers are actor/chat-isolated and restart-
+safe; cancellation uses the existing draft/proposal service, never confirmation.
+These are tested grammar families, not complete natural-language or live coverage.
+
 - Writeoff imperatives equivalent to `спиши`, `списать`, `сделай/оформи
   списание`, `нужно списать` and `убери в списание`, with product, quantity and
   unit, create only the existing persistent draft/preview.

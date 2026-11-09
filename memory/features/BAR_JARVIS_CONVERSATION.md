@@ -15,6 +15,48 @@ summary, five candidates, eight confirmed memories, 500 tool-result characters
 and 24,000 serialized bytes. Actor/chat numeric identifiers, raw DB rows, audit
 data, full catalog and capabilities outside the runtime surface are excluded.
 
+## Server-owned mutation language (from `96f50da...`)
+
+`ParsedMutation` and `MutationLine` are closed, immutable local models, not
+provider schemas. They retain action, entity, Decimal quantity, explicit unit,
+destination/comment, imperative evidence, cancellation, a closed error and the
+selected correction segment. Disposition is `proceed`, `cancel`, `corrected`,
+`ambiguous` or `invalid`. Cancellation is evaluated before action evidence,
+provider planning and tool dispatch. An imperative prefix cannot override a
+later explicit RU/UA refusal; descriptive negation alone is not cancellation.
+
+Only unambiguous correction grammar replaces a quantity/product/destination.
+The old value never becomes an extra intake line. Different unit dimensions,
+ranges, alternatives and unclear corrections require clarification without a
+new draft. Whole numeric tokens are validated: signed, non-positive, non-finite,
+scientific, incomplete and damaged numbers are never reduced to a valid prefix
+or absolute value. Warehouse precision/maximum checks remain authoritative.
+Leading `.5`/`,5` retain existing quantity UX; conventional three-digit space
+grouping is supported. Sentence punctuation after a known unit is distinct from
+an unfinished decimal. A spelled singular measure retains the existing explicit
+one-measure UX; a base unit is never silently selected.
+
+One missing-field request is persisted as typed `pending_mutation` inside the
+existing conversation JSON, isolated by actor/private chat and revision/TTL.
+Restart preserves it; invalid quantity answers do not overwrite valid prior
+fields. Cancellation clears AI context and uses only the owned source-chat
+draft/proposal cancellation service. Reset clears AI pending context, not an
+independent warehouse draft or confirmed long-term memory. Active warehouse
+FSM has priority and handles natural cancellation through its own service.
+
+AI multiline policy is fail-closed for the whole new batch when any line is
+cancelled, ambiguous or numerically invalid. No valid prefix is silently kept.
+Duplicate product lines remain separate and correction affects only its line.
+Unknown/fuzzy products/destinations retain the ordinary explicit resolution
+preview: all lines stay visible and the batch cannot commit until resolved.
+Known-product unit incompatibility is rejected read-only before draft creation.
+Exact unique grammatical forms may map to existing nomenclature names; exact
+names/aliases win, collisions and fuzzy matches still require user selection.
+
+Regressions `ADV_NEGATION_READY_01`, `ADV_NEGATIVE_01`, `ADV_DECIMAL_01` are
+covered through real handlers/services and the temporary-v15 observer/ledger.
+No schema/catalog/seed change, live quality claim or rollout is implied.
+
 Eviction is deterministic oldest-first. Summary uses only server-confirmed
 topic/entity/task/capability state; provider prose never becomes long-term
 memory. Summary/session updates share the v13 optimistic revision. Failed

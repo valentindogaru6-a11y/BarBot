@@ -970,6 +970,10 @@ class MultiProviderPlanner:
                 transport.policy.emit(row)
 
     async def _plan(self, text: str, *, snapshot: PlannerContextSnapshot, capabilities: Sequence[PlannerCapability]) -> PlannerDecision:
+        from app.services.assistant.mutation_language import parse_mutation
+        local = parse_mutation(text)
+        if local is not None and not local.allowed:
+            raise ProviderError('planner', ProviderErrorKind.AUTHORITY)
         providers = [provider for provider in (self.primary, self.fallback) if provider is not None]
         if not providers:
             raise ProviderError("planner", ProviderErrorKind.UNAVAILABLE)

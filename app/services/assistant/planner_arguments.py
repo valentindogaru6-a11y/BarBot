@@ -16,6 +16,7 @@ from app.models.assistant_provider_planner import (
     WarehouseWriteoffArguments,
 )
 from app.services.assistant.bar_language import normalize_bar_text, parse_bar_request
+from app.models.assistant_provider_planner import PlannerAuthorityError
 
 
 _QUANTITY_UNIT_RE = re.compile(
@@ -76,6 +77,8 @@ def extract_warehouse_arguments(
     capability_id: str, text: str
 ) -> WarehouseWriteoffArguments | WarehouseTransferArguments | None:
     parsed = parse_bar_request(text)
+    if parsed.mutation_request is not None and not parsed.mutation_request.allowed:
+        raise PlannerAuthorityError('Local mutation language rejected')
     if capability_id == "warehouse.prepare_writeoff" and parsed.action == "writeoff":
         return WarehouseWriteoffArguments(
             product_text=parsed.entity,

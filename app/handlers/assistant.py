@@ -18,6 +18,9 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from app.config import Settings
+from app.models.assistant_mutation import MutationDisposition, MutationLine, ParsedMutation
+from app.services.assistant.mutation_language import parse_mutation, mutation_reply, resolve_product_case
+from app.services.warehouse.quantity_service import QuantityError
 from app.handlers.catalog import _show_item
 from app.handlers.common import answer_callback_safely, load_catalog
 from app.handlers.warehouse import prepare_intake_message
@@ -327,6 +330,74 @@ class AssistantTextEligibleFilter(BaseFilter):
         return not is_warehouse_trigger_header(first_line)
 
 
+async def _mutation_preflight(message, state, *, text, auth_service, warehouse_service,
+                              memory, controller):
+    """Resolve disposition before providers/tools; never guess a pending actor/chat."""
+    actor, chat = message.from_user.id, message.chat.id
+    context = memory.get(actor, chat) if memory is not None else None
+    previous = context.pending_mutation if context is not None else None
+    if previous is None and context is not None and context.last_entity_type == 'warehouse_product' and context.authorized_action in ('prepare_writeoff','prepare_transfer'):
+        previous = ParsedMutation(action=context.authorized_action.removeprefix('prepare_'),
+            lines=(MutationLine(entity=context.last_query),),imperative_evidence=True)
+    parsed = parse_mutation(text, previous=previous)
+    if parsed is None:
+        return False, None
+    if message.chat.type != 'private':
+        return True, parsed
+    if parsed.disposition == MutationDisposition.CANCEL:
+        if warehouse_service is not None and callable(getattr(warehouse_service,'pending_batch',None)):
+            if auth_service.get_context(actor).can_mutate_warehouse:
+                batch = warehouse_service.pending_batch(actor_user_id=actor)
+                if batch and batch['source_chat_id'] == chat:
+                    if controller is not None:
+                        controller._require(actor, 'warehouse.cancel_batch')
+                    warehouse_service.cancel_batch(batch['id'], actor_user_id=actor)
+        if controller is not None:
+            proposals = controller.proposals
+            proposal = proposals.active_for_actor(actor)
+            if proposal and proposals.get_owned(proposal.token,actor,chat):
+                proposals.cancel(proposal.token,actor,chat)
+        if memory is not None and context is not None:
+            memory.clear(actor,chat)
+        await message.answer(mutation_reply(parsed))
+        return True, parsed
+    if not parsed.allowed:
+        if previous is not None and parse_mutation(text) is not None and memory is not None:
+            # An invalid new explicit command must not leave an older product
+            # armed. Invalid quantity answers retain only the valid old prompt.
+            memory.clear_structured(actor,chat_id=chat,last_intent='clarify')
+        await message.answer(mutation_reply(parsed))
+        return True, parsed
+    identifier = 'warehouse.prepare_' + parsed.action
+    try:
+        if controller is not None:
+            controller._require(actor, identifier)
+        else:
+            auth_service.require_warehouse_mutation(actor)
+    except AccessDeniedError:
+        await message.answer('Недостаточно прав для складского действия.')
+        return True, parsed
+    if parsed.missing:
+        if memory is not None and len(parsed.lines) == 1:
+            memory.remember(actor,chat_id=chat,last_intent='prepare_'+parsed.action,
+                last_entity_type='warehouse_product',last_query=parsed.lines[0].entity,
+                pending_slots=parsed.missing,authorized_action='prepare_'+parsed.action,
+                pending_task=identifier,pending_mutation=parsed)
+        await message.answer(mutation_reply(parsed))
+        return True, parsed
+    repository = getattr(warehouse_service,'repository',None)
+    if callable(getattr(repository,'products',None)):
+        parsed = resolve_product_case(parsed,repository.products())
+    validator = getattr(warehouse_service,'validate_assistant_intake',None)
+    if callable(validator):
+        try:
+            validator(parsed.command(),actor_user_id=actor)
+        except QuantityError:
+            await message.answer('Единица или количество несовместимы с продуктом. Черновик не создан.')
+            return True, parsed
+    return False, parsed
+
+
 async def _run_assistant(
     message: Message,
     state: FSMContext,
@@ -436,6 +507,15 @@ async def _run_assistant(
                 ),
             )
             return
+
+    handled, mutation_request = await _mutation_preflight(message,state,text=text,
+        auth_service=auth_service,warehouse_service=warehouse_service,
+        memory=conversation_memory,controller=assistant_capability_controller)
+    if handled:
+        return
+    if mutation_request is not None:
+        # Typed facts remain authoritative; rendering is only for existing APIs.
+        text = mutation_request.command()
 
     async def send_capability(dispatch: Any) -> None:
         if conversation_memory is not None and user_id is not None:
@@ -594,6 +674,7 @@ async def _run_assistant(
                     'writeoff' if orchestrator.local_action_evidence(text) is AssistantIntentName.PREPARE_WRITEOFF
                     else 'transfer' if orchestrator.local_action_evidence(text) is AssistantIntentName.PREPARE_TRANSFER else None
                 ),
+                mutation_request=mutation_request,
             )
             # Persist successful local selection before another provider step.
             # Failed lookups never replace the last successful entity.
@@ -666,6 +747,10 @@ async def _run_assistant(
                     await message.answer(escape(action.message or 'Выберите карточку.'),
                         reply_markup=build_assistant_candidates_keyboard(action.search_results))
             elif action.kind in {'prepare_writeoff', 'prepare_transfer'} and action.raw_intake and warehouse_service:
+                if conversation_memory is not None:
+                    conversation_memory.remember(user_id,chat_id=message.chat.id,
+                        last_intent=action.kind,last_entity_type='conversation',last_query='',
+                        pending_slots=(),authorized_action='',pending_task='',proposal_ref='',pending_mutation=None)
                 await prepare_intake_message(message, state, warehouse_service, action.raw_intake)
             else:
                 await message.answer(escape(action.message or 'Уточните недостающие параметры.'))
@@ -791,6 +876,7 @@ async def _run_assistant(
     elif (
         context is not None
         and context.last_entity_type == "warehouse_product"
+        and mutation_request is None
         and context.authorized_action
         in {
             AssistantIntentName.PREPARE_WRITEOFF.value,
@@ -899,7 +985,8 @@ async def _run_assistant(
             item for item in all_planner_capabilities
             if item.capability_id in allowed_capability_ids
         )
-        local_intent = contextual_intent or orchestrator.local_intent(request_text)
+        local_intent = contextual_intent or (AssistantOrchestrator.mutation_intent(mutation_request)
+            if mutation_request is not None else orchestrator.local_intent(request_text))
         retrieval = (
             CatalogRetrieval(normalized_query=context.last_query)
             if context is not None

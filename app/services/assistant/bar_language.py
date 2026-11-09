@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from dataclasses import dataclass
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from typing import Literal, Sequence
 
 from app.models.assistant import (
@@ -13,6 +13,8 @@ from app.models.assistant import (
     AssistantRelation,
     AssistantRequestedKind,
 )
+from app.models.assistant_mutation import ParsedMutation
+from app.services.assistant.mutation_language import parse_mutation
 
 
 BarAction = Literal["search", "writeoff", "transfer", "read", "unknown"]
@@ -147,19 +149,29 @@ class ParsedBarRequest:
     confidence: int = 0
     evidence: tuple[str, ...] = ()
     mutation: bool = False
+    mutation_request: ParsedMutation | None = None
+
+    @property
+    def disposition(self):
+        return self.mutation_request.disposition if self.mutation_request else None
+
+    @property
+    def validation_error(self):
+        return self.mutation_request.error if self.mutation_request else None
+
+    @property
+    def imperative_evidence(self):
+        return bool(self.mutation_request and self.mutation_request.imperative_evidence)
+
+    @property
+    def explicit_cancellation(self):
+        return bool(self.mutation_request and self.mutation_request.explicit_cancellation)
+
+    @property
+    def correction_segment(self):
+        return self.mutation_request.correction_segment if self.mutation_request else None
 
 
-_WRITEOFF_RE = re.compile(
-    r"^(?:спиши(?:те)?|списать|нужно\s+списать|"
-    r"(?:убери(?:те)?|добавь(?:те)?)\s+в\s+списание|"
-    r"(?:сделай|оформи)\s+списани\w*|списание\s*:?)",
-)
-_TRANSFER_RE = re.compile(
-    r"^(?:перемести(?:те)?|переместить|перенеси(?:те)?|перенести|"
-    r"отправь(?:те)?|(?:сделай|оформи)\s+перемещени\w*|"
-    r"перемещение(?:\s*:)? )",
-    re.VERBOSE,
-)
 _CATALOG_HINT_RE = re.compile(
     r"\b(?:ингредиент\w*|состав\w*|напит\w*|коктейл\w*|чай\w*|сироп\w*)\b"
 )
@@ -167,82 +179,6 @@ _ATTENDANCE_RE = re.compile(r"\b(?:табел\w*|персональн\w*\s+см�
 _EMPLOYEE_RE = re.compile(r"\b(?:бармен\w*|сотрудник\w*|пользовател\w*|роль\w*)\b")
 _REPORT_RE = re.compile(r"\b(?:отчет\w*|xlsx|excel|получател\w*|расписан\w*|напоминан\w*)\b")
 _WAREHOUSE_RE = re.compile(r"\b(?:склад\w*|списани\w*|перемещени\w*|остат\w*)\b")
-_QUANTITY_RE = re.compile(r"\b(?P<quantity>\d+(?:[.,]\d+)?)\b")
-_UNIT_RE = re.compile(
-    r"\b(?P<unit>кг|килограмм\w*|г|гр|грамм\w*|л|литр\w*|мл|миллилитр\w*|шт|штук\w*)\b"
-)
-_DESTINATION_RE = re.compile(
-    r"(?:->|→|\b(?:в|на)\b)\s*(?P<destination>[\w][\w\s-]{0,199})\s*$",
-    re.IGNORECASE,
-)
-
-
-def _mutation_details(
-    value: str,
-    *,
-    transfer: bool,
-) -> tuple[str, Decimal | None, str, str, str]:
-    raw_text = unicodedata.normalize("NFKC", value).casefold().strip()
-    comment = ""
-    comment_match = re.search(r"\(([^()]*)\)\s*$", raw_text)
-    if comment_match is not None:
-        comment = " ".join(comment_match.group(1).split())[:500]
-        raw_text = raw_text[: comment_match.start()].rstrip()
-    elif "," in raw_text:
-        possible_core, possible_comment = raw_text.rsplit(",", 1)
-        if _QUANTITY_RE.search(possible_core) and _UNIT_RE.search(
-            normalize_bar_text(possible_core)
-        ):
-            comment = " ".join(possible_comment.split())[:500]
-            raw_text = possible_core.rstrip()
-
-    normalized = normalize_bar_text(raw_text)
-    numeric_text = raw_text.replace(",", ".")
-    quantity_match = _QUANTITY_RE.search(numeric_text)
-    unit_match = _UNIT_RE.search(normalized)
-    destination_match = _DESTINATION_RE.search(raw_text.replace("ё", "е")) if transfer else None
-    entity = _WRITEOFF_RE.sub(" ", normalized)
-    entity = _TRANSFER_RE.sub(" ", entity)
-    entity = re.sub(r"\b\d+\s+\d+\b", " ", entity)
-    entity = _QUANTITY_RE.sub(" ", entity)
-    entity = _UNIT_RE.sub(" ", entity)
-    if destination_match is not None:
-        normalized_destination = normalize_bar_text(destination_match.group("destination"))
-        entity = re.sub(
-            rf"\b(?:в|на)\s+{re.escape(normalized_destination)}\s*$",
-            " ",
-            entity,
-        )
-        for word in normalized_destination.split():
-            entity = re.sub(rf"\b{re.escape(word)}\b", " ", entity)
-    quantity: Decimal | None = None
-    if quantity_match is not None:
-        try:
-            quantity = Decimal(quantity_match.group("quantity").replace(",", "."))
-        except InvalidOperation:
-            quantity = None
-    elif unit_match is not None and unit_match.group("unit") in {
-        "килограмм",
-        "литр",
-        "штука",
-    }:
-        quantity = Decimal("1")
-    destination = (
-        normalize_bar_text(destination_match.group("destination"))
-        if destination_match
-        else ""
-    )
-    if destination.endswith("ю"):
-        destination = destination[:-1] + "я"
-    elif destination.endswith("у"):
-        destination = destination[:-1] + "а"
-    return (
-        " ".join(entity.split()),
-        quantity,
-        unit_match.group("unit") if unit_match else "",
-        destination,
-        comment,
-    )
 
 
 def _canonical_catalog_entity(value: str) -> str:
@@ -267,27 +203,16 @@ def parse_bar_request(value: str, *, lexicon: BarLexicon = BAR_LEXICON) -> Parse
     if not text:
         return ParsedBarRequest(action="unknown", domain=AssistantDomain.GENERAL)
 
-    if _WRITEOFF_RE.search(text):
-        entity, quantity, unit, destination, comment = _mutation_details(
-            value, transfer=False
-        )
+    if mutation := parse_mutation(value):
+        line = mutation.lines[0] if mutation.lines else None
         return ParsedBarRequest(
-            action="writeoff", domain=AssistantDomain.WAREHOUSE, entity=entity,
-            quantity=quantity, unit=unit, destination=destination,
-            comment=comment,
+            action=mutation.action or 'unknown', domain=AssistantDomain.WAREHOUSE,
+            entity=line.entity if line else '', quantity=line.quantity if line else None,
+            unit=line.unit if line else '', destination=line.destination if line else '',
+            comment=line.comment if line else '', mutation_request=mutation,
             confidence=10_000,
-            evidence=("explicit_writeoff",), mutation=True,
-        )
-    if _TRANSFER_RE.search(text):
-        entity, quantity, unit, destination, comment = _mutation_details(
-            value, transfer=True
-        )
-        return ParsedBarRequest(
-            action="transfer", domain=AssistantDomain.WAREHOUSE, entity=entity,
-            quantity=quantity, unit=unit, destination=destination,
-            comment=comment,
-            confidence=10_000,
-            evidence=("explicit_transfer",), mutation=True,
+            evidence=(f'explicit_{mutation.action}',) if mutation.imperative_evidence else (),
+            mutation=mutation.allowed,
         )
 
     preparation = lexicon.has_preparation(text)

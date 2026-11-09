@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 from app.models.assistant_capabilities import ActionProposal
 from app.models.assistant_capabilities import CapabilityRisk
 from app.models.assistant import AssistantDomain
+from app.models.assistant_mutation import ParsedMutation
 from app.models.assistant_planner import PlannerContextSnapshot, PlannerDecision
 from app.models.catalog import Catalog
 from app.models.user import Role
@@ -602,6 +603,7 @@ class AssistantCapabilityController:
         self, decision: PlannerDecision, *, snapshot: PlannerContextSnapshot,
         catalog: Catalog, actor_user_id: int, source_chat_id: int,
         source_message_id: int, chat_type: str, explicit_action: str | None = None,
+        mutation_request: ParsedMutation | None = None,
     ) -> CapabilityDispatch:
         """Dispatch validated typed input. Raw language never selects this route."""
         from app.services.assistant.orchestrator import AssistantOrchestrator, AssistantToolRegistry, AssistantToolAction
@@ -627,6 +629,11 @@ class AssistantCapabilityController:
             raise ValueError("Planned domain mismatch")
         if decision.read_only != (definition.risk_level is CapabilityRisk.READ) or decision.mutation == decision.read_only:
             raise AccessDeniedError("Planned risk mismatch")
+        if mutation_request is not None:
+            if not mutation_request.allowed:
+                raise AccessDeniedError('Local mutation disposition rejected')
+            if identifier in {'warehouse.prepare_writeoff','warehouse.prepare_transfer'} and identifier != 'warehouse.prepare_'+mutation_request.action:
+                raise AccessDeniedError('Local mutation action mismatch')
         args = dict(decision.arguments)
         if {'expected_revision', 'values'} & set(args):
             raise AccessDeniedError('Planner cannot choose revisions or mutation values')
@@ -695,7 +702,7 @@ class AssistantCapabilityController:
                 raise AccessDeniedError("Explicit warehouse action is required")
             # Typed Decimal/unit/destination resolution continues in the existing
             # intake service/FSM. This adapter never commits an operation.
-            intent = AssistantOrchestrator.planner_decision_to_intent(
+            intent = AssistantOrchestrator.mutation_intent(mutation_request) if mutation_request else AssistantOrchestrator.planner_decision_to_intent(
                 decision.model_copy(update={'arguments': args})
             ).model_copy(update={'confidence': decision.confidence})
             action = AssistantToolRegistry(catalog).execute(intent)

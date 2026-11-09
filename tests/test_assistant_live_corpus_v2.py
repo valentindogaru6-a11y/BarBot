@@ -265,7 +265,16 @@ def test_v2_expected_never_enters_provider_and_partial_budget_blocks_readiness()
     assert code==1 and not report['ready']
     assert 'SCORER_ONLY_MARKER' not in json.dumps(wire.requests)
     assert 'expected' not in json.dumps(wire.requests)
-    wire=Wire(route('catalog.search','catalog',action='search'),route())
+    class TwoReadWire(Wire):
+        async def post_json(self,*args,**kwargs):
+            # Local clarification now avoids HTTP. Explicitly exercise two-step
+            # reads instead of assuming every incomplete mutation consumes HTTP.
+            data=json.loads(kwargs['payload']['messages'][1]['content'])
+            allowed={item['capability_id'] for item in data['capabilities']}
+            self.responses.append(route('catalog.search','catalog',action='search')
+                if 'catalog.search' in allowed else route())
+            return await super().post_json(*args,**kwargs)
+    wire=TwoReadWire()
     report,code=asyncio.run(run_live(options(suite='core',max_provider_calls=48),settings_loader=settings,
         transport_factory=lambda:wire))
     assert code==3 and not report['ready'] and report['skipped']>0

@@ -13,6 +13,14 @@ The multi-turn context, confirmed-memory and guarded tool-loop contract is in
 
 ## AI-first planner foundation (development)
 
+Mutation-language hardening from `96f50da...` uses the server-owned typed
+disposition described in [conversation contract](BAR_JARVIS_CONVERSATION.md#server-owned-mutation-language-from-96f50da).
+Cancel/ambiguous/invalid input cannot reach a provider or prepare a new draft;
+the same analysis gates local-first, planned dispatch and the isolated harness.
+Full numeric tokens, exact correction segments and a typed persistent missing-
+field context replace substring quantity extraction. This is offline evidence;
+natural-language breadth and provider quality remain pending live coverage.
+
 The provider boundary is now explicitly two-stage. Stage 1 has seven required
 scalar fields and contains no nullable value, array, free object, stable ID,
 argument, risk, permission, confirmation or revision. Providers see bounded

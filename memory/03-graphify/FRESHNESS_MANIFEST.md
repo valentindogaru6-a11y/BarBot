@@ -1,5 +1,12 @@
 # Freshness Manifest
 
+Mutation-language slice revalidated 2026-11-09 from `96f50da...`: typed local
+disposition, cancellation-before-evidence, whole-token Decimal grammar,
+unambiguous correction and fail-closed multiline numeric invalidity. Typed
+missing-field state reuses the existing conversation JSON, without schema or
+migration changes. Evidence is synthetic handlers/services/ledger only; live
+provider quality and production runtime remain pending. Catalog/seed unchanged.
+
 Four-finding provider/evaluation slice revalidated 2026-11-09 from `c298961...`:
 typed terminal outcomes, status-bounded diagnostics, active-consumer config and
 resolved-DB quantity observation across suites. Evidence is offline; owner quota

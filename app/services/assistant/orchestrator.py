@@ -34,6 +34,8 @@ from app.services.assistant.providers import (
     PlannerModelClient,
 )
 from app.services.assistant.bar_language import parse_bar_request
+from app.models.assistant_mutation import ParsedMutation
+from app.services.assistant.mutation_language import parse_mutation, mutation_reply
 from app.services.assistant.retrieval import (
     AssistantCatalogRetriever,
     display_catalog_entity,
@@ -344,6 +346,21 @@ class AssistantOrchestrator:
         return None
 
     @staticmethod
+    def mutation_intent(parsed: ParsedMutation) -> AssistantIntent:
+        if not parsed.allowed:
+            return AssistantIntent(intent=AssistantIntentName.CLARIFY,
+                clarification=mutation_reply(parsed))
+        return AssistantIntent(
+            intent=(AssistantIntentName.PREPARE_WRITEOFF if parsed.action == 'writeoff'
+                else AssistantIntentName.PREPARE_TRANSFER), confidence=10_000,
+            items=[AssistantIntentItem(product_text=line.entity or None,
+                quantity_text=format(line.quantity,'f') if line.quantity is not None else None,
+                unit_text=line.unit or None, destination_text=line.destination or None,
+                comment_text=line.comment or None) for line in parsed.lines],
+            evidence=(f'explicit_{parsed.action}',),
+        )
+
+    @staticmethod
     def _guard_provider_intent(
         intent: AssistantIntent,
         allowed_action: AssistantIntentName | None,
@@ -372,6 +389,8 @@ class AssistantOrchestrator:
                 intent=AssistantIntentName.CLARIFY,
                 clarification="Сформулируйте запрос короче и конкретнее.",
             )
+        if mutation := parse_mutation(text):
+            return AssistantOrchestrator.mutation_intent(mutation)
         if _EXPLICIT_WEB_RE.search(cleaned):
             return AssistantIntent(
                 intent=AssistantIntentName.WEB_SEARCH,
@@ -385,29 +404,6 @@ class AssistantOrchestrator:
         if _UNSUPPORTED_RE.search(cleaned):
             return AssistantIntent(intent=AssistantIntentName.UNSUPPORTED)
         parsed = parse_bar_request(cleaned)
-        if parsed.mutation and parsed.action in {"writeoff", "transfer"}:
-            return AssistantIntent(
-                intent=(
-                    AssistantIntentName.PREPARE_WRITEOFF
-                    if parsed.action == "writeoff"
-                    else AssistantIntentName.PREPARE_TRANSFER
-                ),
-                confidence=parsed.confidence,
-                items=[
-                    AssistantIntentItem(
-                        product_text=parsed.entity or None,
-                        quantity_text=(
-                            format(parsed.quantity, "f")
-                            if parsed.quantity is not None
-                            else None
-                        ),
-                        unit_text=parsed.unit or None,
-                        destination_text=parsed.destination or None,
-                        comment_text=parsed.comment or None,
-                    )
-                ],
-                evidence=parsed.evidence,
-            )
         if parsed.action == "search" and parsed.domain is AssistantDomain.CATALOG and parsed.entity:
             query = parsed.entity
             if parsed.relation is AssistantRelation.DIRECT_LOOKUP:
@@ -480,6 +476,9 @@ class AssistantOrchestrator:
         shadow_key: object | None = None,
         shadow_text: str | None = None,
     ) -> AssistantIntent:
+        mutation = parse_mutation(text)
+        if mutation is not None and not mutation.allowed:
+            return self.mutation_intent(mutation)
         if self.planner_mode == "ai_first" and planner_snapshot is not None:
             try:
                 decision = await self.plan(
@@ -803,6 +802,10 @@ class AssistantToolRegistry:
                 safe_comment = comment.replace("(", "[").replace(")", "]")
                 line += f" ({safe_comment})"
             lines.append(line)
+        header = 'списание:' if intent.intent is AssistantIntentName.PREPARE_WRITEOFF else 'перемещение:'
+        parsed = parse_mutation(header + '\n' + '\n'.join(lines))
+        if parsed is None or not parsed.allowed:
+            return AssistantToolAction('clarify', message=mutation_reply(parsed) if parsed else 'Уточните позицию.')
         if intent.intent is AssistantIntentName.PREPARE_WRITEOFF:
             return AssistantToolAction(
                 "prepare_writeoff",

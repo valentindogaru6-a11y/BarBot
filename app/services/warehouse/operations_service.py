@@ -332,6 +332,22 @@ class WarehouseOperationsService:
             "now": utc_rfc3339(now_value.astimezone(UTC)),
         }
 
+    def validate_assistant_intake(self, raw_text: str, *, actor_user_id: int) -> None:
+        """Read-only AI preflight; reject fatal quantities before any draft write.
+
+        Unknown/fuzzy products and destinations retain the ordinary intake
+        resolution policy. A known product's incompatible unit is not guessable.
+        """
+        self.access.require_warehouse_mutation(actor_user_id)
+        settings = self.repository.runtime_settings()
+        _, lines, _ = self._batch_lines(raw_text, self.repository.products(),
+            source_location_id=int(settings['source_location_id']))
+        fatal = {'invalid_quantity', 'non_positive_quantity', 'quantity_overflow',
+            'excess_precision', 'unsupported_unit', 'incompatible_unit'}
+        for line in lines:
+            if line.get('error_code') in fatal:
+                raise QuantityError(line['error_code'], 'Некорректное количество или единица')
+
     def prepare_batch(
         self,
         *,

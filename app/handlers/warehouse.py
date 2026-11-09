@@ -6,6 +6,7 @@ import asyncio
 import logging
 import re
 from html import escape
+from typing import Any
 
 from aiogram import Bot, F, Router
 from aiogram.filters import BaseFilter, Command, StateFilter
@@ -734,6 +735,45 @@ async def intake_start(
             ),
             reply_markup=intake_prompt_keyboard(),
         )
+
+
+class WarehouseNaturalCancelFilter(BaseFilter):
+    """Keep active warehouse FSM priority; cancel, never start another AI task."""
+
+    async def __call__(self, message: Message, warehouse_service: WarehouseOperationsService,
+                       raw_state: str | None = None) -> bool:
+        from app.services.assistant.mutation_language import explicit_cancel
+        if message.from_user is None or message.chat.type != 'private':
+            return False
+        if not explicit_cancel(message.text or '',contextual=True):
+            return False
+        try:
+            batch = await _thread(warehouse_service.pending_batch,actor_user_id=message.from_user.id)
+        except AccessDeniedError:
+            return False
+        return bool((batch and batch['source_chat_id']==message.chat.id
+                     and batch['operation_type'] in ('writeoff','transfer')) or
+                    (batch is None and raw_state in (WarehouseIntakeStates.writeoff.state,
+                                                     WarehouseIntakeStates.transfer.state)))
+
+
+@router.message(StateFilter(WarehouseIntakeStates), F.text, WarehouseNaturalCancelFilter())
+async def warehouse_natural_cancel(message: Message, state: FSMContext,
+                                   warehouse_service: WarehouseOperationsService,
+                                   assistant_conversation_memory: Any = None) -> None:
+    from app.services.assistant.mutation_language import explicit_cancel
+    actor = message.from_user.id if message.from_user else None
+    if actor is None or message.chat.type != 'private' or not explicit_cancel(message.text or '',contextual=True):
+        return
+    pending = await _thread(warehouse_service.pending_batch,actor_user_id=actor)
+    if pending is not None:
+        if pending['source_chat_id'] != message.chat.id or pending['operation_type'] not in ('writeoff','transfer'):
+            return
+        await _thread(warehouse_service.cancel_batch,pending['id'],actor_user_id=actor)
+    await state.clear()
+    if assistant_conversation_memory is not None:
+        assistant_conversation_memory.clear(actor,message.chat.id)
+    await message.answer('Незавершённая запись отменена. Операции не созданы.')
 
 
 @router.message(Command("cancel"), StateFilter(WarehouseIntakeStates))

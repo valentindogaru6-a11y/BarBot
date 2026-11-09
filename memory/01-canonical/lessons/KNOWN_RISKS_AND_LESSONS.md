@@ -8,6 +8,19 @@ Evidence: regression tests, Git history, rollout docs, owner observations
 Depends on: callbacks, SQLite/WAL, workers, XLSX, imports, VPS environment
 Importance: High
 
+- **Cancellation precedes action evidence:** an imperative followed by explicit
+  refusal must not become a draft, even when a provider chooses a mutation.
+  Use one closed typed disposition across local/planned paths and warehouse
+  FSM cancellation. Comments with ordinary negation are not automatically an
+  action refusal. Preserve only valid missing-field state; clear it on cancel.
+- **Never search for a valid numeric substring:** the adversarial cases
+  `ADV_NEGATIVE_01` and `ADV_DECIMAL_01` lost a sign or accepted a damaged
+  prefix; `ADV_NEGATION_READY_01` hid a cancellation as a comment. Validate the
+  whole quantity, require explicit correction grammar and compatible dimensions,
+  and reject any invalid/ambiguous new AI batch before persistence. Exact unique
+  grammatical forms are not fuzzy selection; collisions must stay unresolved.
+  Existing confirmation/idempotency and provider-refusal boundaries still apply.
+
 - **Terminal is not unavailable:** flattening safety/model/authority failures
   into generic availability enabled a local draft after refusal. Preserve typed
   terminal outcomes through the handler; local imperative evidence cannot erase

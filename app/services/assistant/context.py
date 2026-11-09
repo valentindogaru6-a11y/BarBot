@@ -10,6 +10,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Callable, Literal
 
 from app.models.assistant import AssistantRelation, AssistantRequestedKind
+from app.models.assistant_mutation import ParsedMutation
 from app.storage.assistant_conversation_database import (
     AssistantConversationConflict,
     AssistantConversationDatabase,
@@ -84,6 +85,7 @@ class AssistantConversationContext:
     last_successful_capability: str = ""
     last_tool_result_ref: str = ""
     owner_memory_refs: tuple[str, ...] = ()
+    pending_mutation: ParsedMutation | None = None
 
     @property
     def last_successful_entity_id(self) -> str:
@@ -166,6 +168,7 @@ class AssistantConversationMemory:
         last_successful_capability: str | None = None,
         last_tool_result_ref: str | None = None,
         owner_memory_refs: tuple[str, ...] | None = None,
+        pending_mutation: ParsedMutation | None = None,
     ) -> AssistantConversationContext:
         now = self._clock()
         previous = self.get(user_id, chat_id)
@@ -211,6 +214,7 @@ class AssistantConversationMemory:
             last_successful_capability=(last_successful_capability if last_successful_capability is not None else (previous.last_successful_capability if previous else ""))[:100],
             last_tool_result_ref=(last_tool_result_ref if last_tool_result_ref is not None else (previous.last_tool_result_ref if previous else ""))[:100],
             owner_memory_refs=tuple((owner_memory_refs if owner_memory_refs is not None else (previous.owner_memory_refs if previous else ()))[:8]),
+            pending_mutation=pending_mutation,
         )
         return self._store(self._key(user_id, chat_id), context)
 
@@ -261,6 +265,7 @@ class AssistantConversationMemory:
             selected_entity_id=previous.selected_entity_id if previous else "",
             last_attempt=previous.last_attempt if previous else "",
             revision=(previous.revision + 1) if previous else 1,
+            pending_mutation=previous.pending_mutation if previous else None,
         )
         return self._store(self._key(user_id, chat_id), context)
 
@@ -454,6 +459,8 @@ class PersistentAssistantConversationMemory:
             )[:100],
             last_tool_result_ref=str(candidate_context.get("last_tool_result_ref", ""))[:100],
             owner_memory_refs=tuple(candidate_context.get("owner_memory_refs", ()))[:8],
+            pending_mutation=(ParsedMutation.model_validate(candidate_context['pending_mutation'])
+                if candidate_context.get('pending_mutation') else None),
         )
 
     def _save(self, user_id: int, chat_id: int, context: AssistantConversationContext, expected: int | None) -> AssistantConversationContext:
@@ -499,6 +506,8 @@ class PersistentAssistantConversationMemory:
                 "last_successful_capability": context.last_successful_capability[:100],
                 "last_tool_result_ref": context.last_tool_result_ref[:100],
                 "owner_memory_refs": context.owner_memory_refs[:8],
+                **({'pending_mutation': context.pending_mutation.model_dump(mode='json')}
+                    if context.pending_mutation is not None else {}),
             },
             "last_tool_name": context.last_tool_name[:100],
             "pending_clarification": context.pending_slots[0][:500] if context.pending_slots else "",
@@ -511,7 +520,7 @@ class PersistentAssistantConversationMemory:
         revision = self.database.save(user_id, chat_id, data, turns, expected_revision=expected, now=self._stamp(now))
         return replace(context, revision=revision, expires_at=(now + timedelta(seconds=self.ttl_seconds)).timestamp())
 
-    def remember(self, user_id: int, *, last_intent: str, last_entity_type: str, last_query: str, candidate_ids: tuple[str, ...] = (), pending_slots: tuple[str, ...] = (), topic: str | None = None, authorized_action: str = "", chat_id: int | None = None, summary_text: str | None = None, last_requested_action: str = "", last_entity_id: str | None = None, last_entity_label: str | None = None, last_tool_name: str = "", requested_kind: AssistantRequestedKind = AssistantRequestedKind.UNSPECIFIED, relation: AssistantRelation = AssistantRelation.UNSPECIFIED, relation_target: str = "", parent_entity_id: str = "", related_entity_ids: tuple[str, ...] = (), selected_entity_id: str | None = None, last_attempt: str = "", dialogue_state: str | None = None, pending_task: str | None = None, proposal_ref: str | None = None, last_successful_capability: str | None = None, last_tool_result_ref: str | None = None, owner_memory_refs: tuple[str, ...] | None = None) -> AssistantConversationContext:
+    def remember(self, user_id: int, *, last_intent: str, last_entity_type: str, last_query: str, candidate_ids: tuple[str, ...] = (), pending_slots: tuple[str, ...] = (), topic: str | None = None, authorized_action: str = "", chat_id: int | None = None, summary_text: str | None = None, last_requested_action: str = "", last_entity_id: str | None = None, last_entity_label: str | None = None, last_tool_name: str = "", requested_kind: AssistantRequestedKind = AssistantRequestedKind.UNSPECIFIED, relation: AssistantRelation = AssistantRelation.UNSPECIFIED, relation_target: str = "", parent_entity_id: str = "", related_entity_ids: tuple[str, ...] = (), selected_entity_id: str | None = None, last_attempt: str = "", dialogue_state: str | None = None, pending_task: str | None = None, proposal_ref: str | None = None, last_successful_capability: str | None = None, last_tool_result_ref: str | None = None, owner_memory_refs: tuple[str, ...] | None = None, pending_mutation: ParsedMutation | None = None) -> AssistantConversationContext:
         actual_chat_id = user_id if chat_id is None else chat_id
         previous = self.get(user_id, actual_chat_id)
         now = self._now().timestamp()
@@ -538,6 +547,7 @@ class PersistentAssistantConversationMemory:
             last_successful_capability=(last_successful_capability if last_successful_capability is not None else (previous.last_successful_capability if previous else ""))[:100],
             last_tool_result_ref=(last_tool_result_ref if last_tool_result_ref is not None else (previous.last_tool_result_ref if previous else ""))[:100],
             owner_memory_refs=tuple((owner_memory_refs if owner_memory_refs is not None else (previous.owner_memory_refs if previous else ()))[:8]),
+            pending_mutation=pending_mutation,
         )
         return self._save(user_id, actual_chat_id, context, previous.revision if previous else None)
 
@@ -588,7 +598,7 @@ class PersistentAssistantConversationMemory:
         return self.remember(
             user_id, chat_id=chat_id, last_intent=last_intent,
             last_entity_type="conversation", last_query="", topic=topic or previous.topic,
-            summary_text=previous.summary_text,
+            summary_text=previous.summary_text,pending_task='',proposal_ref='',
         )
 
     def __len__(self) -> int:
