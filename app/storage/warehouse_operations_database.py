@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import sqlite3
 from collections.abc import Callable
 from contextlib import contextmanager
@@ -758,13 +759,31 @@ class WarehouseOperationsDatabase:
             assert result is not None and result["status"] == status
             return result
 
-    def cancel_batch(self, batch_id: int, *, actor_user_id: int, now: str) -> dict[str, Any]:
+    @staticmethod
+    def cancellation_version(batch: dict[str, Any]) -> str:
+        """Opaque optimistic snapshot; no raw data or new persistent revision."""
+        return hashlib.sha256(json.dumps(batch, sort_keys=True, ensure_ascii=False,
+            separators=(',', ':')).encode()).hexdigest()
+
+    def cancel_batch(self, batch_id: int, *, actor_user_id: int, now: str,
+                     source_chat_id: int | None = None, expected_version: str | None = None,
+                     authorize: Callable[[], None] | None = None,
+                     validate_scope: Callable[[], None] | None = None) -> dict[str, Any]:
         with self._transaction() as connection:
-            batch = connection.execute(
-                "SELECT * FROM warehouse_intake_batches WHERE id = ?", (batch_id,)
-            ).fetchone()
+            if authorize is not None:
+                authorize()
+            batch = self._load_batch(connection, batch_id)
             if batch is None:
                 raise WarehouseOperationsError("Batch not found")
+            if batch['actor_user_id'] != actor_user_id or (
+                source_chat_id is not None and batch['source_chat_id'] != source_chat_id):
+                raise WarehouseOperationsError('Batch ownership mismatch')
+            if batch['status'] == 'cancelled':
+                return batch
+            if validate_scope is not None:
+                validate_scope()
+            if expected_version is not None and self.cancellation_version(batch) != expected_version:
+                raise WarehouseRevisionConflict('Batch changed before cancellation')
             if batch["status"] not in ("ready", "needs_resolution"):
                 raise WarehouseOperationsError("Batch cannot be cancelled")
             connection.execute(

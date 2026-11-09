@@ -19,6 +19,7 @@ class WarehouseIntakeStates(StatesGroup):
     comment_choice = State()
     comment_text = State()
     comment_confirm = State()
+    command_clarification = State()
 
 
 class WarehouseOperationEditStates(StatesGroup):

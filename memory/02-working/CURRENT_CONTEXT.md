@@ -5,6 +5,16 @@ Metadata: scope `working`; trust `working`; lifecycle `ephemeral`; last cleared
 
 ## Status
 
+Focused Unicode/token-role hardening starts at `a15759c...`. Frozen v1.1 found
+74 violations: invisible split cancellation and product Стоп mistaken for a
+cancel token. Typed inspection rejects suspicious controls without repair;
+positional tokens preserve quantities and protect entity slots. Warehouse FSM
+keeps the old draft during missing-field clarification and cancels only through
+owned chat/snapshot/business-scope checks. v1.1 corpus/expected/digest are pinned;
+v1.2 is a separate offline extension. Extended live evaluation remains pending.
+No catalog/seed/schema/migration, production, API, systemd, push or deployment
+action belongs to this task.
+
 Focused compound-cancellation fix starts at `27f0b9c...`. The previous independent
 offline review closed the original numeric/sign cases but found two new false
 drafts in both foreground modes. Bounded typed clauses, limited cancellation-

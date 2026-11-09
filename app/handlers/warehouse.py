@@ -738,15 +738,18 @@ async def intake_start(
 
 
 class WarehouseNaturalCancelFilter(BaseFilter):
-    """Keep active warehouse FSM priority; cancel, never start another AI task."""
+    """Typed service/argument roles before an active draft can consume text."""
 
     async def __call__(self, message: Message, warehouse_service: WarehouseOperationsService,
                        raw_state: str | None = None) -> bool:
-        from app.services.assistant.mutation_language import cancellation_analysis
+        from app.services.assistant.mutation_language import cancellation_analysis, parse_mutation
         if message.from_user is None or message.chat.type != 'private':
             return False
         analysis = cancellation_analysis(message.text or '',contextual=True)
-        if analysis.disposition is None and analysis.restart_at is None:
+        parsed = parse_mutation(message.text or '')
+        fresh_command = parsed is not None and parsed.imperative_evidence
+        clarification = raw_state == WarehouseIntakeStates.command_clarification.state
+        if analysis.disposition is None and analysis.restart_at is None and not (fresh_command or clarification):
             return False
         try:
             batch = await _thread(warehouse_service.pending_batch,actor_user_id=message.from_user.id)
@@ -754,7 +757,7 @@ class WarehouseNaturalCancelFilter(BaseFilter):
             return False
         return bool((batch and batch['source_chat_id']==message.chat.id
                      and batch['operation_type'] in ('writeoff','transfer')) or
-                    (batch is None and raw_state in (WarehouseIntakeStates.writeoff.state,
+                    (batch is None and analysis.disposition is not None and raw_state in (WarehouseIntakeStates.writeoff.state,
                                                      WarehouseIntakeStates.transfer.state)))
 
 
@@ -762,12 +765,40 @@ class WarehouseNaturalCancelFilter(BaseFilter):
 async def warehouse_natural_cancel(message: Message, state: FSMContext,
                                    warehouse_service: WarehouseOperationsService,
                                    assistant_conversation_memory: Any = None) -> None:
-    from app.services.assistant.mutation_language import cancellation_analysis
-    from app.models.assistant_mutation import MutationDisposition
+    from app.services.assistant.mutation_language import cancellation_analysis, parse_mutation, mutation_reply
+    from app.models.assistant_mutation import MutationDisposition, MutationError
     actor = message.from_user.id if message.from_user else None
     analysis = cancellation_analysis(message.text or '',contextual=True)
-    if actor is None or message.chat.type != 'private' or (
-        analysis.disposition is None and analysis.restart_at is None):
+    if actor is None or message.chat.type != 'private':
+        return
+    pending = await _thread(warehouse_service.pending_batch,actor_user_id=actor)
+    if pending is not None and (pending['source_chat_id'] != message.chat.id
+        or pending['operation_type'] not in ('writeoff','transfer')):
+        return
+    if analysis.disposition is None and analysis.restart_at is None:
+        # A new product command cannot be swallowed by the old draft's comment
+        # FSM. Keep that draft intact; persist only a typed missing-field prompt.
+        context = (assistant_conversation_memory.get(actor,message.chat.id)
+            if assistant_conversation_memory is not None else None)
+        previous = (context.pending_mutation if context is not None and
+            await state.get_state() == WarehouseIntakeStates.command_clarification.state else None)
+        parsed = parse_mutation(message.text or '',previous=previous)
+        if parsed is None or pending is None:
+            return
+        if parsed.allowed and parsed.missing:
+            if assistant_conversation_memory is not None:
+                assistant_conversation_memory.remember(actor,chat_id=message.chat.id,
+                    last_intent='prepare_'+parsed.action,last_entity_type='warehouse_product',
+                    last_query=parsed.lines[0].entity,pending_slots=parsed.missing,
+                    authorized_action='prepare_'+parsed.action,pending_mutation=parsed)
+                await state.set_state(WarehouseIntakeStates.command_clarification)
+            await message.answer(mutation_reply(parsed))
+        elif not parsed.allowed:
+            if parsed.error == MutationError.UNICODE and assistant_conversation_memory is not None:
+                assistant_conversation_memory.clear_structured(actor,chat_id=message.chat.id,last_intent='clarify')
+            await message.answer(mutation_reply(parsed))
+        else:
+            await message.answer('Позиция распознана. Сначала завершите или явно отмените предыдущий черновик. Новая запись не создана.')
         return
     if analysis.disposition != MutationDisposition.CANCEL:
         # Ambiguity cannot silently cancel an existing draft or become its
@@ -776,11 +807,16 @@ async def warehouse_natural_cancel(message: Message, state: FSMContext,
             assistant_conversation_memory.clear_structured(actor,chat_id=message.chat.id,last_intent='clarify')
         await message.answer('Уточните: отменить незавершённую запись или оставить её? Новые операции не созданы.')
         return
-    pending = await _thread(warehouse_service.pending_batch,actor_user_id=actor)
     if pending is not None:
         if pending['source_chat_id'] != message.chat.id or pending['operation_type'] not in ('writeoff','transfer'):
             return
-        await _thread(warehouse_service.cancel_batch,pending['id'],actor_user_id=actor)
+        try:
+            await _thread(warehouse_service.cancel_batch,pending['id'],actor_user_id=actor,
+                source_chat_id=message.chat.id,
+                expected_version=warehouse_service.repository.cancellation_version(pending))
+        except (AccessDeniedError,WarehouseOperationsError):
+            await message.answer('Черновик изменился или недоступен. Откройте его заново; отмена не выполнена.')
+            return
     await state.clear()
     if assistant_conversation_memory is not None:
         assistant_conversation_memory.clear(actor,message.chat.id)

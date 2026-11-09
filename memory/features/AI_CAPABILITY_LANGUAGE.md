@@ -10,6 +10,15 @@ Importance: High
 
 ## Planner corpus
 
+Offline mutation-role coverage from `a15759c...` adds Unicode/control rejection
+and grammar-aware service-word product slots for `warehouse.prepare_writeoff`
+and `warehouse.prepare_transfer`. Missing-unit clarification for product Стоп
+does not cancel an older draft; standalone cancel remains an owned typed action.
+Frozen v1.1 seed 20261109 and separate v1.2 cases are tracked in
+`tests/assistant_mutation_fuzz.py` / `tests/test_assistant_unicode_roles.py`.
+These are deterministic synthetic regressions, not measured live accuracy;
+extended live language coverage remains pending.
+
 `tests/fixtures/assistant_planner_corpus_v1.json` defines 17 offline contract
 cases covering corrections, pronouns, topic switch/return, incomplete
 mutations, colloquialisms, mixed Russian/Ukrainian typos, attendance,

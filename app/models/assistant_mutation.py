@@ -30,6 +30,56 @@ class MutationError(StrEnum):
     MISSING_UNIT = 'missing_unit'
     DESTINATION = 'missing_destination'
     SYNTAX = 'invalid_mutation_syntax'
+    UNICODE = 'suspicious_unicode'
+    TOKEN_ROLE = 'ambiguous_token_role'
+
+
+class UnicodeFlag(StrEnum):
+    SPACE = 'space'
+    UNICODE_SPACE = 'unicode_space'
+    COMBINING = 'combining_mark'
+    FORMAT = 'format_control'
+    CONTROL = 'control_character'
+    JOINER = 'zero_width_joiner'
+    BIDI = 'bidi_control'
+    VARIATION = 'variation_selector'
+    MIXED_SCRIPT = 'mixed_script'
+    HOMOGLYPH = 'confusable_keyword'
+    BOUNDARY = 'keyword_boundary_manipulation'
+    LENGTH = 'input_too_long'
+    IGNORABLE = 'default_ignorable'
+
+
+class UnicodeInspection(BaseModel):
+    model_config = ConfigDict(extra='forbid', frozen=True)
+    normalized_text: str = Field(repr=False, exclude=True, max_length=4000)
+    detection_text: str = Field(repr=False, exclude=True, max_length=4000)
+    flags: tuple[UnicodeFlag, ...] = ()
+    positions: tuple[int, ...] = Field(default=(), max_length=32)
+    forbidden: bool = False
+
+
+class MutationTokenKind(StrEnum):
+    ACTION = 'action'
+    ENTITY = 'entity'
+    QUANTITY = 'quantity'
+    UNIT = 'unit'
+    CANCEL = 'cancel'
+    CORRECTION = 'correction'
+    REASON = 'reason'
+    BOUNDARY = 'boundary'
+    UNKNOWN = 'unknown'
+
+
+class MutationToken(BaseModel):
+    """Ephemeral lexical metadata, not a replacement for persistent line facts."""
+    model_config = ConfigDict(extra='forbid', frozen=True)
+    normalized_value: str = Field(repr=False, exclude=True, max_length=4000)
+    kind: MutationTokenKind
+    clause_index: int = Field(ge=0, le=63)
+    start: int = Field(ge=0, le=4000)
+    end: int = Field(ge=0, le=4000)
+    suspicious_unicode: bool = False
 
 
 class MutationClauseKind(StrEnum):

@@ -976,14 +976,27 @@ class WarehouseOperationsService:
             now=self._now(),
         )
 
-    def cancel_batch(self, batch_id: int, *, actor_user_id: int) -> dict[str, Any]:
+    def cancel_batch(self, batch_id: int, *, actor_user_id: int,
+                     source_chat_id: int | None = None,
+                     expected_version: str | None = None) -> dict[str, Any]:
         self.access.require_warehouse_mutation(actor_user_id)
         batch = self.repository.get_batch(batch_id)
         if batch is None:
             raise WarehouseOperationsError("Batch not found")
         self._require_batch_owner(batch, actor_user_id)
+        def authorize() -> None:
+            self.access.require_warehouse_mutation(actor_user_id)
+        def validate_scope() -> None:
+            if expected_version is not None:
+                # Natural-language cancellation expires with the existing
+                # business-period scope, not a newly invented global TTL.
+                pending = self.pending_batch(actor_user_id=actor_user_id)
+                if pending is None or pending['id'] != batch_id:
+                    raise WarehouseOperationsError('Cancellation scope expired')
         return self.repository.cancel_batch(
-            batch_id, actor_user_id=actor_user_id, now=self._now()
+            batch_id, actor_user_id=actor_user_id, now=self._now(),
+            source_chat_id=source_chat_id, expected_version=expected_version,
+            authorize=authorize, validate_scope=validate_scope,
         )
 
     def commit_batch(self, batch_id: int, *, actor_user_id: int) -> list[dict[str, Any]]:

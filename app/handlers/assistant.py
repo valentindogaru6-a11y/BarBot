@@ -18,9 +18,10 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from app.config import Settings
-from app.models.assistant_mutation import MutationDisposition, MutationLine, ParsedMutation
+from app.models.assistant_mutation import MutationDisposition, MutationError, MutationLine, ParsedMutation
 from app.services.assistant.mutation_language import parse_mutation, mutation_reply, resolve_product_case
 from app.services.warehouse.quantity_service import QuantityError
+from app.storage.warehouse_operations_database import WarehouseOperationsError
 from app.handlers.catalog import _show_item
 from app.handlers.common import answer_callback_safely, load_catalog
 from app.handlers.warehouse import prepare_intake_message
@@ -340,6 +341,12 @@ async def _mutation_preflight(message, state, *, text, auth_service, warehouse_s
         previous = ParsedMutation(action=context.authorized_action.removeprefix('prepare_'),
             lines=(MutationLine(entity=context.last_query),),imperative_evidence=True)
     parsed = parse_mutation(text, previous=previous)
+    if parsed is not None and parsed.error == MutationError.TOKEN_ROLE:
+        repository = getattr(warehouse_service,'repository',None)
+        if callable(getattr(repository,'products',None)):
+            names = tuple(name for product in repository.products()
+                for name in (product.normalized_name,*product.aliases))
+            parsed = parse_mutation(text,previous=previous,exact_entities=names)
     if parsed is None:
         return False, None
     if message.chat.type != 'private':
@@ -351,7 +358,12 @@ async def _mutation_preflight(message, state, *, text, auth_service, warehouse_s
                 if batch and batch['source_chat_id'] == chat:
                     if controller is not None:
                         controller._require(actor, 'warehouse.cancel_batch')
-                    warehouse_service.cancel_batch(batch['id'], actor_user_id=actor)
+                    try:
+                        warehouse_service.cancel_batch(batch['id'], actor_user_id=actor,
+                            source_chat_id=chat,expected_version=warehouse_service.repository.cancellation_version(batch))
+                    except (AccessDeniedError,WarehouseOperationsError):
+                        await message.answer('Черновик изменился или недоступен. Отмена не выполнена.')
+                        return True, parsed
         if controller is not None:
             proposals = controller.proposals
             proposal = proposals.active_for_actor(actor)
@@ -363,7 +375,8 @@ async def _mutation_preflight(message, state, *, text, auth_service, warehouse_s
         return True, parsed
     if not parsed.allowed:
         if previous is not None and memory is not None and (
-            parsed.disposition == MutationDisposition.AMBIGUOUS or parse_mutation(text) is not None):
+            parsed.disposition == MutationDisposition.AMBIGUOUS or parsed.error == MutationError.UNICODE
+            or parse_mutation(text) is not None):
             # An invalid new explicit command must not leave an older product
             # armed. Invalid quantity answers retain only the valid old prompt.
             memory.clear_structured(actor,chat_id=chat,last_intent='clarify')

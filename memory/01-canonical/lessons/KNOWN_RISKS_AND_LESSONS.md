@@ -8,6 +8,19 @@ Evidence: regression tests, Git history, rollout docs, owner observations
 Depends on: callbacks, SQLite/WAL, workers, XLSX, imports, VPS environment
 Importance: High
 
+- **Invisible controls and service-word entities:** never silently delete
+  default-ignorable/control characters to manufacture executable commands.
+  Detection-only representation vetoes suspicious input before providers/tools.
+  Keep numeric token positions until grammar resolves product versus cancel
+  roles: product Стоп is not standalone cancellation. Exact entity resolution
+  never overrides a separate cancel clause. Real FSM tests must show no unwanted
+  cancellation UPDATE; parser-only evidence is insufficient. Natural cancellation
+  uses owned source-chat/snapshot/business-period checks and idempotent storage.
+  Re-inspect inherited typed fields too: an older accepted control-bearing
+  pending record must not resume via a clean unit-only reply after restart.
+  Frozen v1.1 expectations and separate v1.2 extension prevent oracle weakening.
+  Live extended coverage remains pending.
+
 - **A comment tail is not automatically harmless:** compound/contradictory
   cancellation and a damaged cancellation token previously passed as a reason
   and created a ready draft (`CANCEL_COMPOUND`, `CANCEL_TYPO`). Classify bounded

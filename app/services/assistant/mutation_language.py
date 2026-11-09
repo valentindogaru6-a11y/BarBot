@@ -5,13 +5,15 @@ still needs the normal access, product/destination resolution and confirmation.
 """
 
 import re
-import unicodedata
+from dataclasses import replace
 from decimal import Decimal, localcontext
 
 from app.models.assistant_mutation import (
     MutationClauseKind as K, MutationDisposition as D, MutationError as E, MutationLine, ParsedMutation,
 )
 from app.services.assistant.mutation_clauses import analyze_clauses
+from app.services.assistant.mutation_clauses import ClauseAnalysis
+from app.services.assistant.mutation_tokens import inspect_unicode, normalize_command
 from app.services.warehouse.quantity_service import QuantityError, parse_quantity
 
 
@@ -46,18 +48,23 @@ _SPECIAL = frozenset(('nan','inf','infinity','infinite','∞'))
 
 def _text(value):
     # Keep numeric signs, separators and line boundaries intact.
-    return unicodedata.normalize('NFKC', value).casefold().replace('ё','е').replace('і','и').strip()
+    return normalize_command(value)
 
 
 def explicit_cancel(value: str, *, contextual=False) -> bool:
     return cancellation_analysis(value, contextual=contextual).disposition == D.CANCEL
 
 
-def cancellation_analysis(value: str, *, contextual=False):
+def cancellation_analysis(value: str, *, contextual=False, exact_entities=()):
     """Shared veto for the AI and active warehouse FSM (never confirmation)."""
-    text = _text(value)
-    return analyze_clauses(text, action=lambda clause: _action(clause)[0] is not None,
+    inspection = inspect_unicode(value)
+    if inspection.forbidden:
+        return ClauseAnalysis((),D.INVALID,inspection=inspection)
+    text = inspection.normalized_text
+    result = analyze_clauses(text, action=_action, units=frozenset(_UNITS),
+        exact_entities=frozenset(_text(name) for name in exact_entities),
         active=bool(_action(text)[0] or _GENERIC_IMPERATIVE.match(text)), contextual=contextual)
+    return replace(result,inspection=inspection)
 
 
 def _action(text):
@@ -245,16 +252,19 @@ def _corrected_line(body, action, previous=None):
     return line, error, correction
 
 
-def parse_mutation(value: str, *, previous: ParsedMutation | None = None) -> ParsedMutation | None:
+def parse_mutation(value: str, *, previous: ParsedMutation | None = None, exact_entities=()) -> ParsedMutation | None:
     """One immutable analysis shared by foreground, planner and correction paths."""
-    text = _text(value)
+    inspection = inspect_unicode(value)
+    if inspection.forbidden:
+        return _failure(None,D.INVALID,E.UNICODE,imperative=False)
+    text = inspection.normalized_text
     action, body = _action(text)
     if len(text) > 4000:
         return _failure(action, D.INVALID, E.SYNTAX, imperative=action is not None)
-    analysis = cancellation_analysis(text,contextual=previous is not None)
+    analysis = cancellation_analysis(text,contextual=previous is not None,exact_entities=exact_entities)
     if analysis.disposition is not None:
         return ParsedMutation(action=action, disposition=analysis.disposition,
-            error=E.CANCELLED if analysis.disposition == D.CANCEL else E.AMBIGUOUS,
+            error=E.CANCELLED if analysis.disposition == D.CANCEL else E.TOKEN_ROLE if analysis.ambiguous_entity else E.AMBIGUOUS,
             imperative_evidence=action is not None,
             explicit_cancellation=any(clause.kind == K.CANCELLATION for clause in analysis.clauses),
             clauses=analysis.clauses)
@@ -274,6 +284,12 @@ def parse_mutation(value: str, *, previous: ParsedMutation | None = None) -> Par
             text.split(' ',1)[0] in _UNITS or
             (previous.missing==('unit',) and len(text.split())==1) or
             re.match(r'^(?:в|на|->|→|нет|точнее|исправь|виправ)\b', text)):
+            # Prior releases could persist controls in an otherwise typed
+            # product/comment. A unit-only reply must not revive that input.
+            if any(inspect_unicode(field).forbidden for line in previous.lines
+                for field in (line.entity,line.unit,line.destination,line.comment)):
+                return _failure(previous.action,D.INVALID,E.UNICODE,imperative=False,
+                    clauses=analysis.clauses)
             if not previous.clauses and any(line.comment for line in previous.lines):
                 # Legacy free-text tails lack clause evidence. Refuse only
                 # resumption, not independent read-only requests or commands.

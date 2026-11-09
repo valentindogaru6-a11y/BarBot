@@ -1,5 +1,13 @@
 # Freshness Manifest
 
+Unicode/token-role slice revalidated offline 2026-11-09 from `a15759c...`:
+default-ignorable/control fail-closed inspection, detection-only representation,
+grammar-assigned entity roles with numeric positions and typed FSM cancellation.
+Evidence: frozen v1.1 seed 20261109 plus separate v1.2 parser/FSM/temporary-v15
+ledger tests. Existing v15 JSON, catalog, seed, schema and migrations remain
+unchanged. Live extended quality and all production runtime facts remain pending
+separate authorization and revalidation.
+
 Compound-cancellation slice revalidated 2026-11-09 from `27f0b9c...`: classify
 bounded typed clauses before comments, fail closed on contradiction/unknown
 action tails, recognize only bounded one-edit cancellation typos, preserve

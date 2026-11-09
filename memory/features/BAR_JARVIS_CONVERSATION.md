@@ -57,6 +57,39 @@ Regressions `ADV_NEGATION_READY_01`, `ADV_NEGATIVE_01`, `ADV_DECIMAL_01` are
 covered through real handlers/services and the temporary-v15 observer/ledger.
 No schema/catalog/seed change, live quality claim or rollout is implied.
 
+### Unicode and positional roles (from `a15759c...`)
+
+`mutation_tokens.py` owns bounded typed Unicode inspection before providers or
+tools. NFKC/casefold/ё→е/і→и normalization preserves ordinary/NBSP/thin spaces.
+Format/control characters, joiners, bidi/default-ignorable characters, variation
+selectors, residual combining marks and service-word homoglyph/boundary attacks
+fail closed. Detection-only text is never executable text; suspicious entity or
+comment text is not silently repaired. Raw text/token values are excluded from
+diagnostic repr/serialization.
+
+Ephemeral tokens retain kind, clause index and bounded spans, including quantities
+and units. Grammar assigns entity slots before interpreting service lexemes:
+product Стоп before a quantity is an entity, while a separate terminal `стоп`
+is cancellation. Exact product names/aliases can resolve a postfix entity;
+fuzzy matching cannot suppress a cancel clause. Only typed parsed fields persist,
+not a second copy of input/tokens; existing v15 JSON constraints are unchanged.
+Inherited typed fields are re-inspected on missing-field resumption: old accepted
+control-bearing entity/comment/destination data cannot be revived after restart.
+
+Active warehouse FSM consumes typed cancellation, checks actor/source chat,
+optimistic content snapshot and current business-period scope. Role is checked
+inside the transaction; duplicate cancellation is idempotent. New incomplete
+commands cannot become an older draft's comment: a separate clarification state
+persists typed pending fields and preserves the older draft until explicitly
+resolved. Restart retains the actor/chat-scoped pending fields.
+
+Frozen `barbot-clause-grammar-v1.1` uses seed 20261109, 1410 cases/1372 unique
+strings and SHA256 `61625f501c4f6387bbf0c5ab5b1ec51597ffef53a6f3224526d24488a6572625`.
+Expected outcomes are unchanged. Separate v1.2 adds 210 control, 100 entity and
+100 FSM/context fixtures; evidence is offline parser plus real temporary-v15
+handler/FSM/service and mutation ledger, not live language quality. Extended live
+evaluation remains pending; no production permissions or rollout are implied.
+
 ### Compound cancellation hardening (from `27f0b9c...`)
 
 `mutation_clauses.py` classifies at most 64 clauses/4,000 characters before any
