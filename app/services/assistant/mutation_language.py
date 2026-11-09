@@ -9,8 +9,9 @@ import unicodedata
 from decimal import Decimal, localcontext
 
 from app.models.assistant_mutation import (
-    MutationDisposition as D, MutationError as E, MutationLine, ParsedMutation,
+    MutationClauseKind as K, MutationDisposition as D, MutationError as E, MutationLine, ParsedMutation,
 )
+from app.services.assistant.mutation_clauses import analyze_clauses
 from app.services.warehouse.quantity_service import QuantityError, parse_quantity
 
 
@@ -21,14 +22,6 @@ _TRANSFER = re.compile(r'^(?:пожалуйста\s+)?(?:перемести(?:т
     r'перенести|отправь(?:те)?|(?:сделай|оформи)\s+перемещени[ея]|перемещение|'
     r'перемисти|перенеси|зроби\s+перемищення|перемищення)\b\s*:?\s*')
 _DOCUMENT_SEND = re.compile(r'\b(?:отчет\w*|табел\w*|xlsx|excel|файл\w*|документ\w*|списания)\b')
-_NEGATED_ACTION = re.compile(r'\bне\s+(?:(?:надо|нужно|треба|потрібно|потрибно)\s+)?'
-    r'(?:(?:ничего|ничого|больше|бильше)\s+)?(?:списывай\w*|списывать|списуй\w*|списувати|'
-    r'спиши\w*|делай\w*|делать|роби\w*|перемещай\w*|перемещать|переноси\w*|'
-    r'перемищуй\w*|отправляй\w*|надсилай\w*)\b')
-_CANCEL = re.compile(r'^(?:(?:нет|ни)\s*[,!:;]?\s*)?(?:отмена|отмени|отбой|стоп|'
-    r'скасуй|скасування|видмина|передумал[а]?|передумав|передумала|хотя\s+нет|'
-    r'не\s+(?:надо|нужно|треба))\s*[.!?]*$')
-_CANCEL_TAIL = re.compile(r'(?:^|\s)' + _CANCEL.pattern[1:])
 _GENERIC_IMPERATIVE = re.compile(r'^(?:пожалуйста\s+)?(?:измени|изменить|добавь|добавить|'
     r'удали|удалить|убери|замени|заменить|закрой|закрыть|открой|открыть|создай|создать|'
     r'отправь|отправить|настрой|настроить|отмени|отменить|подтверди|подтвердить)\b')
@@ -57,20 +50,19 @@ def _text(value):
 
 
 def explicit_cancel(value: str, *, contextual=False) -> bool:
+    return cancellation_analysis(value, contextual=contextual).disposition == D.CANCEL
+
+
+def cancellation_analysis(value: str, *, contextual=False):
+    """Shared veto for the AI and active warehouse FSM (never confirmation)."""
     text = _text(value)
-    if text in ('нет','ни'):
-        return True
-    if _NEGATED_ACTION.search(text):
-        return True
-    if (contextual or _action(text)[0] or _GENERIC_IMPERATIVE.match(text)) and _CANCEL_TAIL.search(text):
-        return True
-    clauses = re.split(r'[,;\n]+', text)
-    return (len(clauses)>1 and clauses[-1].strip(' .!?') in ('нет','ни')) or any(
-        _CANCEL.fullmatch(clause.strip()) for clause in clauses) or bool(
-        re.search(r'\b(?:хотя\s+нет|передумал[а]?|передумав|передумала)\s*[.!?]*$', text))
+    return analyze_clauses(text, action=lambda clause: _action(clause)[0] is not None,
+        active=bool(_action(text)[0] or _GENERIC_IMPERATIVE.match(text)), contextual=contextual)
 
 
 def _action(text):
+    # Only this closed positive imperative template may strip a negation.
+    text = re.sub(r'^не\s+забудь\s+(?=(?:списать|переместить)\b)', '', text)
     for name, pattern in (('writeoff', _WRITEOFF), ('transfer', _TRANSFER)):
         if match := pattern.match(text):
             if name == 'transfer' and re.match(r'^(?:пожалуйста\s+)?отправь',text) and _DOCUMENT_SEND.search(text):
@@ -81,9 +73,9 @@ def _action(text):
     return None, text
 
 
-def _failure(action, disposition, error, *, imperative=True):
+def _failure(action, disposition, error, *, imperative=True, clauses=()):
     return ParsedMutation(action=action, disposition=disposition, error=error,
-        imperative_evidence=imperative)
+        imperative_evidence=imperative, clauses=clauses)
 
 
 def _quantity_tokens(core):
@@ -259,9 +251,22 @@ def parse_mutation(value: str, *, previous: ParsedMutation | None = None) -> Par
     action, body = _action(text)
     if len(text) > 4000:
         return _failure(action, D.INVALID, E.SYNTAX, imperative=action is not None)
-    if explicit_cancel(text,contextual=previous is not None):
-        return ParsedMutation(action=action, disposition=D.CANCEL, error=E.CANCELLED,
-            imperative_evidence=action is not None, explicit_cancellation=True)
+    analysis = cancellation_analysis(text,contextual=previous is not None)
+    if analysis.disposition is not None:
+        return ParsedMutation(action=action, disposition=analysis.disposition,
+            error=E.CANCELLED if analysis.disposition == D.CANCEL else E.AMBIGUOUS,
+            imperative_evidence=action is not None,
+            explicit_cancellation=any(clause.kind == K.CANCELLATION for clause in analysis.clauses),
+            clauses=analysis.clauses)
+    restart = analysis.restart_at
+    if restart is not None:
+        # Only a fully new explicit action can supersede a cancellation. No
+        # partial quantity/correction inherits the cancelled product or amount.
+        text = text[restart:].strip()
+        action, body = _action(text)
+        previous = None
+        if action is None or len(text) > 2000:
+            return _failure(action,D.AMBIGUOUS,E.AMBIGUOUS,clauses=analysis.clauses)
     inherited = False
     if action is None:
         if previous and previous.allowed and len(previous.lines) == 1 and (
@@ -269,9 +274,13 @@ def parse_mutation(value: str, *, previous: ParsedMutation | None = None) -> Par
             text.split(' ',1)[0] in _UNITS or
             (previous.missing==('unit',) and len(text.split())==1) or
             re.match(r'^(?:в|на|->|→|нет|точнее|исправь|виправ)\b', text)):
+            if not previous.clauses and any(line.comment for line in previous.lines):
+                # Legacy free-text tails lack clause evidence. Refuse only
+                # resumption, not independent read-only requests or commands.
+                return _failure(previous.action,D.AMBIGUOUS,E.AMBIGUOUS,clauses=analysis.clauses)
             action, body, inherited = previous.action, text, True
             if previous.missing==('unit',) and len(text.split())==1 and not re.search(r'[0-9]',text) and text not in _UNITS:
-                return _failure(action,D.INVALID,E.UNIT)
+                return _failure(action,D.INVALID,E.UNIT,clauses=analysis.clauses)
         else:
             return None
     lines = []
@@ -282,24 +291,29 @@ def parse_mutation(value: str, *, previous: ParsedMutation | None = None) -> Par
             continue
         other_action, raw_body = _action(raw)
         if other_action and other_action != action:
-            return _failure(action, D.AMBIGUOUS, E.AMBIGUOUS)
+            return _failure(action, D.AMBIGUOUS, E.AMBIGUOUS,clauses=analysis.clauses)
         line, error, correction = _corrected_line(raw_body, action,
             previous.lines[0] if inherited else None)
         if error:
-            return _failure(action, D.AMBIGUOUS if error in (E.RANGE,E.AMBIGUOUS) else D.INVALID, error)
+            return _failure(action, D.AMBIGUOUS if error in (E.RANGE,E.AMBIGUOUS) else D.INVALID, error,clauses=analysis.clauses)
         lines.append(line)
         corrected = correction or corrected
         if len(lines) > 20:
-            return _failure(action, D.INVALID, E.SYNTAX)
+            return _failure(action, D.INVALID, E.SYNTAX,clauses=analysis.clauses)
     if not lines:
-        return _failure(action, D.AMBIGUOUS, E.PRODUCT)
+        return _failure(action, D.AMBIGUOUS, E.PRODUCT,clauses=analysis.clauses)
     if corrected is not None:
         corrected = ' '.join(corrected.split())
         if len(corrected) > 2000:
-            return _failure(action,D.INVALID,E.SYNTAX)
+            return _failure(action,D.INVALID,E.SYNTAX,clauses=analysis.clauses)
     result = ParsedMutation(action=action, lines=tuple(lines), imperative_evidence=True,
-        disposition=D.CORRECTED if corrected else D.PROCEED, correction_segment=corrected)
+        disposition=D.CORRECTED if corrected or restart is not None else D.PROCEED,
+        correction_segment=corrected or (text if restart is not None else None),
+        clauses=tuple(clause.model_copy(update={'superseded':True})
+            if restart is not None and clause.end <= restart else clause for clause in analysis.clauses))
     missing = result.missing
+    if restart is not None and (missing or not result.allowed):
+        return _failure(action,D.AMBIGUOUS,E.AMBIGUOUS,clauses=analysis.clauses)
     if missing:
         result = result.model_copy(update={'error': {'product':E.PRODUCT,'quantity':E.QUANTITY,
             'unit':E.MISSING_UNIT,'destination':E.DESTINATION}[missing[0]]})

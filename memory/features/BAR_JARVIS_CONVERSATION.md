@@ -57,6 +57,44 @@ Regressions `ADV_NEGATION_READY_01`, `ADV_NEGATIVE_01`, `ADV_DECIMAL_01` are
 covered through real handlers/services and the temporary-v15 observer/ledger.
 No schema/catalog/seed change, live quality claim or rollout is implied.
 
+### Compound cancellation hardening (from `27f0b9c...`)
+
+`mutation_clauses.py` classifies at most 64 clauses/4,000 characters before any
+tail can become a comment. Closed `MutationClause` values carry only kind,
+bounded source span and a server-owned superseded flag, never raw text. Kinds:
+action, arguments, comment/reason, correction, cancellation, contradiction,
+unknown. Decimal punctuation is not a clause delimiter. Existing v15 JSON
+without this optional metadata remains readable; an unvalidated legacy comment
+cannot be revived by an amount-only answer and requires fresh clear input.
+No schema migration is needed.
+
+Final direct cancellation vetoes the whole new batch. Contradictory cancellation,
+double negation, cancellation-of-cancellation and unresolved action-like tails
+require clarification, with no provider/tool/draft. A later complete explicit
+action may supersede cancellation only after full product/quantity/unit/destination
+syntax validation; a quantity fragment cannot revive the cancelled action.
+Ambiguity clears actionable AI pending state, preserving successful catalog
+context. Active warehouse FSM intercepts ambiguous cancellation without changing
+an existing draft or consuming the text as its comment; clear cancellation alone
+uses the existing owned cancellation service.
+
+Cancellation typos use a closed RU/UA lexicon, whole tokens of length >=5 and
+at most one Damerau edit. Only a final isolated clause head/current-action
+reference is eligible. Ties clarify. Two-edit damage is not repaired: an unknown
+isolated/action-related tail clarifies instead. Short words are never fuzzy
+matched. Product names and ordinary reason prose are not scanned for typos;
+reason/comment markers cannot hide a direct command to cancel this action.
+Supply-cancellation reasons and descriptive negation remain comments. Only the
+explicit `не забудь + списать/переместить` template is a positive imperative.
+An explicit dialogue correction (`нет, я имел в виду ...`) is not a cancellation;
+the existing contextual planner/authority boundary still handles it.
+
+Exact synthetic `CANCEL_COMPOUND` and `CANCEL_TYPO` inputs are reconstructed and
+tracked in `tests/test_assistant_compound_cancellation.py`, not copied from
+production. Vertical regressions use real handler/FSM/services and the temporary
+v15 ledger, including zero transient business inserts for blocked input. Broad
+natural-language quality and extended live Gemini evaluation remain pending.
+
 Eviction is deterministic oldest-first. Summary uses only server-confirmed
 topic/entity/task/capability state; provider prose never becomes long-term
 memory. Summary/session updates share the v13 optimistic revision. Failed

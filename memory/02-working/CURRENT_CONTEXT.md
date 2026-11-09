@@ -5,6 +5,15 @@ Metadata: scope `working`; trust `working`; lifecycle `ephemeral`; last cleared
 
 ## Status
 
+Focused compound-cancellation fix starts at `27f0b9c...`. The previous independent
+offline review closed the original numeric/sign cases but found two new false
+drafts in both foreground modes. Bounded typed clauses, limited cancellation-
+lexeme typos, reason/action separation and the explicit positive-negation
+template address those repros. Existing v15 JSON remains compatible; no schema,
+catalog/seed, production, API, systemd or rollout change belongs to this task.
+Final offline validation and a separate crash-test are required before any live
+extended evaluation, which remains pending.
+
 Focused mutation-language hardening starts at `96f50da...`: close cancelled
 writeoff preparation, signed-number coercion and malformed-decimal prefix
 acceptance. Shared closed local dispositions gate handlers/planners; pending

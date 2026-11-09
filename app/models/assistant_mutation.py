@@ -4,7 +4,7 @@ from decimal import Decimal
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class MutationDisposition(StrEnum):
@@ -30,6 +30,31 @@ class MutationError(StrEnum):
     MISSING_UNIT = 'missing_unit'
     DESTINATION = 'missing_destination'
     SYNTAX = 'invalid_mutation_syntax'
+
+
+class MutationClauseKind(StrEnum):
+    ACTION = 'action'
+    ARGUMENTS = 'arguments'
+    COMMENT = 'comment_reason'
+    CORRECTION = 'correction'
+    CANCELLATION = 'cancellation'
+    CONTRADICTION = 'contradiction'
+    UNKNOWN = 'unknown'
+
+
+class MutationClause(BaseModel):
+    """Local source spans only: no raw text or provider-owned classification."""
+    model_config = ConfigDict(extra='forbid', frozen=True)
+    kind: MutationClauseKind
+    start: int = Field(ge=0, le=4000)
+    end: int = Field(ge=0, le=4000)
+    superseded: bool = False
+
+    @model_validator(mode='after')
+    def ordered_span(self):
+        if self.end < self.start:
+            raise ValueError('invalid clause span')
+        return self
 
 
 class MutationLine(BaseModel):
@@ -64,6 +89,7 @@ class ParsedMutation(BaseModel):
     imperative_evidence: bool = False
     explicit_cancellation: bool = False
     correction_segment: str | None = Field(default=None, max_length=2000)
+    clauses: tuple[MutationClause, ...] = Field(default=(), max_length=64)
 
     @property
     def allowed(self) -> bool:
@@ -71,6 +97,9 @@ class ParsedMutation(BaseModel):
             and self.disposition in (MutationDisposition.PROCEED, MutationDisposition.CORRECTED)
             and self.error in (None,MutationError.PRODUCT,MutationError.QUANTITY,
                 MutationError.MISSING_UNIT,MutationError.DESTINATION)
+            and not any(not clause.superseded and clause.kind in (
+                MutationClauseKind.CANCELLATION, MutationClauseKind.CONTRADICTION,
+                MutationClauseKind.UNKNOWN) for clause in self.clauses)
             and self.lines and all(line.entity for line in self.lines))
 
     @property

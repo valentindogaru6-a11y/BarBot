@@ -8,6 +8,16 @@ Evidence: regression tests, Git history, rollout docs, owner observations
 Depends on: callbacks, SQLite/WAL, workers, XLSX, imports, VPS environment
 Importance: High
 
+- **A comment tail is not automatically harmless:** compound/contradictory
+  cancellation and a damaged cancellation token previously passed as a reason
+  and created a ready draft (`CANCEL_COMPOUND`, `CANCEL_TYPO`). Classify bounded
+  typed clauses first; unknown action-like tails clarify. One-edit typo matching
+  is restricted to cancellation clause heads/references, not products or prose.
+  Supply-cancellation reasons remain comments, but a direct action cancellation
+  cannot hide behind a reason marker. `не забудь + allowed action` is positive
+  evidence, not cancellation. Validate both foreground paths with the real
+  SQLite mutation ledger; broad live language quality is still pending.
+
 - **Cancellation precedes action evidence:** an imperative followed by explicit
   refusal must not become a draft, even when a provider chooses a mutation.
   Use one closed typed disposition across local/planned paths and warehouse

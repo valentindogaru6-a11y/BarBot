@@ -340,7 +340,8 @@ class LiveConversationEvaluationAdapter:
                         raise ProbeComplete
                     if not local_mutation.allowed or local_mutation.missing:
                         observation['clarification']=True
-                        if not local_mutation.allowed and context is not None and context.pending_mutation and parse_mutation(request.text) is not None:
+                        if not local_mutation.allowed and context is not None and context.pending_mutation and (
+                            local_mutation.disposition == MutationDisposition.AMBIGUOUS or parse_mutation(request.text) is not None):
                             e.memory.clear_structured(e.owner,chat_id=e.chat,last_intent='clarify')
                         if local_mutation.allowed and len(local_mutation.lines)==1:
                             e.memory.remember(e.owner,chat_id=e.chat,last_intent='prepare_'+local_mutation.action,

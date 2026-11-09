@@ -275,8 +275,15 @@ def test_v2_expected_never_enters_provider_and_partial_budget_blocks_readiness()
                 if 'catalog.search' in allowed else route())
             return await super().post_json(*args,**kwargs)
     wire=TwoReadWire()
+    # Budget exhaustion must not depend on how many corpus mutations are now
+    # rejected locally. Use independent read-only requests; expectations never
+    # enter provider input. Keep the same physical-budget/readiness assertions.
+    template=select_suite('core')[0].cases[1]
+    budget_cases=tuple(replace(template,request=replace(template.request,
+        case_id=f'budget_read_{index}',dialogue='budget_read',max_steps=2))
+        for index in range(30))
     report,code=asyncio.run(run_live(options(suite='core',max_provider_calls=48),settings_loader=settings,
-        transport_factory=lambda:wire))
+        transport_factory=lambda:wire,corpus=budget_cases))
     assert code==3 and not report['ready'] and report['skipped']>0
     assert report['call_budget']['attempted']==48
 

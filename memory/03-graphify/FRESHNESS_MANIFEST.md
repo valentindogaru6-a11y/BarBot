@@ -1,5 +1,13 @@
 # Freshness Manifest
 
+Compound-cancellation slice revalidated 2026-11-09 from `27f0b9c...`: classify
+bounded typed clauses before comments, fail closed on contradiction/unknown
+action tails, recognize only bounded one-edit cancellation typos, preserve
+ordinary reasons and positive `не забудь + action`. Evidence is synthetic real
+handler/FSM/services plus the temporary-v15 ledger. Optional clause metadata is
+v15 JSON-compatible; schema/catalog/seed unchanged. Extended live evaluation
+and production facts remain pending separate authorization and verification.
+
 Mutation-language slice revalidated 2026-11-09 from `96f50da...`: typed local
 disposition, cancellation-before-evidence, whole-token Decimal grammar,
 unambiguous correction and fail-closed multiline numeric invalidity. Typed

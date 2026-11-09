@@ -362,7 +362,8 @@ async def _mutation_preflight(message, state, *, text, auth_service, warehouse_s
         await message.answer(mutation_reply(parsed))
         return True, parsed
     if not parsed.allowed:
-        if previous is not None and parse_mutation(text) is not None and memory is not None:
+        if previous is not None and memory is not None and (
+            parsed.disposition == MutationDisposition.AMBIGUOUS or parse_mutation(text) is not None):
             # An invalid new explicit command must not leave an older product
             # armed. Invalid quantity answers retain only the valid old prompt.
             memory.clear_structured(actor,chat_id=chat,last_intent='clarify')

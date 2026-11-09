@@ -742,10 +742,11 @@ class WarehouseNaturalCancelFilter(BaseFilter):
 
     async def __call__(self, message: Message, warehouse_service: WarehouseOperationsService,
                        raw_state: str | None = None) -> bool:
-        from app.services.assistant.mutation_language import explicit_cancel
+        from app.services.assistant.mutation_language import cancellation_analysis
         if message.from_user is None or message.chat.type != 'private':
             return False
-        if not explicit_cancel(message.text or '',contextual=True):
+        analysis = cancellation_analysis(message.text or '',contextual=True)
+        if analysis.disposition is None and analysis.restart_at is None:
             return False
         try:
             batch = await _thread(warehouse_service.pending_batch,actor_user_id=message.from_user.id)
@@ -761,9 +762,19 @@ class WarehouseNaturalCancelFilter(BaseFilter):
 async def warehouse_natural_cancel(message: Message, state: FSMContext,
                                    warehouse_service: WarehouseOperationsService,
                                    assistant_conversation_memory: Any = None) -> None:
-    from app.services.assistant.mutation_language import explicit_cancel
+    from app.services.assistant.mutation_language import cancellation_analysis
+    from app.models.assistant_mutation import MutationDisposition
     actor = message.from_user.id if message.from_user else None
-    if actor is None or message.chat.type != 'private' or not explicit_cancel(message.text or '',contextual=True):
+    analysis = cancellation_analysis(message.text or '',contextual=True)
+    if actor is None or message.chat.type != 'private' or (
+        analysis.disposition is None and analysis.restart_at is None):
+        return
+    if analysis.disposition != MutationDisposition.CANCEL:
+        # Ambiguity cannot silently cancel an existing draft or become its
+        # comment/quantity answer. Only a fresh clear command may change it.
+        if assistant_conversation_memory is not None:
+            assistant_conversation_memory.clear_structured(actor,chat_id=message.chat.id,last_intent='clarify')
+        await message.answer('Уточните: отменить незавершённую запись или оставить её? Новые операции не созданы.')
         return
     pending = await _thread(warehouse_service.pending_batch,actor_user_id=actor)
     if pending is not None:

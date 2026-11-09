@@ -94,6 +94,15 @@ size, scoring rules and reproducible results exist, coverage remains `pending`.
 
 ## Verified warehouse language
 
+Compound cancellation hardening from `27f0b9c...` adds offline-tested families
+for both `warehouse.prepare_writeoff` and `warehouse.prepare_transfer`: bounded
+clause veto, contradictory/double-negation clarification, one-edit cancellation
+typos and the closed positive `не забудь + action` template. Reason/product
+words are not fuzzy cancellation targets. Exact reconstructed synthetic review
+cases live in `tests/test_assistant_compound_cancellation.py`; handler/FSM and
+temporary-v15 ledger tests check no transient draft writes for blocked input.
+This is not complete language coverage; extended live evaluation is pending.
+
 Offline hardening from `96f50da...` is covered in
 `tests/test_assistant_mutation_language.py`. Writeoff/transfer retain typed
 `proceed/cancel/corrected/ambiguous/invalid` disposition, whole Decimal tokens
