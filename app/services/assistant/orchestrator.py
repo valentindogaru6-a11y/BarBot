@@ -26,6 +26,8 @@ from app.models.assistant_planner import (
 )
 from app.models.catalog import Catalog
 from app.services.assistant.providers import (
+    ProviderError,
+    ProviderErrorKind,
     GroundedSearchClient,
     GroundedSearchResult,
     IntentModelClient,
@@ -493,6 +495,19 @@ class AssistantOrchestrator:
                 raise
             except Exception as exc:
                 logger.info("Assistant planner fallback kind=%s", type(exc).__name__)
+                terminal = isinstance(exc, ProviderError) and exc.kind in {
+                    ProviderErrorKind.SAFETY_REFUSAL, ProviderErrorKind.AUTHORITY,
+                }
+                available = isinstance(exc, ProviderError) and exc.kind in {
+                    ProviderErrorKind.TIMEOUT, ProviderErrorKind.UNAVAILABLE,
+                    ProviderErrorKind.RATE_LIMIT, ProviderErrorKind.BUSY,
+                }
+                local = self.local_intent(text)
+                if terminal or (local and local.intent in {
+                    AssistantIntentName.PREPARE_WRITEOFF, AssistantIntentName.PREPARE_TRANSFER,
+                } and not available):
+                    return AssistantIntent(intent=AssistantIntentName.CLARIFY,
+                        clarification='Запрос не прошёл безопасную проверку. Уточните действие или используйте меню.')
                 if (
                     planner_snapshot.last_successful_entity_id
                     and _CONTEXT_MUTATION_FOLLOWUP_RE.search(text)
@@ -529,6 +544,12 @@ class AssistantOrchestrator:
                 local=self.shadow_local_decision(local, route_category='local_clarification'))
             return local
         if self.intent_client is None:
+            # Groq-only planning must not silently depend on a disabled Gemini
+            # fallback/legacy client. Local routes above still have priority.
+            if self.planner_client is not None and planner_snapshot is not None:
+                decision = await self.plan(text, snapshot=planner_snapshot,
+                    capabilities=planner_capabilities)
+                return self._guard_provider_intent(self.planner_decision_to_intent(decision), allowed_action)
             raise AssistantUnavailableError("intent provider is disabled")
         kwargs = {
             "candidates": candidates,

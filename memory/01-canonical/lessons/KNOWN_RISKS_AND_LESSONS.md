@@ -8,6 +8,16 @@ Evidence: regression tests, Git history, rollout docs, owner observations
 Depends on: callbacks, SQLite/WAL, workers, XLSX, imports, VPS environment
 Importance: High
 
+- **Terminal is not unavailable:** flattening safety/model/authority failures
+  into generic availability enabled a local draft after refusal. Preserve typed
+  terminal outcomes through the handler; local imperative evidence cannot erase
+  them. HTTP status bounds body diagnostics: a body rate-limit code on 400 must
+  not authorize failover or an availability circuit.
+- **Dependency and observation contracts need vertical tests:** disabled
+  fallback must not require/create its provider. Scorer unit tests alone missed
+  absent actual quantity/unit fields; derive typed canonical values from resolved
+  temporary DB rows and verify readiness through the real runner.
+
 - **Provider failover is not backpressure:** busy/cooldown requests must not fan
   out to another provider. Count at the physical HTTP boundary and share limits
   across users; keep claims/cancellation/shutdown bounded. A tool/proposal

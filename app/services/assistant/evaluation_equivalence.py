@@ -1,13 +1,48 @@
 """Scorer-only equivalence; never influences provider input or execution."""
 
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, localcontext
+from typing import Literal
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+class CanonicalEvaluationQuantity(BaseModel):
+    """Resolved DB quantity in its base unit; never inferred from prompt text."""
+    model_config = ConfigDict(extra='forbid', frozen=True)
+    quantity_text: str = Field(min_length=1, max_length=50, strict=True)
+    unit_text: Literal['kg', 'l', 'pcs']
+
+    @field_validator('quantity_text')
+    @classmethod
+    def positive_decimal(cls, value):
+        try:
+            number = Decimal(value)
+            if not number.is_finite() or number <= 0 or abs(number.adjusted()) > 30:
+                raise ValueError('invalid canonical quantity')
+            with localcontext() as context:
+                context.prec = 100
+                normalized = format(number.normalize(), 'f')
+            if len(normalized) > 50:
+                raise ValueError('canonical quantity exceeds bound')
+            return normalized
+        except InvalidOperation:
+            raise ValueError('invalid canonical quantity') from None
+
+    @classmethod
+    def from_scaled(cls, quantity_scaled, base_unit):
+        if type(quantity_scaled) is not int or quantity_scaled <= 0:
+            return None
+        from app.services.warehouse.quantity_service import SCALE
+        try:
+            return cls(quantity_text=format(Decimal(quantity_scaled) / SCALE, 'f'), unit_text=base_unit)
+        except ValueError:
+            return None
 
 _UNITS = {}
 for aliases, dimension, factor in (
     (('g', 'gram', 'grams', 'г', 'гр', 'грамм', 'грамма', 'граммов'), 'mass', '1'),
     (('kg', 'кг', 'килограмм'), 'mass', '1000'),
     (('ml', 'мл'), 'volume', '1'),
-    (('l', 'л'), 'volume', '1000'),
+    (('l', 'liter', 'litre', 'л', 'литр'), 'volume', '1000'),
     (('pcs', 'шт'), 'count', '1'),
 ):
     for alias in aliases:
@@ -18,6 +53,8 @@ def quantity_equivalent(quantity, unit, expected_quantity, expected_unit):
     try:
         if isinstance(quantity, (float, bool)) or isinstance(expected_quantity, (float, bool)):
             return False
+        if len(str(quantity)) > 100 or len(str(expected_quantity)) > 100:
+            return False
         actual = Decimal(quantity)
         expected = Decimal(expected_quantity)
         if (not actual.is_finite() or not expected.is_finite()
@@ -25,9 +62,11 @@ def quantity_equivalent(quantity, unit, expected_quantity, expected_unit):
             return False
         actual_dimension, actual_factor = _UNITS[unit.strip().casefold()]
         expected_dimension, expected_factor = _UNITS[expected_unit.strip().casefold()]
-        return (actual.is_finite() and expected.is_finite() and actual >= 0 and expected >= 0
-            and actual_dimension == expected_dimension
-            and actual * actual_factor == expected * expected_factor)
+        with localcontext() as context:
+            context.prec = 256  # Exact multiplication for the bounded inputs.
+            return (actual.is_finite() and expected.is_finite() and actual > 0 and expected > 0
+                and actual_dimension == expected_dimension
+                and actual * actual_factor == expected * expected_factor)
     except (InvalidOperation, ValueError, TypeError, KeyError, AttributeError):
         return False
 

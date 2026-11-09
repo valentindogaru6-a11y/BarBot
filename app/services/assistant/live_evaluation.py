@@ -404,7 +404,8 @@ class LiveConversationEvaluationAdapter:
                 if event.executor_invoked:
                     event.side_effect_observed = True
         observation.update(operations=after['operations'],memory_active=after['memory_active'],
-            memory_pending=after['memory_pending'],proposal_count=after['proposals_ready'])
+            memory_pending=after['memory_pending'],proposal_count=after['proposals_ready'],
+            **arguments(e))
         if structured_before is not None:
             structured_after = capture(e)
             observation.update(operation_delta=after['operations']-self.scene_operations,
@@ -413,8 +414,7 @@ class LiveConversationEvaluationAdapter:
                 state_unchanged=structured_before['protected']==structured_after['protected'],
                 context_turns=structured_after['turn_count'],summary_present=structured_after['summary_present'],
                 long_context=(structured_after['turn_count']<=12 and structured_after['context_chars']<=12000
-                    and structured_after['summary_present'] and observation.get('snapshot_bytes',0)<=24000),
-                **arguments(e))
+                    and structured_after['summary_present'] and observation.get('snapshot_bytes',0)<=24000))
         if request.action != 'confirm_proposal' and (
             after['operations'] != before['operations'] or after['attendance_open'] != before['attendance_open'] or
             after['proposals_executed'] != before['proposals_executed']):

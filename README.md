@@ -263,6 +263,30 @@ failure enables fallback. Timeout/network/429/5xx/open availability circuit may
 enable one fallback only before any executed tool, draft or proposal. Production
 stays local-first; the next separately authorized pilot is owner-only Gemini shadow.
 
+Terminal safety/model refusals and authority/target/domain violations stay typed
+through the chain and handler: they never become availability and never prepare
+a local mutation, even with explicit imperative evidence. Only a read completed
+before the refusal can be retained. HTTP status is the upper trust boundary for
+error classification; body metadata may refine a non-retryable 400, but cannot
+turn it into rate-limit/server availability or authorize fallback.
+
+Disabled fallback names, keys and models are ignored. An old explicit
+`AI_PLANNER_FALLBACK_PROVIDER=gemini` with default Gemini primary is valid while
+fallback is off; enabling identical providers is rejected. Groq-only planning
+does not construct or require Gemini. Legacy intent/general, web and Whisper
+consumers have explicit independent dependencies; general/web may still require
+Gemini, and voice requires its Groq STT contract. No unused planner adapter is built.
+
+Evaluation reads typed positive Decimal quantities and base units from resolved
+temporary DB lines for every suite, not by re-parsing prompts. Canonical 0.2 kg
+matches 200 g/gram/grams/г/гр/грамм/грамма/граммов; 0.5 l matches 500 ml.
+Mass/volume/count mismatches and missing/invalid quantities cannot pass scoring.
+
+Owner-reported Gemini limits (2026-11-09, documentation only): 15 RPM, 250K TPM,
+500 RPD; the paced bake-off used six requests, with reported peaks of 4 RPM and
+8.39K TPM. The conservative ten-second interval is unchanged. These are not
+fresh API measurements or an application-enforced daily quota guarantee.
+
 Planner admission uses immediate busy responses (no waiting queue or overflow tasks),
 two provider-backed logical requests globally, one text/voice request per user,
 a two-second per-user cooldown and ten-minute/1024-entry accepted-update suppression.

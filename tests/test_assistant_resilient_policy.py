@@ -81,8 +81,9 @@ def test_enabled_fallback_and_independent_voice_configuration():
 
 
 @pytest.mark.parametrize('overrides', [
-    {'ai_planner_primary_provider': 'unknown'}, {'ai_planner_fallback_provider': 'unknown'},
-    {'ai_planner_fallback_provider': 'gemini'}, {'gemini_planner_model': ' '},
+    {'ai_planner_primary_provider': 'unknown'},
+    {'ai_planner_fallback_enabled': True, 'ai_planner_fallback_provider': 'unknown'},
+    {'ai_planner_fallback_enabled': True, 'ai_planner_fallback_provider': 'gemini'}, {'gemini_planner_model': ' '},
     {'ai_planner_fallback_enabled': True},
     {'ai_planner_fallback_enabled': True, 'groq_api_key': ' '},
     {'ai_planner_fallback_enabled': True, 'groq_api_key': 'synthetic', 'groq_planner_fallback_model': None},
@@ -168,8 +169,9 @@ def test_read_only_question_cannot_be_promoted_to_mutation():
     async def run():
         wire = Wire(TimeoutError(), route(capability_id='catalog.manage', action_code='edit', target_index=0))
         planner, _, _ = chain(wire)
-        with pytest.raises(ValueError, match='local action evidence'):
+        with pytest.raises(ProviderError) as error:
             await planner.plan('что такое изменение состава?', snapshot=snapshot(), capabilities=CAPS)
+        assert error.value.kind is ProviderErrorKind.AUTHORITY
         assert len(wire.calls) == 2
     asyncio.run(run())
 

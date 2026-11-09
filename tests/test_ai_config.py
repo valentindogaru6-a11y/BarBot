@@ -182,10 +182,13 @@ def test_planner_provider_names_and_models_are_strict() -> None:
             ai_text_enabled=True,
             ai_planner_primary_provider="gemini",
             ai_planner_fallback_provider="gemini",
+            ai_planner_fallback_enabled=True,
             gemini_api_key="gemini",
         )
     with pytest.raises(ValidationError, match="model name"):
-        Settings(_env_file=None, bot_token="test", groq_planner_model="   ")
+        Settings(_env_file=None, bot_token="test", ai_assistant_enabled=True,
+            ai_access_mode='role_based', ai_text_enabled=True,
+            ai_planner_primary_provider='groq', groq_api_key='synthetic', groq_planner_model="   ")
     custom = Settings(
         _env_file=None,
         bot_token="test",
@@ -205,6 +208,9 @@ def test_ai_first_groq_primary_requires_configured_gemini_fallback() -> None:
             ai_access_mode="role_based",
             ai_text_enabled=True,
             ai_planner_mode="ai_first",
+            ai_planner_primary_provider='groq',
+            ai_planner_fallback_provider='gemini',
+            ai_planner_fallback_enabled=True,
             groq_api_key="groq",
         )
 

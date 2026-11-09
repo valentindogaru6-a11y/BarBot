@@ -77,6 +77,32 @@ Production remains `local_first`; next phase is separately authorized owner-only
 Gemini shadow. `ai_first`, broad staff access, Groq fallback enablement and larger
 live evaluation remain pending. No config or runtime change is authorized by memory.
 
+### Four contract corrections (from `c298961...`)
+
+Terminal safety/model refusals and authority/capability/target/domain violations
+remain typed through adapters, chain and handler. They cannot become availability
+or trigger local mutation preparation; explicit imperative evidence does not
+override refusal. Only an already completed read may survive. Unknown internal
+errors likewise do not authorize local mutation. HTTP status is authoritative:
+400 metadata may only refine a terminal category, never grant retry/fallback or
+availability-circuit authority. 401/403, 429 and 5xx stay in their status classes.
+
+Disabled fallback is absent from dependency validation and composition, including
+legacy same-provider configuration. Active primary/fallback consumers validate
+their own key/model. Legacy Gemini intent/general, Gemini web and Groq Whisper
+are explicit separate consumers, never hidden planner fallback dependencies.
+
+All evaluation suites project canonical positive quantity/base-unit pairs from
+resolved temporary intake lines through a typed contract. Decimal scale/unit
+equivalence reaches the real runner, metrics and readiness, without raw-text
+re-parsing. A correct 200 g line is canonical 0.2 kg; missing/invalid data and
+cross-dimensional comparisons fail. These are offline regression claims only.
+
+Owner-confirmed dashboard limits for documentation, 2026-11-09: Gemini 15 RPM,
+250K TPM, 500 RPD; six bake-off requests, peaks 4 RPM / 8.39K TPM. Keep pilot
+pacing at ten seconds. Limits are not newly queried or a claim of daily-quota
+enforcement. Owner-only shadow/live validation and production changes remain pending.
+
 The first controlled Groq planner smoke established a strict-schema PASS for
 the initial catalog lookup. Its second correction call returned HTTP 400, but
 the old adapter discarded provider `type`/`code`/safe `param`, so the precise

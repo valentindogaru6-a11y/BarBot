@@ -101,6 +101,9 @@ def _request_size_bucket(size: int) -> str:
 
 
 class ProviderErrorKind(StrEnum):
+    SAFETY_REFUSAL = "safety_refusal"
+    AUTHORITY = "authority_violation"
+    INTERNAL = "internal"
     BUSY = "busy"
     AUTH = "auth"
     BILLING = "billing"

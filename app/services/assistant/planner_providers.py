@@ -33,6 +33,7 @@ from app.models.assistant_provider_planner import (
     ProviderErrorDiagnostic,
     ProviderPlanError,
     ProviderPlanResult,
+    PlannerAuthorityError,
     SafeProviderErrorCode,
     SafeProviderErrorType,
 )
@@ -246,11 +247,11 @@ def assemble_route_decision(
     capability_id = None if envelope.capability_id == "none" else envelope.capability_id
     contract = contracts.get(capability_id) if capability_id else None
     if capability_id is not None and contract is None:
-        raise ValueError("planner selected an unavailable capability")
+        raise PlannerAuthorityError("planner selected an unavailable capability")
     if capability_id is not None and capability_id not in snapshot.available_capability_ids:
-        raise ValueError("planner capability escaped the snapshot allowlist")
+        raise PlannerAuthorityError("planner capability escaped the snapshot allowlist")
     if contract is not None and envelope.domain is not _route_domain_for_capability(contract):
-        raise ValueError("planner domain disagrees with capability")
+        raise PlannerAuthorityError("planner domain disagrees with capability")
     expected_actions = {
         "catalog.search": {PlannerRouteActionCode.SEARCH},
         "catalog.get": {PlannerRouteActionCode.OPEN},
@@ -278,10 +279,10 @@ def assemble_route_decision(
     target: PlannerTargetOption | None = None
     if envelope.target_index >= 0:
         if envelope.target_index >= len(targets):
-            raise ValueError("planner target index is out of range")
+            raise PlannerAuthorityError("planner target index is out of range")
         target = targets[envelope.target_index]
         if target.domain != envelope.domain.value:
-            raise ValueError("planner target belongs to another domain")
+            raise PlannerAuthorityError("planner target belongs to another domain")
     target_required = bool(
         contract
         and (
@@ -297,9 +298,9 @@ def assemble_route_decision(
         )
     )
     if target_required and target is None:
-        raise ValueError("planner omitted a required target")
+        raise PlannerAuthorityError("planner omitted a required target")
     if contract is None and target is not None:
-        raise ValueError("planner supplied target without capability")
+        raise PlannerAuthorityError("planner supplied target without capability")
 
     resolved_arguments = dict(arguments or {})
     if contract is not None:
@@ -403,6 +404,9 @@ def convert_gemini_route(
 
 def _normalized_error(kind: ProviderErrorKind) -> ProviderPlanError:
     return {
+        ProviderErrorKind.SAFETY_REFUSAL: ProviderPlanError.SAFETY_REFUSAL,
+        ProviderErrorKind.AUTHORITY: ProviderPlanError.AUTHORITY_VIOLATION,
+        ProviderErrorKind.INTERNAL: ProviderPlanError.INTERNAL,
         ProviderErrorKind.BUSY: ProviderPlanError.BUSY,
         ProviderErrorKind.AUTH: ProviderPlanError.AUTH,
         ProviderErrorKind.BILLING: ProviderPlanError.QUOTA,
@@ -487,17 +491,17 @@ def _provider_error_diagnostic(
 
     if transport_error is not None:
         category = transport_error
-    elif status in {401, 403} or safe_code is SafeProviderErrorCode.INVALID_API_KEY:
+    elif status in {401, 403}:
         category = ProviderPlanError.AUTH
-    elif status == 402 or safe_code in {
-        SafeProviderErrorCode.INSUFFICIENT_QUOTA,
-        SafeProviderErrorCode.QUOTA_EXCEEDED,
-    }:
+    elif status == 402:
         category = ProviderPlanError.QUOTA
-    elif status == 429 or safe_code is SafeProviderErrorCode.RATE_LIMIT_EXCEEDED:
+    elif status == 429:
         category = ProviderPlanError.RATE_LIMIT
     elif status is not None and status >= 500:
         category = ProviderPlanError.SERVER_ERROR
+    elif status != 400:
+        category = (ProviderPlanError.MALFORMED_RESPONSE if status is not None and 200 <= status < 300
+                    else ProviderPlanError.CONFIG)
     elif safe_code in {
         SafeProviderErrorCode.INVALID_SCHEMA,
         SafeProviderErrorCode.JSON_SCHEMA_INVALID,
@@ -688,6 +692,9 @@ class GroqPlannerProvider(_PlannerProviderBase):
                     status=PlannerValidationStatus.PROVIDER_ERROR,
                 )
             outer = json.loads(response.body)
+            if outer['choices'][0]['message'].get('refusal'):
+                return self._result(started, error=ProviderPlanError.MODEL_REFUSAL,
+                    status=PlannerValidationStatus.PROVIDER_ERROR)
             raw = outer["choices"][0]["message"]["content"]
             envelope = GroqPlannerRouteEnvelope.model_validate_json(raw)
             arguments = (
@@ -706,6 +713,10 @@ class GroqPlannerProvider(_PlannerProviderBase):
             raise
         except PlannerBusy:
             return self._result(started, error=ProviderPlanError.BUSY, status=PlannerValidationStatus.PROVIDER_ERROR)
+        except ProviderError as exc:
+            return self._result(started, error=_normalized_error(exc.kind), status=PlannerValidationStatus.PROVIDER_ERROR)
+        except PlannerAuthorityError:
+            return self._result(started, error=ProviderPlanError.AUTHORITY_VIOLATION, status=PlannerValidationStatus.CANONICAL_INVALID)
         except (asyncio.TimeoutError, TimeoutError):
             diagnostic = _provider_error_diagnostic(
                 status=None,
@@ -736,7 +747,7 @@ class GroqPlannerProvider(_PlannerProviderBase):
                 diagnostic=diagnostic,
                 status=PlannerValidationStatus.PROVIDER_ERROR,
             )
-        except (json.JSONDecodeError, KeyError, IndexError, TypeError, ValidationError):
+        except (json.JSONDecodeError, KeyError, IndexError, TypeError, AttributeError, ValidationError):
             return self._result(started, error=ProviderPlanError.MALFORMED_RESPONSE, status=PlannerValidationStatus.WIRE_INVALID)
         except ValueError:
             return self._result(started, error=ProviderPlanError.MALFORMED_RESPONSE, status=PlannerValidationStatus.CANONICAL_INVALID)
@@ -770,12 +781,23 @@ class GeminiPlannerProvider(_PlannerProviderBase):
         if len(json.dumps(payload, ensure_ascii=False).encode()) > MAX_PLANNER_REQUEST_BYTES:
             return self._result(started, error=ProviderPlanError.CONFIG, status=PlannerValidationStatus.POLICY_REJECTED)
         try:
-            response = await self._safe_post(
+            response = await self._post(
                 f"{GEMINI_API_ROOT}/{self.model}:generateContent",
                 {"x-goog-api-key": self._api_key},
                 payload,
             )
+            if response.status >= 400:
+                diagnostic = _provider_error_diagnostic(status=response.status, body=response.body,
+                    request_hash=_canonical_hash(payload), schema_hash=_canonical_hash(schema))
+                return self._result(started, error=diagnostic.category, diagnostic=diagnostic,
+                    status=PlannerValidationStatus.PROVIDER_ERROR)
             outer = json.loads(response.body)
+            if (outer.get('promptFeedback', {}).get('blockReason') or any(
+                candidate.get('finishReason') in {'SAFETY', 'PROHIBITED_CONTENT', 'BLOCKLIST', 'SPII'}
+                for candidate in outer.get('candidates', ())
+            )):
+                return self._result(started, error=ProviderPlanError.SAFETY_REFUSAL,
+                    status=PlannerValidationStatus.PROVIDER_ERROR)
             raw = outer["candidates"][0]["content"]["parts"][0]["text"]
             envelope = GeminiPlannerRouteEnvelope.model_validate_json(raw)
             arguments = (
@@ -794,7 +816,13 @@ class GeminiPlannerProvider(_PlannerProviderBase):
             raise
         except ProviderError as exc:
             return self._result(started, error=_normalized_error(exc.kind), status=PlannerValidationStatus.PROVIDER_ERROR)
-        except (json.JSONDecodeError, KeyError, IndexError, TypeError, ValidationError):
+        except PlannerAuthorityError:
+            return self._result(started, error=ProviderPlanError.AUTHORITY_VIOLATION, status=PlannerValidationStatus.CANONICAL_INVALID)
+        except (asyncio.TimeoutError, TimeoutError):
+            return self._result(started, error=ProviderPlanError.TIMEOUT, status=PlannerValidationStatus.PROVIDER_ERROR)
+        except aiohttp.ClientError:
+            return self._result(started, error=ProviderPlanError.NETWORK, status=PlannerValidationStatus.PROVIDER_ERROR)
+        except (json.JSONDecodeError, KeyError, IndexError, TypeError, AttributeError, ValidationError):
             return self._result(started, error=ProviderPlanError.MALFORMED_RESPONSE, status=PlannerValidationStatus.WIRE_INVALID)
         except ValueError:
             return self._result(started, error=ProviderPlanError.MALFORMED_RESPONSE, status=PlannerValidationStatus.CANONICAL_INVALID)
@@ -905,6 +933,12 @@ class MultiProviderPlanner:
             # Release a half-open probe even on cancellation/unexpected errors.
             self.circuit.failure(provider.provider_name, transient=False)
             raise
+        if result.decision is not None and result.decision.mutation and self.mode != 'shadow':
+            from app.services.assistant.planner_policy import mutation_evidence
+            if not mutation_evidence(text):
+                result = ProviderPlanResult.model_validate({**result.model_dump(), 'decision': None,
+                    'error': ProviderPlanError.AUTHORITY_VIOLATION,
+                    'validation_status': PlannerValidationStatus.POLICY_REJECTED})
         transport = getattr(provider, 'transport', None)
         row = None
         if isinstance(transport, GovernedPlannerTransport):
@@ -967,22 +1001,21 @@ class MultiProviderPlanner:
             finally:
                 ATTEMPT_ROLE.reset(role_token)
             if last.decision is not None:
-                # A planner never supplies imperative evidence or permissions.
-                if last.decision.mutation and self.mode != 'shadow':
-                    from app.services.assistant.planner_policy import mutation_evidence
-                    if not mutation_evidence(text):
-                        raise ValueError('Planner mutation requires local action evidence')
                 return last.decision
             if last.error not in _FALLBACK_ERRORS or index + 1 >= len(providers):
                 break
         if last and last.error is ProviderPlanError.BUSY:
             raise PlannerBusy()
         kind = (ProviderErrorKind.TIMEOUT if last and last.error in {ProviderPlanError.TIMEOUT, ProviderPlanError.DEADLINE}
+            else ProviderErrorKind.SAFETY_REFUSAL if last and last.error in {ProviderPlanError.SAFETY_REFUSAL, ProviderPlanError.MODEL_REFUSAL}
+            else ProviderErrorKind.AUTHORITY if last and last.error is ProviderPlanError.AUTHORITY_VIOLATION
             else ProviderErrorKind.AUTH if last and last.error in {ProviderPlanError.AUTH, ProviderPlanError.QUOTA}
             else ProviderErrorKind.MALFORMED_RESPONSE if last and last.error in {
                 ProviderPlanError.MALFORMED_RESPONSE, ProviderPlanError.GENERATED_OUTPUT_SCHEMA_MISMATCH,
                 ProviderPlanError.INVALID_SCHEMA, ProviderPlanError.UNKNOWN_BAD_REQUEST,
             }
             else ProviderErrorKind.CONFIG if last and last.error in {ProviderPlanError.CONFIG, ProviderPlanError.UNSUPPORTED_PARAMETER}
-            else ProviderErrorKind.UNAVAILABLE)
+            else ProviderErrorKind.UNAVAILABLE if last and last.error in {
+                ProviderPlanError.NETWORK, ProviderPlanError.SERVER_ERROR, ProviderPlanError.RATE_LIMIT, ProviderPlanError.CIRCUIT_OPEN,
+            } else ProviderErrorKind.INTERNAL)
         raise ProviderError(last.provider if last else "planner", kind)

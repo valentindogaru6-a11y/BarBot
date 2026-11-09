@@ -172,42 +172,27 @@ def build_assistant_clients(
                 model=settings.groq_stt_model,
                 timeout_seconds=settings.ai_request_timeout_seconds,
             )
-        assert settings.gemini_api_key is not None
-        intent_client = GeminiIntentClient(
-            GovernedPlannerTransport(provider_transport, attempt_policy, transport_trace=True),
-            api_key=settings.gemini_api_key.get_secret_value(),
-            model=settings.gemini_fast_model,
-            timeout_seconds=settings.ai_request_timeout_seconds,
-            max_attempts=1,
-        )
-        planner_providers = {}
-        if (
-            settings.groq_api_key is not None
-            and settings.groq_api_key.get_secret_value().strip()
-            and ('groq' == settings.ai_planner_primary_provider or
-                 settings.ai_planner_fallback_enabled)
-        ):
-            planner_providers["groq"] = GroqPlannerProvider(
-                provider_transport,
-                api_key=settings.groq_api_key.get_secret_value(),
-                model=(settings.groq_planner_fallback_model.strip()
-                    if settings.ai_planner_fallback_provider == 'groq'
-                    else settings.groq_planner_model),
-                connect_timeout_seconds=settings.groq_planner_connect_seconds,
-                read_timeout_seconds=settings.groq_planner_read_seconds,
-                total_timeout_seconds=settings.groq_planner_total_seconds,
-            )
-        if (
-            settings.gemini_api_key is not None
-            and settings.gemini_api_key.get_secret_value().strip()
-        ):
-            planner_providers["gemini"] = GeminiPlannerProvider(
-                provider_transport,
+        if settings.needs_gemini_intent:
+            assert settings.gemini_api_key is not None
+            intent_client = GeminiIntentClient(
+                GovernedPlannerTransport(provider_transport, attempt_policy, transport_trace=True),
                 api_key=settings.gemini_api_key.get_secret_value(),
-                model=settings.gemini_planner_model,
-                connect_timeout_seconds=settings.gemini_planner_connect_seconds,
-                read_timeout_seconds=settings.gemini_planner_read_seconds,
-                total_timeout_seconds=settings.gemini_planner_total_seconds,
+                model=settings.gemini_fast_model,
+                timeout_seconds=settings.ai_request_timeout_seconds,
+                max_attempts=1,
+            )
+        planner_providers = {}
+        for name in settings.active_planner_providers:
+            key = getattr(settings, name + '_api_key')
+            assert key is not None
+            factory = GroqPlannerProvider if name == 'groq' else GeminiPlannerProvider
+            planner_providers[name] = factory(
+                provider_transport,
+                api_key=key.get_secret_value(),
+                model=settings.planner_model_for(name),
+                connect_timeout_seconds=getattr(settings, name + '_planner_connect_seconds'),
+                read_timeout_seconds=getattr(settings, name + '_planner_read_seconds'),
+                total_timeout_seconds=getattr(settings, name + '_planner_total_seconds'),
             )
         primary = planner_providers.get(settings.ai_planner_primary_provider)
         fallback = (planner_providers.get(settings.ai_planner_fallback_provider)
@@ -223,6 +208,7 @@ def build_assistant_clients(
                 attempt_policy=attempt_policy,
             )
         if settings.ai_web_search_enabled:
+            assert settings.gemini_api_key is not None
             search_client = GeminiGroundedSearchClient(
                 provider_transport,
                 api_key=settings.gemini_api_key.get_secret_value(),

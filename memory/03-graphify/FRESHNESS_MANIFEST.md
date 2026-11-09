@@ -1,5 +1,11 @@
 # Freshness Manifest
 
+Four-finding provider/evaluation slice revalidated 2026-11-09 from `c298961...`:
+typed terminal outcomes, status-bounded diagnostics, active-consumer config and
+resolved-DB quantity observation across suites. Evidence is offline; owner quota
+figures are documentation, not new API measurement. Ten-second Gemini pacing,
+catalog/seed/schema/migrations and production configuration are unchanged.
+
 Provider-policy slice revalidated 2026-11-09 from `197a765...`: Gemini-first,
 disabled conditional Groq fallback, process-local admission and physical pacing,
 one logical deadline and safe local/clarification termination. Prior six-case

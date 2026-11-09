@@ -110,6 +110,7 @@ class PlannerValidationStatus(StrEnum):
 
 
 class ProviderPlanError(StrEnum):
+    AUTHORITY_VIOLATION = "authority_violation"
     BUSY = "busy"
     AUTH = "auth"
     QUOTA = "quota"
@@ -128,6 +129,10 @@ class ProviderPlanError(StrEnum):
     CIRCUIT_OPEN = "circuit_open"
     DEADLINE = "deadline"
     INTERNAL = "internal"
+
+
+class PlannerAuthorityError(ValueError):
+    """Server-side plan authority/target validation; never availability."""
 
 
 class SafeProviderErrorType(StrEnum):

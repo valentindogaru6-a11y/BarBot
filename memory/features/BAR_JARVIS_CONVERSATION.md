@@ -98,6 +98,13 @@ controlled shadow evaluation`. Voice, web, images and video also remain pending.
 
 ## Isolated live evaluation (development)
 
+Resolved quantity observation is typed end-to-end: temporary intake line scaled
+quantity plus product base unit → canonical Decimal text/unit → actual report →
+scorer/domain metrics/readiness. It is present in smoke as well as v2 suites;
+aliases and scale conversions are dimensional, never inferred from raw prompts.
+Terminal refusal/authority errors preserve only earlier successful reads and
+cannot start a draft, proposal, tool or dangerous context update.
+
 Current provider policy is documented in [AI assistant](AI_ASSISTANT.md#gemini-first-policy-from-197a765):
 Gemini primary, conditional Groq fallback disabled by default, application
 admission before network and shared physical pacing. The prior six-case paced

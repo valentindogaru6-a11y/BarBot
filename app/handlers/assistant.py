@@ -618,6 +618,11 @@ async def _run_assistant(
             raise
         except Exception as exc:
             logger.info('Assistant planned request rejected')
+            if isinstance(exc, ProviderError) and exc.kind in {
+                ProviderErrorKind.SAFETY_REFUSAL, ProviderErrorKind.AUTHORITY,
+            }:
+                await message.answer('Запрос отклонён безопасной проверкой. Уточните действие или используйте меню.')
+                return
             local = orchestrator.local_intent(text)
             safe_availability = isinstance(exc, ProviderError) and exc.kind in {
                 ProviderErrorKind.TIMEOUT, ProviderErrorKind.UNAVAILABLE, ProviderErrorKind.RATE_LIMIT, ProviderErrorKind.BUSY,

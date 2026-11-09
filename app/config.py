@@ -94,10 +94,10 @@ class Settings(BaseSettings):
     ai_web_search_enabled: bool = False
     ai_planner_mode: Literal["local_first", "shadow", "ai_first"] = "local_first"
     ai_planner_primary_provider: Literal["groq", "gemini"] = "gemini"
-    ai_planner_fallback_provider: Literal["groq", "gemini"] = "groq"
+    ai_planner_fallback_provider: str | None = Field(default="groq", max_length=40)
     ai_planner_fallback_enabled: bool = False
     ai_planner_total_deadline_seconds: int = Field(default=12, ge=1, le=30)
-    gemini_planner_model: str = Field(default="gemini-3.5-flash-lite", min_length=1, max_length=100)
+    gemini_planner_model: str | None = Field(default="gemini-3.5-flash-lite", max_length=100)
     groq_planner_fallback_model: str | None = Field(default="openai/gpt-oss-120b", max_length=100)
     gemini_planner_connect_seconds: float = Field(default=3, gt=0, le=3)
     gemini_planner_read_seconds: float = Field(default=4, gt=0, le=4)
@@ -114,25 +114,21 @@ class Settings(BaseSettings):
     ai_request_user_cooldown_seconds: float = Field(default=2, ge=1, le=60)
     ai_request_queue_policy: Literal["immediate_busy"] = "immediate_busy"
     groq_api_key: SecretStr | None = None
-    groq_stt_model: str = Field(
+    groq_stt_model: str | None = Field(
         default="whisper-large-v3-turbo",
-        min_length=1,
         max_length=100,
     )
-    groq_planner_model: str = Field(
+    groq_planner_model: str | None = Field(
         default="openai/gpt-oss-20b",
-        min_length=1,
         max_length=100,
     )
     gemini_api_key: SecretStr | None = None
-    gemini_fast_model: str = Field(
+    gemini_fast_model: str | None = Field(
         default="gemini-3.5-flash-lite",
-        min_length=1,
         max_length=100,
     )
-    gemini_strong_model: str = Field(
+    gemini_strong_model: str | None = Field(
         default="gemini-3.8-flash",
-        min_length=1,
         max_length=100,
     )
     ai_voice_max_duration_seconds: int = Field(default=180, gt=0, le=600)
@@ -181,23 +177,34 @@ class Settings(BaseSettings):
         "gemini_fast_model",
         "gemini_strong_model",
         "gemini_planner_model",
+        "groq_planner_fallback_model",
     )
     @classmethod
-    def reject_blank_model_names(cls, value: str) -> str:
-        cleaned = value.strip()
-        if not cleaned:
-            raise ValueError("AI model name must not be blank")
-        return cleaned
+    def normalize_model_name(cls, value: str | None) -> str | None:
+        # Only active consumers validate their contract; an unused fallback is
+        # not a dependency of startup, including during legacy deployment.
+        return value.strip() if value is not None else None
 
-    @field_validator('gemini_planner_model', 'groq_planner_fallback_model')
-    @classmethod
-    def validate_planner_model_path(cls, value: str | None) -> str | None:
-        if value is None:
-            return None
-        value = value.strip()
-        if value and not re.fullmatch(r'[A-Za-z0-9_./-]{1,100}', value):
-            raise ValueError('Invalid planner model name')
-        return value
+    @property
+    def active_planner_providers(self) -> tuple[str, ...]:
+        if not self.ai_assistant_enabled or not (self.ai_text_enabled or self.ai_voice_enabled):
+            return ()
+        return (self.ai_planner_primary_provider, *(
+            (self.ai_planner_fallback_provider,) if self.ai_planner_fallback_enabled else ()))
+
+    @property
+    def needs_gemini_intent(self) -> bool:
+        return bool(self.ai_assistant_enabled and (self.ai_text_enabled or self.ai_voice_enabled) and (
+            self.ai_general_chat_enabled or
+            (self.ai_planner_mode == 'local_first' and self.ai_planner_primary_provider == 'gemini')))
+
+    def planner_model_for(self, provider: str) -> str | None:
+        if provider == 'gemini':
+            return self.gemini_planner_model
+        if provider == 'groq':
+            return (self.groq_planner_model if self.ai_planner_primary_provider == 'groq'
+                else self.groq_planner_fallback_model)
+        raise ValueError('Unknown AI planner provider')
 
     @field_validator("catalog_path", "database_path")
     @classmethod
@@ -271,11 +278,11 @@ class Settings(BaseSettings):
                 "AI_GENERAL_CHAT_ENABLED/AI_WEB_SEARCH_ENABLED требуют "
                 "AI_ASSISTANT_ENABLED"
             )
-        if self.ai_planner_primary_provider == self.ai_planner_fallback_provider:
-            raise ValueError("AI planner primary и fallback должны различаться")
-        if self.ai_planner_fallback_enabled and self.ai_planner_fallback_provider == 'groq':
-            if not self.groq_planner_fallback_model or not self.groq_planner_fallback_model.strip():
-                raise ValueError("Groq fallback model name must not be blank")
+        if self.ai_planner_fallback_enabled:
+            if self.ai_planner_fallback_provider not in {'gemini', 'groq'}:
+                raise ValueError('Unknown AI planner fallback provider')
+            if self.ai_planner_primary_provider == self.ai_planner_fallback_provider:
+                raise ValueError("AI planner primary и fallback должны различаться")
         if not self.ai_assistant_enabled:
             return self
         if (
@@ -284,54 +291,27 @@ class Settings(BaseSettings):
             raise ValueError(
                 "AI general/web требуют AI_TEXT_ENABLED или AI_VOICE_ENABLED"
             )
-        if self.ai_voice_enabled and (
-            self.groq_api_key is None
-            or not self.groq_api_key.get_secret_value().strip()
-        ):
-            raise ValueError(
-                "GROQ_API_KEY обязателен при включённом AI voice pilot"
-            )
-        active_input = self.ai_text_enabled or self.ai_voice_enabled
-        if (
-            active_input
-            and self.ai_planner_primary_provider == "groq"
-            and (
-                self.groq_api_key is None
-                or not self.groq_api_key.get_secret_value().strip()
-            )
-        ):
-            raise ValueError("GROQ_API_KEY обязателен для выбранного AI planner")
-        if (
-            active_input
-            and self.ai_planner_primary_provider == "gemini"
-            and (
-                self.gemini_api_key is None
-                or not self.gemini_api_key.get_secret_value().strip()
-            )
-        ):
-            raise ValueError("GEMINI_API_KEY обязателен для выбранного AI planner")
-        if (
-            active_input
-            and self.ai_planner_fallback_enabled
-            and self.ai_planner_fallback_provider == "groq"
-            and (
-                self.groq_api_key is None
-                or not self.groq_api_key.get_secret_value().strip()
-            )
-        ):
-            raise ValueError("GROQ_API_KEY обязателен для planner fallback")
-        if (
-            self.ai_text_enabled
-            or self.ai_voice_enabled
-            or self.ai_general_chat_enabled
-            or self.ai_web_search_enabled
-        ) and (
-            self.gemini_api_key is None
-            or not self.gemini_api_key.get_secret_value().strip()
-        ):
-            raise ValueError(
-                "GEMINI_API_KEY обязателен при включённом AI text/voice pilot"
-            )
+        def require_key(provider):
+            key = getattr(self, provider + '_api_key')
+            if key is None or not key.get_secret_value().strip():
+                raise ValueError(provider.upper() + '_API_KEY обязателен для активной AI функции')
+
+        def require_model(value):
+            if not value or not re.fullmatch(r'[A-Za-z0-9_./-]{1,100}', value):
+                raise ValueError('Active AI model name must not be blank or invalid')
+
+        if self.ai_voice_enabled:
+            require_key('groq')
+            require_model(self.groq_stt_model)
+        for provider in self.active_planner_providers:
+            require_key(provider)
+            require_model(self.planner_model_for(provider))
+        if self.needs_gemini_intent:
+            require_key('gemini')
+            require_model(self.gemini_fast_model)
+        if self.ai_web_search_enabled:
+            require_key('gemini')
+            require_model(self.gemini_strong_model)
         if self.ai_access_mode == "pilot_allowlist" and not self.ai_pilot_user_ids:
             raise ValueError(
                 "AI_PILOT_USER_IDS обязателен для закрытого AI pilot"

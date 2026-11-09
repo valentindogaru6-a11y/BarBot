@@ -75,13 +75,20 @@ def arguments(e):
     e.validate_path(e.path)
     with closing(sqlite3.connect(e.path)) as connection:
         connection.execute('PRAGMA query_only=ON')
-        row = connection.execute('''SELECT l.quantity_scaled,l.comment_text,l.reason_text,d.normalized_name
+        row = connection.execute('''SELECT l.quantity_scaled,l.comment_text,l.reason_text,d.normalized_name,
+            p.base_unit,l.status
             FROM warehouse_intake_lines l JOIN warehouse_intake_batches b ON b.id=l.batch_id
+            LEFT JOIN warehouse_products p ON p.id=l.product_id
             LEFT JOIN warehouse_locations d ON d.id=l.destination_location_id
             WHERE b.actor_user_id=? ORDER BY b.id DESC,l.line_number LIMIT 1''',(e.owner,)).fetchone()
     if row is None:
-        return dict(quantity_base=None,destination=None,comment_hash=None)
+        return dict(quantity_base=None,destination=None,comment_hash=None,quantity_text=None,unit_text=None)
+    from app.services.assistant.evaluation_equivalence import CanonicalEvaluationQuantity
+    quantity = (CanonicalEvaluationQuantity.from_scaled(row[0], row[4])
+        if row[5] in {'resolved', 'committed'} else None)
     comment = ' '.join(str(row[1] or row[2] or '').split())
     return dict(quantity_base=str(Decimal(row[0])/SCALE) if row[0] is not None else None,
+        quantity_text=quantity.quantity_text if quantity else None,
+        unit_text=quantity.unit_text if quantity else None,
         destination={'кухня':'kitchen','кондитерка':'confectionery'}.get(row[3],row[3]),
         comment_hash=hashlib.sha256(comment.encode()).hexdigest()[:16] if comment else None)

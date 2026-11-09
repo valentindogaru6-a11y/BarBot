@@ -5,6 +5,13 @@ Metadata: scope `working`; trust `working`; lifecycle `ephemeral`; last cleared
 
 ## Status
 
+Focused corrections from `c298961...` address exactly four review findings:
+terminal refusal fail-closed, HTTP status authority over diagnostic body,
+consumer-specific active key/model composition and real-runner typed quantity
+observation. Gemini interval stays ten seconds; owner-provided quota facts are
+documentation only. No new live run, production access, schema/catalog/seed
+change or deployment belongs to this task; separate re-review remains required.
+
 Gemini-first resilience development starts at `197a765...`: explicit disabled
 Groq fallback, shared physical admission/pacing, bounded logical text/voice
 requests and privacy-safe attempt traces. Six-case paced bake-off selected
