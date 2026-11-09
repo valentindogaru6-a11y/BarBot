@@ -8,6 +8,16 @@ Evidence: regression tests, Git history, rollout docs, owner observations
 Depends on: callbacks, SQLite/WAL, workers, XLSX, imports, VPS environment
 Importance: High
 
+- **Do not parse a typed body as another command:** a product containing an
+  action noun was shortened to a different exact product by a second `_action`
+  call. Positional roles alone were insufficient. Use original clause command/
+  body spans and render server-owned facts directly; request-local legacy
+  bindings must be exact-text-only and always released. Preserve full product
+  names, including repetitions and service words, through aliases and restart.
+  Unknown full names require resolution, never truncation to a shorter product.
+  v1.3 and real temporary-v15 ledger regressions supplement unchanged v1.1/v1.2;
+  live language quality remains pending.
+
 - **Invisible controls and service-word entities:** never silently delete
   default-ignorable/control characters to manufacture executable commands.
   Detection-only representation vetoes suspicious input before providers/tools.

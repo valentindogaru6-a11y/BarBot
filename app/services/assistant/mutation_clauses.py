@@ -11,7 +11,7 @@ from typing import Callable
 
 from app.models.assistant_mutation import (
     MutationClause, MutationClauseKind as K, MutationDisposition as D,
-    MutationToken, UnicodeInspection,
+    MutationToken, MutationTokenKind as T, UnicodeInspection, MutationCommand, MutationSpan,
 )
 from app.services.assistant.mutation_tokens import CANCEL_WORDS, tokenize_clause
 
@@ -92,6 +92,7 @@ class ClauseAnalysis:
     tokens: tuple[MutationToken, ...] = field(default=(),repr=False)
     inspection: UnicodeInspection | None = field(default=None,repr=False)
     ambiguous_entity: bool = False
+    commands: tuple[MutationCommand, ...] = ()
 
 
 def analyze_clauses(text: str, *, action: Callable[[str], tuple[str | None,str]], active=False,
@@ -110,17 +111,44 @@ def analyze_clauses(text: str, *, action: Callable[[str], tuple[str | None,str]]
     contradictions = []
     actions = []
     all_tokens = []
+    commands = []
     entity_ambiguity = False
+    def finish(disposition=None, restart_at=None):
+        return ClauseAnalysis(tuple(clauses),disposition,restart_at,tokens=tuple(all_tokens),
+            ambiguous_entity=entity_ambiguity,commands=tuple(commands))
     for index, (start, end, reason_context) in enumerate(spans):
         raw = text[start:end].strip()
         head = _CONNECTORS.sub('', raw).strip()
         selected_action,body = action(head)
         is_action = selected_action is not None
+        uncertain_command = False
+        if is_action and commands and clauses and '\n' in text[clauses[-1].end:start]:
+            # A bare noun header or a service-word product followed only by
+            # its amount is a batch row, not a second imperative command.
+            prefix = head[:len(head)-len(body)]
+            noun = re.match(r'^(?:списание|списання|перемещение|перемищення)\b',head)
+            argument_words = _TOKENS.findall(body)
+            amount_only = bool(re.search(r'[0-9]',body)) and all(word in units for word in argument_words)
+            possible_entity = re.split(r'\s+(?=[+−–—-]?[.,]?[0-9])',head,maxsplit=1)[0].strip()
+            if (noun and ':' not in prefix) or amount_only or (not body.strip() and ':' not in prefix) or possible_entity in exact_entities:
+                selected_action,body,is_action = None,head,False
+            elif commands[0].body_span.start == commands[0].body_span.end:
+                # An imperative-looking row under a list header may itself be
+                # an exact full product name. Ask the server resolver rather
+                # than shorten it to the verb's apparent argument.
+                uncertain_command = True
+        if is_action:
+            active = True
         head_offset = start + text[start:end].index(head)
         prefix_end = head_offset + len(head)-len(body) if is_action else None
+        if is_action:
+            commands.append(MutationCommand(action=selected_action,clause_index=index,
+                action_span=MutationSpan(start=head_offset,end=prefix_end),
+                body_span=MutationSpan(start=prefix_end,end=end)))
         reason = bool(_REASON.match(raw)) or reason_context
         lexical = tokenize_clause(text,start=start,end=end,clause_index=index,prefix_end=prefix_end,
-            units=units,exact_entities=exact_entities,argument_context=active or contextual,reason=reason)
+            units=units,exact_entities=exact_entities,argument_context=active or contextual,reason=reason,
+            transfer=(selected_action or (commands[0].action if commands else None))=='transfer')
         all_tokens.extend(lexical.tokens)
         if len(all_tokens)>512:
             return ClauseAnalysis(tuple(clauses),D.AMBIGUOUS)
@@ -130,17 +158,23 @@ def analyze_clauses(text: str, *, action: Callable[[str], tuple[str | None,str]]
         # A phrase explicitly negating the action is not a service-word noun
         # in a product slot. Preserve the existing fail-closed negation veto.
         negative_action = bool(_NEGATED_ACTION.search(raw))
+        entity_text = ' '.join(t.normalized_value for t in lexical.tokens if t.kind == T.ENTITY)
+        exact_entity = bool(entity_text and entity_text in exact_entities)
+        negated_entity = bool(commands and (
+            _NEGATED_ACTION.match(entity_text) or _NEGATED_CANCEL.match(entity_text)))
+        if exact_entity:
+            negative_action = bool(_NEGATED_ACTION.search(service_text))
         # A direct command still vetoes a comment/reason marker. Nouns such as
         # "отмена поставки" alone are not cancellation of the current action.
         imperative = words & _IMPERATIVES
         cancellation_words = [token for token in tokens if token in _LEXEMES | _CANCEL_NOUNS]
-        contradiction = bool(_NEGATED_CANCEL.search(raw)) or (
+        contradiction = bool(_NEGATED_CANCEL.search(service_text if exact_entity else raw)) or (
             len(cancellation_words) > 1 and bool(imperative or _ACTION_REF.search(service_text))) or (
             tokens.count('не') > 1 and (negative_action or _ACTION_REF.search(service_text)))
         negated_typo = len(tokens) == 2 and tokens[0] == 'не' and bool(_typos(tokens[1]))
         reason_head = _REASON.sub('',head).strip()
         reason_tokens = _TOKENS.findall(reason_head)
-        if lexical.ambiguous_entity:
+        if lexical.ambiguous_entity or uncertain_command or (negated_entity and not exact_entity):
             entity_ambiguity = True
             kind = K.UNKNOWN
         elif contradiction or negated_typo:
@@ -177,11 +211,11 @@ def analyze_clauses(text: str, *, action: Callable[[str], tuple[str | None,str]]
             referent_tail = bool(tokens) and all(token in _REFERENTS for token in tokens[1:])
             eligible = bool(tokens) and (active or contextual) and (
                 (index == len(spans)-1 and (index > 0 or contextual) and referent_tail)
-                or bool(_ACTION_REF.search(head)))
+                or bool(_ACTION_REF.search(service_text)))
             matches = _typos(tokens[0]) if eligible else ()
             if matches:
                 kind = K.CANCELLATION if len(matches) == 1 else K.CONTRADICTION
-            elif eligible and (active or _ACTION_REF.search(head)) and len(tokens[0]) >= 5 and referent_tail and tokens[0] not in _REASONS:
+            elif eligible and (active or _ACTION_REF.search(service_text)) and len(tokens[0]) >= 5 and referent_tail and tokens[0] not in _REASONS:
                 kind = K.UNKNOWN
             elif active and index > 0 and len(tokens) == 2 and tokens[0] == 'не' and not _DESCRIPTIVE_NEGATION.fullmatch(head):
                 kind = K.UNKNOWN
@@ -189,7 +223,7 @@ def analyze_clauses(text: str, *, action: Callable[[str], tuple[str | None,str]]
                 # An unrecognised isolated tail is not silently declared a
                 # harmless comment (also covers two-edit cancellation damage).
                 kind = K.UNKNOWN
-            elif (active or contextual) and (index > 0 or contextual) and _ACTION_REF.search(head):
+            elif (active or contextual) and (index > 0 or contextual) and _ACTION_REF.search(service_text):
                 kind = K.UNKNOWN
             else:
                 kind = K.ARGUMENTS if index == 0 or re.search(r'[0-9]',head) else K.COMMENT
@@ -202,7 +236,7 @@ def analyze_clauses(text: str, *, action: Callable[[str], tuple[str | None,str]]
         if kind == K.ACTION:
             actions.append(index)
     if contradictions:
-        return ClauseAnalysis(tuple(clauses), D.AMBIGUOUS,tokens=tuple(all_tokens),ambiguous_entity=entity_ambiguity)
+        return finish(D.AMBIGUOUS)
     if cancellations:
         last_cancel = cancellations[-1]
         later_actions = [i for i in actions if i > last_cancel]
@@ -210,13 +244,13 @@ def analyze_clauses(text: str, *, action: Callable[[str], tuple[str | None,str]]
             target = later_actions[0]
             raw = text[clauses[target].start:clauses[target].end]
             head = _CONNECTORS.sub('',raw.strip()).strip()
-            return ClauseAnalysis(tuple(clauses), restart_at=clauses[target].start + raw.index(head),tokens=tuple(all_tokens))
+            return finish(restart_at=clauses[target].start + raw.index(head))
         if any(c.kind == K.CORRECTION for c in clauses[last_cancel+1:]):
-            return ClauseAnalysis(tuple(clauses), D.AMBIGUOUS,tokens=tuple(all_tokens))
-        return ClauseAnalysis(tuple(clauses), D.CANCEL,tokens=tuple(all_tokens))
+            return finish(D.AMBIGUOUS)
+        return finish(D.CANCEL)
     # Two commands on a comma-separated line cannot disappear as a comment.
     # Explicit newline batch rows remain owned by the existing intake parser.
     if len(actions) > 1 and any('\n' not in text[clauses[a].end:clauses[b].start]
         for a,b in zip(actions,actions[1:])):
-        return ClauseAnalysis(tuple(clauses), D.AMBIGUOUS,tokens=tuple(all_tokens))
-    return ClauseAnalysis(tuple(clauses),tokens=tuple(all_tokens))
+        return finish(D.AMBIGUOUS)
+    return finish()

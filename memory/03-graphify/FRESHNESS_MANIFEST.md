@@ -1,5 +1,14 @@
 # Freshness Manifest
 
+Service-word entity slice revalidated offline 2026-11-09 from `d515ed0...`:
+single clause-level action extraction, closed typed spans, no action stripping
+inside a body, direct rendering of server-owned facts and exact request-scoped
+reuse at legacy interfaces. Full official names precede aliases/candidates;
+provider product/target substitution is denied. Frozen v1.1/v1.2 are unchanged;
+v1.3 is a separate 360-case deterministic extension with real temporary-v15
+handler/service ledger checks. No catalog/seed/schema/migration change or live
+quality claim. Extended live coverage and production runtime remain pending.
+
 Unicode/token-role slice revalidated offline 2026-11-09 from `a15759c...`:
 default-ignorable/control fail-closed inspection, detection-only representation,
 grammar-assigned entity roles with numeric positions and typed FSM cancellation.

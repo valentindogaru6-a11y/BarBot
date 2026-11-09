@@ -69,6 +69,8 @@ class MutationTokenKind(StrEnum):
     REASON = 'reason'
     BOUNDARY = 'boundary'
     UNKNOWN = 'unknown'
+    DESTINATION = 'destination'
+    SOURCE = 'source'
 
 
 class MutationToken(BaseModel):
@@ -105,6 +107,46 @@ class MutationClause(BaseModel):
         if self.end < self.start:
             raise ValueError('invalid clause span')
         return self
+
+
+class MutationSpan(BaseModel):
+    """Offsets in the bounded, Unicode-inspected source, never diagnostic text."""
+    model_config = ConfigDict(extra='forbid', frozen=True)
+    start: int = Field(ge=0, le=4000)
+    end: int = Field(ge=0, le=4000)
+
+    @model_validator(mode='after')
+    def ordered(self):
+        if self.end < self.start:
+            raise ValueError('invalid mutation span')
+        return self
+
+
+class MutationCommand(BaseModel):
+    model_config = ConfigDict(extra='forbid', frozen=True)
+    action: Literal['writeoff', 'transfer']
+    clause_index: int = Field(ge=0, le=63)
+    action_span: MutationSpan
+    body_span: MutationSpan
+
+
+class MutationSyntax(BaseModel):
+    """Ephemeral AST. Persistent storage keeps only validated mutation facts."""
+    model_config = ConfigDict(extra='forbid', frozen=True)
+    normalized_text: str = Field(repr=False, exclude=True, max_length=4000)
+    commands: tuple[MutationCommand, ...] = Field(default=(), max_length=64)
+    clauses: tuple[MutationClause, ...] = Field(default=(), max_length=64)
+    tokens: tuple[MutationToken, ...] = Field(default=(), max_length=512, repr=False)
+    entity_spans: tuple[MutationSpan, ...] = Field(default=(), max_length=512)
+    quantity_spans: tuple[MutationSpan, ...] = Field(default=(), max_length=512)
+    unit_spans: tuple[MutationSpan, ...] = Field(default=(), max_length=512)
+    destination_spans: tuple[MutationSpan, ...] = Field(default=(), max_length=512)
+    source_spans: tuple[MutationSpan, ...] = Field(default=(), max_length=512)
+    correction_spans: tuple[MutationSpan, ...] = Field(default=(), max_length=64)
+    comment_spans: tuple[MutationSpan, ...] = Field(default=(), max_length=64)
+    disposition: MutationDisposition | None = None
+    validation_category: MutationError | None = None
+    restart_at: int | None = Field(default=None, ge=0, le=4000)
 
 
 class MutationLine(BaseModel):

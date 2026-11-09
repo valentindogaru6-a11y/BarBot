@@ -629,7 +629,14 @@ class AssistantToolRegistry:
             candidate.provider_label for candidate in retrieval.candidates
         )
 
-    def execute(self, intent: AssistantIntent) -> AssistantToolAction:
+    def execute(self, intent: AssistantIntent, *, mutation_request: ParsedMutation | None = None) -> AssistantToolAction:
+        if mutation_request is not None and intent.intent in _WAREHOUSE_ACTION_INTENTS:
+            expected = ('writeoff' if intent.intent is AssistantIntentName.PREPARE_WRITEOFF else 'transfer')
+            if not mutation_request.allowed or mutation_request.missing or mutation_request.action != expected:
+                return AssistantToolAction('clarify',message=mutation_reply(mutation_request))
+            # A server AST/fact record is rendered, never parsed as another
+            # command. Product resolution and confirmation still own execution.
+            return AssistantToolAction('prepare_'+expected,raw_intake=mutation_request.command())
         if intent.intent is AssistantIntentName.GENERAL_CHAT:
             return AssistantToolAction(
                 "general_chat",

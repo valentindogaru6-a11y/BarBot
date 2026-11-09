@@ -57,6 +57,38 @@ Regressions `ADV_NEGATION_READY_01`, `ADV_NEGATIVE_01`, `ADV_DECIMAL_01` are
 covered through real handlers/services and the temporary-v15 observer/ledger.
 No schema/catalog/seed change, live quality claim or rollout is implied.
 
+### Single-pass service-word entities (from `d515ed0...`)
+
+`mutation_syntax()` performs one action extraction per original clause and
+returns a closed, bounded `MutationSyntax`/`MutationCommand` AST: action/body
+spans, entity/quantity/unit/destination/source spans, correction/comment spans,
+cancellation clauses, disposition and validation category. Numeric/entity word
+spans preserve order and repetitions. The body is never fed back into `_action`.
+New explicit clauses retain the old multi-action clarification/fail-closed
+policy; a bare noun inside a batch row is not another command header.
+
+Service-like words are valid product data, including full/repeated action names.
+Exact normalized full official name wins, then exact alias, then the unchanged
+explicit candidate policy. A missing full name cannot silently become a shorter
+known product. Stable IDs are bound by the warehouse resolver, not by a planner.
+Provider product/target substitutions are rejected before draft creation.
+
+Validated immutable mutation facts are passed directly to registry rendering.
+Legacy parser/evidence interfaces reuse facts only for the exact normalized
+rendering within an isolated request scope, cleared in `finally` on every exit.
+Unicode inspection precedes every scoped lookup, including leading/trailing
+controls that ordinary whitespace stripping would otherwise hide.
+Changed text is gated normally; different tasks do not share bindings. The
+isolated evaluation path uses the same binding. No spans or extra input copies
+are persisted in v15 conversation JSON; restart keeps the existing typed facts.
+
+The blocking short/full collision is now an explicit real handler/service/ledger
+regression in both foreground modes. Frozen v1.1/v1.2 remain unchanged; separate
+v1.3 adds 360 deterministic service-word/entity cases (12 families), plus vertical
+exact/alias/missing/compound/restart variants. Its SHA256 is
+`99a82aeb28c58a0a23883c5546a9c9a2a5037f912ccbc5c7a6fd546497f84d5a`.
+Evidence is offline only. Extended live evaluation remains pending.
+
 ### Unicode and positional roles (from `a15759c...`)
 
 `mutation_tokens.py` owns bounded typed Unicode inspection before providers or

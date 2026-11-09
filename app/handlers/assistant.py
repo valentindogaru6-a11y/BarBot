@@ -19,7 +19,9 @@ from aiogram.types import CallbackQuery, Message
 
 from app.config import Settings
 from app.models.assistant_mutation import MutationDisposition, MutationError, MutationLine, ParsedMutation
-from app.services.assistant.mutation_language import parse_mutation, mutation_reply, resolve_product_case
+from app.services.assistant.mutation_language import (
+    parse_mutation, mutation_reply, resolve_product_case, isolated_mutation_facts, bind_mutation_facts,
+)
 from app.services.warehouse.quantity_service import QuantityError
 from app.storage.warehouse_operations_database import WarehouseOperationsError
 from app.handlers.catalog import _show_item
@@ -412,6 +414,7 @@ async def _mutation_preflight(message, state, *, text, auth_service, warehouse_s
     return False, parsed
 
 
+@isolated_mutation_facts
 async def _run_assistant(
     message: Message,
     state: FSMContext,
@@ -529,6 +532,7 @@ async def _run_assistant(
         return
     if mutation_request is not None:
         # Typed facts remain authoritative; rendering is only for existing APIs.
+        bind_mutation_facts(mutation_request)
         text = mutation_request.command()
 
     async def send_capability(dispatch: Any) -> None:
@@ -735,7 +739,8 @@ async def _run_assistant(
                 assistant_capability_controller.access_policy.require_assistant_access(user_id, chat_type=message.chat.type)
                 if assistant_access_policy is not None:
                     assistant_access_policy.require_assistant_access(user_id, chat_type=message.chat.type)
-                completed = (CapabilityDispatch(local_id, 'Локальный результат.', tool_action=registry.execute(local)),)
+                completed = (CapabilityDispatch(local_id, 'Локальный результат.', tool_action=(
+                    registry.execute(local,mutation_request=mutation_request) if mutation_request is not None else registry.execute(local))),)
                 clarification = None
             else:
                 await message.answer(AI_REQUEST_BUSY_TEXT if isinstance(exc, ProviderError) and exc.kind is ProviderErrorKind.BUSY
@@ -1097,7 +1102,7 @@ async def _run_assistant(
                 return
             await send_capability(planned)
             return
-        action = registry.execute(intent)
+        action = registry.execute(intent,mutation_request=mutation_request) if mutation_request is not None else registry.execute(intent)
 
         if (
             local_intent is None

@@ -38,8 +38,10 @@ from app.services.assistant.evaluation_scenarios import (
     capture, arguments, FaultTransport, ProbeComplete, ProbeLimitedTransport, PROBE_CALLS,
 )
 from app.services.assistant.coordinator import AssistantRequestCoordinator
-from app.models.assistant_mutation import MutationDisposition
-from app.services.assistant.mutation_language import parse_mutation, resolve_product_case
+from app.models.assistant_mutation import MutationDisposition,MutationError
+from app.services.assistant.mutation_language import (
+    parse_mutation,resolve_product_case,isolated_mutation_facts,bind_mutation_facts,
+)
 from app.services.warehouse.quantity_service import QuantityError
 from app.services.assistant.evaluation_business_state import unexpected_changes
 from app.services.assistant.evaluation_domain_scoring import (
@@ -256,6 +258,7 @@ class LiveConversationEvaluationAdapter:
         elif action != 'assert_state':
             raise EvaluationSafetyError('unknown_evaluation_action')
 
+    @isolated_mutation_facts
     async def evaluate(self, request: LiveInput) -> dict:
         # One mutable synthetic service composition; actor changes must never
         # interleave. Production per-user concurrency policy is not modified.
@@ -331,6 +334,10 @@ class LiveConversationEvaluationAdapter:
                 context = e.memory.get(e.owner,e.chat)
                 local_mutation = parse_mutation(request.text,
                     previous=context.pending_mutation if context else None)
+                if local_mutation is not None and local_mutation.error == MutationError.TOKEN_ROLE:
+                    names=tuple(name for p in e.operations.repository.products() for name in (p.normalized_name,*p.aliases))
+                    local_mutation=parse_mutation(request.text,previous=context.pending_mutation if context else None,
+                        exact_entities=names)
                 if local_mutation is not None:
                     observation.update(domain='warehouse',read_only=True,mutation=False,
                         local_validation_error=local_mutation.error.value if local_mutation.error else None)
@@ -341,7 +348,8 @@ class LiveConversationEvaluationAdapter:
                     if not local_mutation.allowed or local_mutation.missing:
                         observation['clarification']=True
                         if not local_mutation.allowed and context is not None and context.pending_mutation and (
-                            local_mutation.disposition == MutationDisposition.AMBIGUOUS or parse_mutation(request.text) is not None):
+                            local_mutation.disposition == MutationDisposition.AMBIGUOUS or local_mutation.error == MutationError.UNICODE
+                            or parse_mutation(request.text) is not None):
                             e.memory.clear_structured(e.owner,chat_id=e.chat,last_intent='clarify')
                         if local_mutation.allowed and len(local_mutation.lines)==1:
                             e.memory.remember(e.owner,chat_id=e.chat,last_intent='prepare_'+local_mutation.action,
@@ -356,6 +364,7 @@ class LiveConversationEvaluationAdapter:
                     except QuantityError as error:
                         observation.update(clarification=True,local_validation_error=error.code)
                         raise ProbeComplete
+                    bind_mutation_facts(local_mutation)
                 planning_text = local_mutation.command() if local_mutation else request.text
                 snapshot,capabilities = self._inputs(planning_text)
                 if request.probe == 'tool_result':

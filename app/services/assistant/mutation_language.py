@@ -5,11 +5,14 @@ still needs the normal access, product/destination resolution and confirmation.
 """
 
 import re
+from contextvars import ContextVar
+from functools import wraps
 from dataclasses import replace
 from decimal import Decimal, localcontext
 
 from app.models.assistant_mutation import (
     MutationClauseKind as K, MutationDisposition as D, MutationError as E, MutationLine, ParsedMutation,
+    MutationSyntax, MutationSpan, MutationTokenKind as T,
 )
 from app.services.assistant.mutation_clauses import analyze_clauses
 from app.services.assistant.mutation_clauses import ClauseAnalysis
@@ -44,6 +47,33 @@ _ATTACHED = re.compile(rf'(?P<number>{_NUMBER})(?P<unit>[^0-9\W][\w.]*)?$', re.U
 _DEST = re.compile(r'(?:->|→|\b(?:в|на)\s+)\s*(.+)$')
 _RANGE = re.compile(r'[0-9]\s*[-–—/]\s*[0-9]|\b(?:или|або|примерно|приблизно|может|можливо)\b')
 _SPECIAL = frozenset(('nan','inf','infinity','infinite','∞'))
+_BOUND_FACTS: ContextVar[dict[str, ParsedMutation] | None] = ContextVar('server_mutation_facts',default=None)
+
+
+def isolated_mutation_facts(function):
+    """Request-local facts only; no actor/chat IDs or durable extra state."""
+    @wraps(function)
+    async def scoped(*args,**kwargs):
+        token = _BOUND_FACTS.set({})
+        try:
+            return await function(*args,**kwargs)
+        finally:
+            _BOUND_FACTS.reset(token)
+    return scoped
+
+
+def bind_mutation_facts(parsed: ParsedMutation) -> None:
+    """Called by the handler only after local syntax/access/product preflight.
+
+    Legacy interfaces still accept rendered intake. Their parser can retrieve
+    the immutable facts for that exact rendering, never infer another command
+    from an already typed product. Any changed text takes the ordinary gate.
+    """
+    scope = _BOUND_FACTS.get()
+    if scope is None or not parsed.allowed or parsed.missing:
+        raise ValueError('unvalidated mutation binding')
+    scope.clear()
+    scope[_text(parsed.command())] = parsed
 
 
 def _text(value):
@@ -63,8 +93,28 @@ def cancellation_analysis(value: str, *, contextual=False, exact_entities=()):
     text = inspection.normalized_text
     result = analyze_clauses(text, action=_action, units=frozenset(_UNITS),
         exact_entities=frozenset(_text(name) for name in exact_entities),
-        active=bool(_action(text)[0] or _GENERIC_IMPERATIVE.match(text)), contextual=contextual)
+        active=bool(_GENERIC_IMPERATIVE.match(text)), contextual=contextual)
     return replace(result,inspection=inspection)
+
+
+def mutation_syntax(value: str, *, contextual=False, exact_entities=()) -> MutationSyntax:
+    """One clause-level action pass; downstream code only consumes its spans."""
+    analysis = cancellation_analysis(value,contextual=contextual,exact_entities=exact_entities)
+    comments = {index for index,c in enumerate(analysis.clauses) if c.kind == K.COMMENT}
+    def spans(kind):
+        return tuple(MutationSpan(start=t.start,end=t.end) for t in analysis.tokens
+            if t.kind == kind and t.clause_index not in comments)
+    error = (E.UNICODE if analysis.inspection.forbidden else
+        E.CANCELLED if analysis.disposition == D.CANCEL else
+        E.TOKEN_ROLE if analysis.ambiguous_entity else
+        E.AMBIGUOUS if analysis.disposition is not None else None)
+    return MutationSyntax(normalized_text=analysis.inspection.normalized_text,
+        commands=analysis.commands,clauses=analysis.clauses,tokens=analysis.tokens,
+        entity_spans=spans(T.ENTITY),quantity_spans=spans(T.QUANTITY),unit_spans=spans(T.UNIT),
+        destination_spans=spans(T.DESTINATION),source_spans=spans(T.SOURCE),
+        correction_spans=tuple(MutationSpan(start=c.start,end=c.end) for c in analysis.clauses if c.kind == K.CORRECTION),
+        comment_spans=tuple(MutationSpan(start=c.start,end=c.end) for c in analysis.clauses if c.kind == K.COMMENT),
+        disposition=analysis.disposition,validation_category=error,restart_at=analysis.restart_at)
 
 
 def _action(text):
@@ -87,7 +137,8 @@ def _failure(action, disposition, error, *, imperative=True, clauses=()):
 
 def _quantity_tokens(core):
     """Every number-like whitespace token is consumed completely, never searched."""
-    words = core.split()
+    positions = [MutationSpan(start=m.start(),end=m.end()) for m in re.finditer(r'\S+',core)]
+    words = [core[s.start:s.end] for s in positions]
     for index, token in enumerate(words):
         if token.endswith(('.',',',';','!','?')):
             # Punctuation after an explicit measure is safe. A bare "1." or
@@ -105,7 +156,7 @@ def _quantity_tokens(core):
         if token in _SPECIAL:
             return None, '', E.INVALID_QUANTITY
         if not numeric:
-            kept.append(token.strip(',;.!?'))
+            kept.append(positions[index])
             index += 1
             continue
         # Only conventional 3-digit grouping; never reinterpret arbitrary pairs.
@@ -139,16 +190,18 @@ def _quantity_tokens(core):
     if len(found) > 1:
         return None, '', E.RANGE
     if not found:
-        measures = [word for word in kept if word in _UNITS]
+        measures = [span for span in kept if core[span.start:span.end].strip(',;.!?') in _UNITS]
         if len(measures) > 1:
             return None, '', E.RANGE
         if measures:
-            unit = measures[0]
-            kept.remove(unit)
+            measure = measures[0]
+            unit = core[measure.start:measure.end].strip(',;.!?')
+            kept.remove(measure)
             # Existing UX: a spelled singular measure explicitly means one.
             number = Decimal('1') if kept and unit in ('килограмм','литр','штука') else None
             found.append((number,unit))
-    return found[0] if found else (None, ''), ' '.join(kept), None
+    entity = ' '.join(core[s.start:s.end].strip(',;.!?') for s in kept)
+    return found[0] if found else (None, ''), entity, None
 
 
 def _line(core, action, previous=None):
@@ -257,14 +310,20 @@ def parse_mutation(value: str, *, previous: ParsedMutation | None = None, exact_
     inspection = inspect_unicode(value)
     if inspection.forbidden:
         return _failure(None,D.INVALID,E.UNICODE,imperative=False)
-    text = inspection.normalized_text
-    action, body = _action(text)
-    if len(text) > 4000:
-        return _failure(action, D.INVALID, E.SYNTAX, imperative=action is not None)
-    analysis = cancellation_analysis(text,contextual=previous is not None,exact_entities=exact_entities)
+    scope = _BOUND_FACTS.get()
+    if scope is not None and (bound := scope.get(inspection.normalized_text)) is not None:
+        return bound
+    analysis = mutation_syntax(value,contextual=previous is not None,exact_entities=exact_entities)
+    if analysis.validation_category == E.UNICODE:
+        return _failure(None,D.INVALID,E.UNICODE,imperative=False)
+    text = analysis.normalized_text
+    command = analysis.commands[0] if analysis.commands else None
+    action = command.action if command else None
+    body_start = command.body_span.start if command else 0
+    body = text[body_start:]
     if analysis.disposition is not None:
         return ParsedMutation(action=action, disposition=analysis.disposition,
-            error=E.CANCELLED if analysis.disposition == D.CANCEL else E.TOKEN_ROLE if analysis.ambiguous_entity else E.AMBIGUOUS,
+            error=analysis.validation_category,
             imperative_evidence=action is not None,
             explicit_cancellation=any(clause.kind == K.CANCELLATION for clause in analysis.clauses),
             clauses=analysis.clauses)
@@ -272,10 +331,12 @@ def parse_mutation(value: str, *, previous: ParsedMutation | None = None, exact_
     if restart is not None:
         # Only a fully new explicit action can supersede a cancellation. No
         # partial quantity/correction inherits the cancelled product or amount.
-        text = text[restart:].strip()
-        action, body = _action(text)
+        command = next((c for c in analysis.commands if c.action_span.start == restart),None)
+        action = command.action if command else None
+        body_start = command.body_span.start if command else restart
+        body = text[body_start:]
         previous = None
-        if action is None or len(text) > 2000:
+        if action is None or len(text[restart:].strip()) > 2000:
             return _failure(action,D.AMBIGUOUS,E.AMBIGUOUS,clauses=analysis.clauses)
     inherited = False
     if action is None:
@@ -301,13 +362,17 @@ def parse_mutation(value: str, *, previous: ParsedMutation | None = None, exact_
             return None
     lines = []
     corrected = None
-    for raw in body.splitlines():
-        raw = raw.strip()
+    offset = body_start
+    for row in body.splitlines(keepends=True):
+        row_start = offset + len(row)-len(row.lstrip())
+        offset += len(row)
+        raw = row.strip()
         if not raw:
             continue
-        other_action, raw_body = _action(raw)
-        if other_action and other_action != action:
+        row_command = next((c for c in analysis.commands if c.action_span.start == row_start),None)
+        if row_command and row_command.action != action:
             return _failure(action, D.AMBIGUOUS, E.AMBIGUOUS,clauses=analysis.clauses)
+        raw_body = text[row_command.body_span.start:offset].strip() if row_command else raw
         line, error, correction = _corrected_line(raw_body, action,
             previous.lines[0] if inherited else None)
         if error:
@@ -324,7 +389,7 @@ def parse_mutation(value: str, *, previous: ParsedMutation | None = None, exact_
             return _failure(action,D.INVALID,E.SYNTAX,clauses=analysis.clauses)
     result = ParsedMutation(action=action, lines=tuple(lines), imperative_evidence=True,
         disposition=D.CORRECTED if corrected or restart is not None else D.PROCEED,
-        correction_segment=corrected or (text if restart is not None else None),
+        correction_segment=corrected or (text[restart:].strip() if restart is not None else None),
         clauses=tuple(clause.model_copy(update={'superseded':True})
             if restart is not None and clause.end <= restart else clause for clause in analysis.clauses))
     missing = result.missing

@@ -10,6 +10,15 @@ Importance: High
 
 ## Planner corpus
 
+Service-word entity coverage from `d515ed0...` strengthens
+`warehouse.prepare_writeoff` / `warehouse.prepare_transfer`: one clause action
+pass, typed body/entity spans, exact full-name precedence and provider
+non-authority over product binding. `tests/test_assistant_service_entities.py`
+covers exact/alias/missing products, both foreground modes, clarification/restart
+and bounded scoped-fact cleanup. Separate deterministic v1.3 has 360 cases;
+v1.1/v1.2 expectations stay frozen. This is offline evidence only; extended live
+coverage remains pending.
+
 Offline mutation-role coverage from `a15759c...` adds Unicode/control rejection
 and grammar-aware service-word product slots for `warehouse.prepare_writeoff`
 and `warehouse.prepare_transfer`. Missing-unit clarification for product Стоп

@@ -635,6 +635,17 @@ class AssistantCapabilityController:
             if identifier in {'warehouse.prepare_writeoff','warehouse.prepare_transfer'} and identifier != 'warehouse.prepare_'+mutation_request.action:
                 raise AccessDeniedError('Local mutation action mismatch')
         args = dict(decision.arguments)
+        if mutation_request is not None and identifier in {'warehouse.prepare_writeoff','warehouse.prepare_transfer'}:
+            from app.services.assistant.mutation_tokens import normalize_command
+            # The provider cannot shorten a server-owned full product name.
+            if args.get('product') is not None and (not isinstance(args['product'],str) or
+                ' '.join(normalize_command(args['product']).split()) not in {
+                    ' '.join(normalize_command(line.entity).split()) for line in mutation_request.lines}):
+                raise AccessDeniedError('Local mutation product mismatch')
+            if decision.target_entity_id is not None:
+                # Unlike catalog reads, warehouse IDs are bound only by the
+                # intake product/unit/destination resolver, never the planner.
+                raise AccessDeniedError('Warehouse target requires local resolution')
         if {'expected_revision', 'values'} & set(args):
             raise AccessDeniedError('Planner cannot choose revisions or mutation values')
         if identifier == 'capabilities.list':
@@ -705,7 +716,8 @@ class AssistantCapabilityController:
             intent = AssistantOrchestrator.mutation_intent(mutation_request) if mutation_request else AssistantOrchestrator.planner_decision_to_intent(
                 decision.model_copy(update={'arguments': args})
             ).model_copy(update={'confidence': decision.confidence})
-            action = AssistantToolRegistry(catalog).execute(intent)
+            tools = AssistantToolRegistry(catalog)
+            action = tools.execute(intent,mutation_request=mutation_request) if mutation_request is not None else tools.execute(intent)
             return CapabilityDispatch(identifier, action.message or 'Проверьте складской черновик.', tool_action=action)
 
         if identifier == 'capabilities.list':

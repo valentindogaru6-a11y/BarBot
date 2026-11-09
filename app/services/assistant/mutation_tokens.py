@@ -112,7 +112,7 @@ class ClauseTokens:
 def tokenize_clause(text: str, *, start: int, end: int, clause_index: int,
                     prefix_end: int | None, units: frozenset[str],
                     exact_entities: frozenset[str] = frozenset(),
-                    argument_context=False, reason=False) -> ClauseTokens:
+                    argument_context=False, reason=False, transfer=False) -> ClauseTokens:
     """Resolve slots before considering a keyword's service role.
 
     Quantity atoms and their offsets are retained, including malformed numeric
@@ -167,8 +167,16 @@ def tokenize_clause(text: str, *, start: int, end: int, clause_index: int,
                         if t in tail:output[i]=t.model_copy(update={'kind':T.ENTITY})
                 else:
                     ambiguous=True
+    if transfer:
+        destination=False
+        for i,t in enumerate(output):
+            if t.normalized_value in ('->','→','на','в') and t.start >= (prefix_end or start):
+                destination=True
+                output[i]=t.model_copy(update={'kind':T.BOUNDARY})
+            elif destination and t.kind in (T.UNKNOWN,T.ENTITY):
+                output[i]=t.model_copy(update={'kind':T.DESTINATION})
     service=list(text[start:end])
     for token in output:
-        if token.kind in (T.ACTION,T.ENTITY,T.QUANTITY,T.UNIT):
+        if token.kind in (T.ACTION,T.ENTITY,T.QUANTITY,T.UNIT,T.DESTINATION,T.SOURCE):
             service[token.start-start:token.end-start]=' '*(token.end-token.start)
     return ClauseTokens(tuple(output),''.join(service),ambiguous)

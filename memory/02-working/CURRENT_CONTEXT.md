@@ -5,6 +5,15 @@ Metadata: scope `working`; trust `working`; lifecycle `ephemeral`; last cleared
 
 ## Status
 
+Focused service-word entity fix starts at `d515ed0...`: the independent review
+found a wrong-product draft when `_action` stripped an action word from a
+previously isolated body. Source-clause action/body spans and server-fact
+rendering replace that second interpretation. Full exact names/aliases are
+preserved and planner target substitutions fail closed. Frozen v1.1/v1.2 are
+unchanged; separate v1.3 has 360 cases plus vertical variants. Validation is
+offline on temporary v15; catalog, seed, DDL/migrations and production are out
+of scope. Extended live Gemini/Groq evaluation remains pending.
+
 Focused Unicode/token-role hardening starts at `a15759c...`. Frozen v1.1 found
 74 violations: invisible split cancellation and product Стоп mistaken for a
 cancel token. Typed inspection rejects suspicious controls without repair;
