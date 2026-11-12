@@ -1,6 +1,7 @@
 """Private super-admin handlers for the bounded AI assistant pilot."""
 
 from __future__ import annotations
+from app.services.assistant.read_only import safe_tool_errors
 
 import asyncio
 import logging
@@ -415,6 +416,7 @@ async def _mutation_preflight(message, state, *, text, auth_service, warehouse_s
 
 
 @isolated_mutation_facts
+@safe_tool_errors
 async def _run_assistant(
     message: Message,
     state: FSMContext,
@@ -1627,6 +1629,7 @@ async def handle_assistant_proposal(
 @voice_router.callback_query(
     StateFilter(None), AssistantCandidateCallback.filter()
 )
+@safe_tool_errors
 async def handle_assistant_candidate(
     callback: CallbackQuery,
     callback_data: AssistantCandidateCallback,

@@ -11,6 +11,7 @@ from contextvars import ContextVar
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from app.services.assistant.evaluation_business_state import MUTATION_LEDGER, Mutation
+from app.services.assistant.read_only import authorize_sql
 
 from app.services.assistant.evaluation_budget import EvaluationSafetyError
 
@@ -38,6 +39,11 @@ class _OwnedConnection(sqlite3.Connection):
         self._targets=None
         def authorize(action,table,column,database,source):
             verbs={sqlite3.SQLITE_INSERT:'insert',sqlite3.SQLITE_UPDATE:'update',sqlite3.SQLITE_DELETE:'delete'}
+            if authorize_sql(action,table,column,database,source) == sqlite3.SQLITE_DENY:
+                ledger = MUTATION_LEDGER.get()
+                if ledger is not None:
+                    ledger.append(Mutation(table if action in verbs else 'schema', verbs.get(action,'ddl'), 0))
+                return sqlite3.SQLITE_DENY
             if self._targets is not None and database=='main' and action in verbs:
                 self._targets.add((table,verbs[action]))
             ddl=(sqlite3.SQLITE_CREATE_TABLE,sqlite3.SQLITE_DROP_TABLE,sqlite3.SQLITE_ALTER_TABLE,

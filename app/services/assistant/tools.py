@@ -1,6 +1,7 @@
 """Server-authorized, deterministic and read-only BarBot assistant tools."""
 
 from __future__ import annotations
+from app.services.assistant.read_only import read_tool
 
 from app.models.assistant_tools import (
     CurrentShiftSummaryInput,
@@ -76,6 +77,7 @@ class AssistantReadOnlyTools:
         if not self.access.get_context(actor_user_id).can_manage_warehouse_attendance:
             raise AccessDeniedError("Недостаточно прав для просмотра персональных смен")
 
+    @read_tool('catalog.search')
     def search_tech_cards(self, actor_user_id: int, payload: SearchTechCardsInput) -> tuple[TechCardToolResult, ...]:
         self._require_catalog_view(actor_user_id)
         retrieval = self.retriever.retrieve(payload.query, limit=10)
@@ -89,6 +91,7 @@ class AssistantReadOnlyTools:
             for result in results
         )
 
+    @read_tool('catalog.get')
     def get_tech_card(self, actor_user_id: int, payload: GetTechCardInput) -> TechCardToolResult | None:
         self._require_catalog_view(actor_user_id)
         result = self.retriever.by_key(payload.card_id)
@@ -100,6 +103,7 @@ class AssistantReadOnlyTools:
             subcategory=result.subcategory.name if result.subcategory else None,
         )
 
+    @read_tool('attendance.list_open')
     def list_open_attendance_sessions(self, actor_user_id: int, payload: OpenAttendanceSessionsInput | None = None) -> tuple[OpenAttendanceSessionResult, ...]:
         del payload
         self._require_attendance_management(actor_user_id)
@@ -119,6 +123,7 @@ class AssistantReadOnlyTools:
             for row in rows
         )
 
+    @read_tool('warehouse.shift_summary')
     def get_current_shift_summary(self, actor_user_id: int, payload: CurrentShiftSummaryInput | None = None) -> CurrentShiftSummaryResult:
         del payload
         self._require_warehouse_view(actor_user_id)
@@ -132,6 +137,7 @@ class AssistantReadOnlyTools:
             status=str(row["status"]),
         )
 
+    @read_tool('users.list')
     def list_registered_users(self, actor_user_id: int, payload: NoCapabilityInput | None = None) -> CapabilityResult:
         del payload
         context = self.access.get_context(actor_user_id)
@@ -144,6 +150,7 @@ class AssistantReadOnlyTools:
             data={"users": [{"name": row.display_name, "role": row.role.value, "active": row.is_active} for row in rows]},
         )
 
+    @read_tool('users.list_bartenders')
     def list_registered_bartenders(self, actor_user_id: int, payload: NoCapabilityInput | None = None) -> CapabilityResult:
         del payload
         context = self.access.get_context(actor_user_id)
@@ -156,6 +163,7 @@ class AssistantReadOnlyTools:
             data={"users": [{"name": row.display_name, "active": row.is_active} for row in rows]},
         )
 
+    @read_tool('users.get')
     def get_user_summary(self, actor_user_id: int, payload: QueryCapabilityInput) -> CapabilityResult:
         context = self.access.get_context(actor_user_id)
         if not context.can_manage_users or self.users is None:
@@ -167,6 +175,7 @@ class AssistantReadOnlyTools:
             data={"users": [{"name": row.display_name, "role": row.role.value, "active": row.is_active} for row in rows]},
         )
 
+    @read_tool('attendance.get')
     def get_attendance_session(self, actor_user_id: int, payload: EntityCapabilityInput) -> CapabilityResult:
         if self.attendance is None:
             raise RuntimeError("Attendance tool is unavailable")
@@ -185,6 +194,7 @@ class AssistantReadOnlyTools:
             },
         )
 
+    @read_tool('warehouse.list_operations')
     def list_shift_operations(self, actor_user_id: int, payload: NoCapabilityInput | None = None) -> CapabilityResult:
         del payload
         if self.operations is None:
@@ -197,23 +207,26 @@ class AssistantReadOnlyTools:
             data={"operations": [{"type": str(row["operation_type"]), "product": str(row.get("product_name_snapshot") or row.get("development_title") or "Позиция"), "quantity": str(row.get("input_quantity_text") or "")} for row in rows[:50]]},
         )
 
+    @read_tool('warehouse.required_status')
     def get_required_writeoff_status(self, actor_user_id: int, payload: NoCapabilityInput | None = None) -> CapabilityResult:
         del payload
         if self.closing is None:
             raise RuntimeError("Closing tool is unavailable")
-        overview = self.closing.overview(actor_user_id=actor_user_id)
+        overview = self.closing.get_required_status_snapshot(actor_user_id=actor_user_id)
         return CapabilityResult(
             kind="required_writeoffs",
             message="Статус обязательных списаний получен.",
-            data={"total": int(overview["requirements_total"]), "resolved": int(overview["requirements_resolved"])},
+            data={"total": overview.requirements_total, "resolved": overview.requirements_resolved},
         )
 
+    @read_tool('reports.status')
     def get_report_status(self, actor_user_id: int, payload: EntityCapabilityInput) -> CapabilityResult:
         if self.reports is None:
             raise RuntimeError("Reports tool is unavailable")
         row = self.reports.report_card(int(payload.entity_ref), actor_user_id=actor_user_id)
         return CapabilityResult(kind="report", message="Отчёт готов.", data={"business_date": str(row["business_date"]), "version": int(row["version"]), "status": str(row["status"])})
 
+    @read_tool('reports.history')
     def list_report_history(self, actor_user_id: int, payload: NoCapabilityInput | None = None) -> CapabilityResult:
         del payload
         if self.reports is None:
@@ -221,6 +234,7 @@ class AssistantReadOnlyTools:
         rows, total = self.reports.history(actor_user_id=actor_user_id, page=0)
         return CapabilityResult(kind="reports", message=f"Готовых отчётов: {total}.", data={"reports": [{"business_date": str(row["business_date"]), "version": int(row["version"]), "status": str(row["status"])} for row in rows]})
 
+    @read_tool('recipients.list')
     def list_report_recipients(self, actor_user_id: int, payload: NoCapabilityInput | None = None) -> CapabilityResult:
         del payload
         if self.recipients is None:
@@ -228,6 +242,7 @@ class AssistantReadOnlyTools:
         rows = self.recipients.list_recipients(actor_user_id=actor_user_id)
         return CapabilityResult(kind="recipients", message=f"Получателей: {len(rows)}.", data={"recipients": [{"title": str(row["title"]), "active": bool(row["is_active"])} for row in rows]})
 
+    @read_tool('reminders.get')
     def get_reminder_settings(self, actor_user_id: int, payload: NoCapabilityInput | None = None) -> CapabilityResult:
         del payload
         if self.reminders is None or self.operations is None:
@@ -236,6 +251,7 @@ class AssistantReadOnlyTools:
         row = self.reminders.get(int(shift["source_location_id"]), actor_user_id)
         return CapabilityResult(kind="reminders", message="Настройки напоминаний получены.", data={"enabled": bool(row["enabled"]), "first_minutes": int(row["first_reminder_minutes_before_close"]), "repeat_minutes": int(row["repeat_interval_minutes"]), "maximum": int(row["max_reminders"])})
 
+    @read_tool('schedules.list')
     def list_schedules(self, actor_user_id: int, payload: NoCapabilityInput | None = None) -> CapabilityResult:
         del payload
         if self.schedules is None:
@@ -243,6 +259,7 @@ class AssistantReadOnlyTools:
         rows = self.schedules.list(actor_user_id)
         return CapabilityResult(kind="schedules", message=f"Расписаний: {len(rows)}.", data={"schedules": [{"title": str(row.get("title") or "Расписание"), "active": bool(row["is_active"]), "type": str(row["schedule_type"])} for row in rows[:50]]})
 
+    @read_tool('capabilities.list')
     def get_capabilities(self, actor_user_id: int, payload: QueryCapabilityInput) -> CapabilityResult:
         del payload
         available = self.capabilities.available_for_actor(

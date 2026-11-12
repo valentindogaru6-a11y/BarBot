@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import sqlite3
 import unicodedata
+from app.services.assistant.read_only import planned_boundary, local_boundary, enter_local_read
 from dataclasses import dataclass
 from typing import Any
 from typing import TYPE_CHECKING
@@ -270,6 +271,8 @@ class AssistantCapabilityController:
         available = self.access_policy.available_capabilities(actor)
         if capability not in available:
             raise AccessDeniedError("Capability is unavailable")
+        if int(capability.risk_level) == 0:
+            enter_local_read(capability.id)
 
     def _proposal(
         self,
@@ -342,6 +345,7 @@ class AssistantCapabilityController:
             lines.extend(f"• {item.title}" for item in capabilities)
         return CapabilityDispatch("capabilities.list", "\n".join(lines))
 
+    @local_boundary
     def dispatch(
         self,
         text: str,
@@ -599,6 +603,7 @@ class AssistantCapabilityController:
             )
         return None
 
+    @planned_boundary
     def dispatch_plan(
         self, decision: PlannerDecision, *, snapshot: PlannerContextSnapshot,
         catalog: Catalog, actor_user_id: int, source_chat_id: int,

@@ -1,5 +1,14 @@
 # Freshness Manifest
 
+Read-only capability slice reviewed offline 2026-11-09 from `3f7e6c...`:
+`get_required_status_snapshot` computes virtual/materialized effective status
+without persistence; ordinary overview delegates to it. Materialization belongs
+to explicit start. AI read executors enforce query-only/authorizer and scoped
+external-effect denial; evaluator composes authorizers and treats violations as
+safety exit 2. Regression evidence is temporary-v15/fake-transport only. Extended
+live metrics are partial (117/183, stopped on P1), not release proof. Schema v15,
+catalog, seed and migrations unchanged; live semantic quality/runtime pending.
+
 Service-word entity slice revalidated offline 2026-11-09 from `d515ed0...`:
 single clause-level action extraction, closed typed spans, no action stripping
 inside a body, direct rendering of server-owned facts and exact request-scoped

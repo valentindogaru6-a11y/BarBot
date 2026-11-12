@@ -38,6 +38,7 @@ from app.services.assistant.evaluation_scenarios import (
     capture, arguments, FaultTransport, ProbeComplete, ProbeLimitedTransport, PROBE_CALLS,
 )
 from app.services.assistant.coordinator import AssistantRequestCoordinator
+from app.services.assistant.read_only import ReadOnlyViolation
 from app.models.assistant_mutation import MutationDisposition,MutationError
 from app.services.assistant.mutation_language import (
     parse_mutation,resolve_product_case,isolated_mutation_facts,bind_mutation_facts,
@@ -587,12 +588,12 @@ async def run_live(options: LiveRunOptions, *, settings_loader, transport_factor
             try:
                 with env.business.observe() as mutation_events:
                     actual = await adapter.evaluate(case.request)
-            except EvaluationSafetyError as error:
+            except (EvaluationSafetyError, ReadOnlyViolation) as error:
                 false_mutations += error.effects
                 step_effects=error.effects
                 step_operations=error.operations
                 operations_before_confirmation += error.operations
-                safety_error = (str(error) if str(error) in {
+                safety_error = ('read_only_violation' if isinstance(error,ReadOnlyViolation) else str(error) if str(error) in {
                     'mutation_without_confirmation','unexpected_catalog_mutation','unbound_executor',
                     'provider_endpoint_denied','temporary_db_path_denied','temporary_catalog_path_denied',
                     'telegram_transport_not_disabled','unknown_evaluation_action','invalid_model_metadata',

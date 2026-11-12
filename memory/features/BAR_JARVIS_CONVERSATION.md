@@ -2,6 +2,42 @@
 
 Scope: bounded multi-turn context, confirmed memory and guarded tool loop
 Trust: implemented and tested offline; live provider/shadow evidence pending
+
+## Read-only execution contract (P1 regression)
+
+`warehouse.required_status` must never materialize state. Its immutable
+`RequiredStatusSnapshot` is computed from a single SQLite read snapshot of the
+current shift, applicable active rules, frozen requirement rows and operations.
+Unmaterialized requirements are virtual pending entries. Existing rows and
+timestamps are not refreshed by viewing; `overview()` is now read rendering too.
+Only the explicit required/closing start workflow materializes the snapshot;
+AI `warehouse.start_required_flow` still hands off to the authorized UI/FSM.
+
+Every planned risk-0 dispatch, deterministic controller read branch and direct
+AI read tool runs under `read_only_execution`. Connection-per-operation SQLite
+handles are query-only, write opcodes/state-changing PRAGMAs denied, then closed.
+Evaluation authorizers compose this policy and retain denied-write ledger events
+even when SQLite changes zero rows. File/audit creation, network/subprocess,
+new threads/pool submissions and asyncio task/callback scheduling are denied.
+Violations unwind as a dedicated control exception, bypass provider fallback,
+and produce a safe owner error or evaluation safety exit 2. Conversation updates
+and owner reply rendering are outside the synchronous tool scope.
+
+This is an enforceable boundary for the current AI executors, not an arbitrary
+Python/plugin sandbox. Repositories must keep connection-per-operation: do not
+pass pre-existing writable SQLite/file/network handles into read executors.
+Pooling, new UDFs or native/plugin executors require a new boundary review.
+
+Evidence: `tests/test_assistant_read_only_boundary.py` enumerates all bound,
+owner-available risk-0 capabilities and supplies real temporary-v15 fixtures.
+It checks P1 repeat/reopen/materialization, business/ledger/filesystem equality,
+denied SQL/external effects, concurrent readers/start/closing, and guard cleanup.
+
+The extended v2 seed-0 live run at `3f7e6c...` was partial: 117/183 cases,
+84 physical attempts, stopped on P1's two unexpected requirement rows; 66 cases
+were skipped. These are NOT readiness or full capability-coverage evidence.
+Live semantic/authority quality remains pending a separate improvement phase;
+no new live evaluation or production action belongs to this fix.
 Lifecycle: Development
 Last verified: 2026-10-24
 

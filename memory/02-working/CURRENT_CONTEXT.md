@@ -5,6 +5,15 @@ Metadata: scope `working`; trust `working`; lifecycle `ephemeral`; last cleared
 
 ## Status
 
+Focused P1 read-only fix is based on `3f7e6c...`. Required status/ordinary closing
+overview now compute without lazy writes; explicit start keeps the existing
+mutation/FSM path. Risk-0 AI executors have query-only SQL/authorizer and scoped
+external-effect guards; all bound owner read capabilities have synthetic
+temporary-v15 fixtures. Extended live was stopped at 117/183 cases on two
+unexpected P1 requirement rows: partial metrics are not readiness proof.
+Semantic routing is unchanged and remains a separate phase. No production,
+live API, catalog/seed/schema/migration, systemd, push or deployment action.
+
 Focused service-word entity fix starts at `d515ed0...`: the independent review
 found a wrong-product draft when `_action` stripped an action word from a
 previously isolated body. Source-clause action/body spans and server-fact

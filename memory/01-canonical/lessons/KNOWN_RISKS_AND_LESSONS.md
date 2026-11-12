@@ -8,6 +8,15 @@ Evidence: regression tests, Git history, rollout docs, owner observations
 Depends on: callbacks, SQLite/WAL, workers, XLSX, imports, VPS environment
 Importance: High
 
+- **Read metadata does not make a service read-only:** live P1 selected the
+  correct `warehouse.required_status`, but `closing.overview()` lazily inserted
+  requirement rows. Status now uses an immutable computed read snapshot;
+  explicit start owns materialization. AI risk-0 execution has query-only SQL,
+  authorizer and external-effect enforcement. Denied attempts remain visible to
+  the evaluation ledger even with rollback/zero changed rows. Preserve the
+  connection-per-operation contract; pre-opened writable handles/native plugins
+  are not an arbitrary-code sandbox and require separate review.
+
 - **Do not parse a typed body as another command:** a product containing an
   action noun was shortened to a different exact product by a second `_action`
   call. Positional roles alone were insufficient. Use original clause command/

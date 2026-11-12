@@ -1,6 +1,7 @@
 """Local-first intent routing and a narrow allowlisted tool registry."""
 
 from __future__ import annotations
+from app.services.assistant.read_only import catalog_boundary
 
 import asyncio
 import logging
@@ -629,6 +630,7 @@ class AssistantToolRegistry:
             candidate.provider_label for candidate in retrieval.candidates
         )
 
+    @catalog_boundary
     def execute(self, intent: AssistantIntent, *, mutation_request: ParsedMutation | None = None) -> AssistantToolAction:
         if mutation_request is not None and intent.intent in _WAREHOUSE_ACTION_INTENTS:
             expected = ('writeoff' if intent.intent is AssistantIntentName.PREPARE_WRITEOFF else 'transfer')

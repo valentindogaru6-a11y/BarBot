@@ -493,6 +493,42 @@ class WarehouseClosingDatabase:
             raise WarehouseClosingError("Closing session not found")
         return result
 
+    def read_required_state(self, source_location_id: int, business_date: str) -> tuple:
+        """One SQLite read snapshot; never initialize a shift or requirements."""
+        with self._connection() as connection:
+            connection.execute('PRAGMA query_only=ON')
+            connection.execute('BEGIN')
+            try:
+                shift = connection.execute(
+                    'SELECT s.*, l.name AS source_location_name FROM warehouse_shifts s '
+                    'JOIN warehouse_locations l ON l.id=s.source_location_id '
+                    'WHERE s.source_location_id=? AND s.business_date=?',
+                    (source_location_id, business_date),
+                ).fetchone()
+                rules = connection.execute(
+                    'SELECT * FROM warehouse_required_rules WHERE is_active=1 '
+                    'AND (weekdays_mask & ?)<>0 ORDER BY sort_order,id',
+                    (1 << date.fromisoformat(business_date).weekday(),),
+                ).fetchall()
+                requirements = operations = []
+                has_session = False
+                if shift is not None:
+                    requirements = connection.execute(
+                        'SELECT * FROM warehouse_shift_requirements WHERE shift_id=? ORDER BY sort_order,id',
+                        (shift['id'],),
+                    ).fetchall()
+                    has_session = connection.execute(
+                        'SELECT 1 FROM warehouse_closing_sessions WHERE shift_id=? LIMIT 1', (shift['id'],),
+                    ).fetchone() is not None
+                    operations = connection.execute(
+                        'SELECT * FROM warehouse_operations WHERE shift_id=? AND is_deleted=0', (shift['id'],),
+                    ).fetchall()
+                return (dict(shift) if shift is not None else None,
+                    tuple(map(dict, rules)), tuple(map(dict, requirements)),
+                    tuple(map(dict, operations)), has_session)
+            finally:
+                connection.rollback()
+
     def prepare_requirements(
         self,
         shift_id: int,

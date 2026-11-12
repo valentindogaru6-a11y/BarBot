@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from datetime import UTC
+from dataclasses import dataclass
 from decimal import Decimal
+from types import MappingProxyType
+from collections.abc import Mapping
 from typing import Any
 
 from app.models.catalog_item import MAX_STABLE_ID_LENGTH
@@ -22,6 +25,32 @@ from app.storage.warehouse_closing_database import (
     WarehouseClosingDatabase,
     WarehouseClosingError,
 )
+
+
+@dataclass(frozen=True)
+class RequiredStatusEntry:
+    product_id: int
+    base_unit: str
+    status: str
+    materialized: bool
+
+
+@dataclass(frozen=True)
+class RequiredStatusSnapshot:
+    shift: Mapping
+    requirements: tuple[RequiredStatusEntry, ...]
+    writeoffs: int
+    transfers: int
+    developments: int
+    development_groups: int
+
+    @property
+    def requirements_total(self) -> int:
+        return len(self.requirements)
+
+    @property
+    def requirements_resolved(self) -> int:
+        return sum(row.status != 'pending' for row in self.requirements)
 
 
 class WarehouseClosingService:
@@ -67,46 +96,42 @@ class WarehouseClosingService:
         )
 
     def overview(self, *, actor_user_id: int) -> dict[str, Any]:
-        context = self.access.require_warehouse_view(actor_user_id)
-        shift = self.operations.current_shift(actor_user_id=actor_user_id)
-        if shift["id"] is None:
-            if context.can_mutate_warehouse:
-                shift = self._ensure_current_shift(actor_user_id)
-            else:
-                return {
-                    "shift": shift,
-                    "writeoffs": 0,
-                    "transfers": 0,
-                    "developments": 0,
-                    "development_groups": 0,
-                    "requirements_total": 0,
-                    "requirements_resolved": 0,
-                }
-        requirements = self.repository.prepare_requirements(
-            int(shift["id"]), now=self._now()
-        )
-        operations = self.operations.list_operations(
-            int(shift["id"]), actor_user_id=actor_user_id
-        )
+        snapshot = self.get_required_status_snapshot(actor_user_id=actor_user_id)
         return {
-            "shift": shift,
-            "writeoffs": sum(row["operation_type"] == "writeoff" for row in operations),
-            "transfers": sum(row["operation_type"] == "transfer" for row in operations),
-            "developments": sum(
-                row["operation_type"] == "development" for row in operations
-            ),
-            "development_groups": len(
-                {
-                    int(row["development_group_id"])
-                    for row in operations
-                    if row["operation_type"] == "development"
-                }
-            ),
-            "requirements_total": len(requirements),
-            "requirements_resolved": sum(
-                row["status"] != "pending" for row in requirements
-            ),
+            'shift': dict(snapshot.shift), 'writeoffs': snapshot.writeoffs,
+            'transfers': snapshot.transfers, 'developments': snapshot.developments,
+            'development_groups': snapshot.development_groups,
+            'requirements_total': snapshot.requirements_total,
+            'requirements_resolved': snapshot.requirements_resolved,
         }
+
+    def get_required_status_snapshot(self, *, actor_user_id: int) -> RequiredStatusSnapshot:
+        self.access.require_warehouse_view(actor_user_id)
+        settings = self.operations.repository.runtime_settings()
+        period = BusinessDateService(timezone=str(settings['timezone']),
+            cutoff=str(settings['cutoff_local_time']), clock=self.clock).current_period()
+        shift, rules, stored, operations, has_session = self.repository.read_required_state(
+            int(settings['source_location_id']), period.business_date.isoformat())
+        if shift is None:
+            shift = dict(id=None, source_location_id=int(settings['source_location_id']),
+                source_location_name=str(settings['source_location_name']),
+                business_date=period.business_date.isoformat(), status='open')
+        # A started session freezes the rule set, including an empty snapshot.
+        rows = stored if stored or has_session else rules
+        entries = []
+        for row in rows:
+            total = sum(int(op['quantity_scaled']) for op in operations
+                if op['product_id'] == row['product_id'] and op['operation_type'] == row['operation_type']
+                and op['base_unit'] == row['base_unit'])
+            satisfied = (total > 0 and (row['minimum_scaled'] is None or total >= row['minimum_scaled'])
+                and (row['maximum_scaled'] is None or total <= row['maximum_scaled']))
+            status = 'satisfied' if satisfied else ('not_applicable' if row.get('status') == 'not_applicable' else 'pending')
+            entries.append(RequiredStatusEntry(int(row['product_id']), str(row['base_unit']), status, bool(stored)))
+        return RequiredStatusSnapshot(MappingProxyType(shift), tuple(entries),
+            sum(op['operation_type']=='writeoff' for op in operations),
+            sum(op['operation_type']=='transfer' for op in operations),
+            sum(op['operation_type']=='development' for op in operations),
+            len({op['development_group_id'] for op in operations if op['operation_type']=='development'}))
 
     def active_session(self, *, actor_user_id: int) -> dict[str, Any] | None:
         self.access.require_warehouse_view(actor_user_id)
