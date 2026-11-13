@@ -10,7 +10,7 @@ import os
 import re
 import subprocess
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from pathlib import Path
 from time import monotonic
 
@@ -38,7 +38,7 @@ from app.services.assistant.evaluation_scenarios import (
     capture, arguments, FaultTransport, ProbeComplete, ProbeLimitedTransport, PROBE_CALLS,
 )
 from app.services.assistant.coordinator import AssistantRequestCoordinator
-from app.services.assistant.read_only import ReadOnlyViolation
+from app.services.assistant.read_only import ReadOnlyViolation, ReadOnlyCleanupFailure, read_only_failure
 from app.models.assistant_mutation import MutationDisposition,MutationError
 from app.services.assistant.mutation_language import (
     parse_mutation,resolve_product_case,isolated_mutation_facts,bind_mutation_facts,
@@ -588,7 +588,12 @@ async def run_live(options: LiveRunOptions, *, settings_loader, transport_factor
             try:
                 with env.business.observe() as mutation_events:
                     actual = await adapter.evaluate(case.request)
-            except (EvaluationSafetyError, ReadOnlyViolation) as error:
+            except (EvaluationSafetyError, ReadOnlyViolation, BaseExceptionGroup) as error:
+                if isinstance(error, BaseExceptionGroup):
+                    failure = read_only_failure(error)
+                    if failure is None:
+                        raise
+                    error = failure
                 false_mutations += error.effects
                 step_effects=error.effects
                 step_operations=error.operations
@@ -600,6 +605,9 @@ async def run_live(options: LiveRunOptions, *, settings_loader, transport_factor
                 } else 'safety_contract_failure')
                 counts[FailureCategory.SAFETY] += 1
                 actual = dict(case_id=case.request.case_id,skipped=False,error='safety_contract_failure')
+                if isinstance(error, ReadOnlyCleanupFailure):
+                    actual.update(cleanup_quarantined=error.quarantined,
+                        cleanup_diagnostics=[asdict(row) for row in error.diagnostics])
             after_state=env.business.snapshot()
             changes=unexpected_changes(before_state,after_state,mutation_events,case.expected.effects)
             unexpected_totals.update(changes)

@@ -5,6 +5,14 @@ Metadata: scope `working`; trust `working`; lifecycle `ephemeral`; last cleared
 
 ## Status
 
+Focused cleanup hardening starts from `e8482f5...`: rollback/close failure must
+not leak a read transaction or skip guard restoration. Owned native SQLite
+handles use staged idempotent cleanup, supported forced base close, normalized
+failure aggregation and unconditional context/counter/loop-hook restoration.
+P1/all bound read-only executors are rechecked on temporary v15; capabilities,
+catalog/seed/schema/migrations are unchanged. Pooling/native/plugin/escaping
+cursor support is not claimed. No live API, production, systemd, push or rollout.
+
 Focused P1 read-only fix is based on `3f7e6c...`. Required status/ordinary closing
 overview now compute without lazy writes; explicit start keeps the existing
 mutation/FSM path. Risk-0 AI executors have query-only SQL/authorizer and scoped

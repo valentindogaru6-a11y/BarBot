@@ -5,6 +5,37 @@ Trust: implemented and tested offline; live provider/shadow evidence pending
 
 ## Read-only execution contract (P1 regression)
 
+### Exception-safe ownership and teardown
+
+From development base `e8482f5...`, cleanup has independent rollback, close,
+verification and application-restoration stages. The execution scope owns every
+new native SQLite handle observed inside it, including helper-created handles;
+duplicate registration/cleanup is idempotent. Multiple handles are supported.
+Repositories must consume/close cursors inside the operation: escaping cursors,
+external writable connections, pools and native/plugin executors are unsupported.
+
+A rollback error never skips close or cleanup of later connections. A broken
+instance close falls back to the captured `sqlite3.Connection.close` descriptor
+only for supported native SQLite connections/subclasses. Closed handles are not
+effectively closed twice. If base close fails and the handle remains usable,
+the normalized diagnostic explicitly marks `connection_leaked`; execution and
+evaluation readiness fail. Physical release cannot be promised after native
+close failure, but request registry/context/counter/hooks are still released.
+
+An independent outer finally restores contextvars, loop hooks and the atomic
+bytecode counter regardless of resource errors. Body errors remain intact;
+ordinary simultaneous failures use BaseExceptionGroup. Cancellation/fatal
+control exceptions remain primary with cleanup failures chained, preserving
+asyncio cancellation state. Handlers produce a safe error without provider
+fallback; evaluator treats recoverable and fatal cleanup failures as safety exit
+2 and emits only normalized cleanup metadata. Pooling/native/plugin support and
+live semantic quality remain pending a separate review.
+
+Evidence: `tests/test_assistant_read_only_cleanup.py` covers injected rollback/
+close/control errors, native forced-close success/failure, DELETE/WAL lock probes,
+multiple/duplicate/nested ownership, registration errors, two threads/event loops,
+query/close cancellation, safe diagnostics and real fake-transport evaluation.
+
 `warehouse.required_status` must never materialize state. Its immutable
 `RequiredStatusSnapshot` is computed from a single SQLite read snapshot of the
 current shift, applicable active rules, frozen requirement rows and operations.

@@ -8,6 +8,14 @@ Evidence: regression tests, Git history, rollout docs, owner observations
 Depends on: callbacks, SQLite/WAL, workers, XLSX, imports, VPS environment
 Importance: High
 
+- **Resource teardown must not own application restoration:** the first
+  read-only guard put rollback and close in one try and restored context/hooks
+  afterwards. Injected rollback failure skipped close; non-SQLite close failure
+  skipped `_ACTIVE`/counter restoration. Independent per-handle stages plus an
+  outer restoration finally fix this contract. Ordinary cleanup failures are
+  normalized/aggregated; cancellation stays primary with a cleanup cause. Native
+  forced-close failure is an explicit fatal leaked-handle result, not a success.
+
 - **Read metadata does not make a service read-only:** live P1 selected the
   correct `warehouse.required_status`, but `closing.overview()` lazily inserted
   requirement rows. Status now uses an immutable computed read snapshot;

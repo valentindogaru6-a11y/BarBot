@@ -1,7 +1,10 @@
 """Fail-closed AI tool boundary, not a sandbox for arbitrary Python code.
 
-Repositories use connection-per-operation. Connections opened inside a read tool
-are query-only and closed at scope exit; no pooled connection state is changed.
+Repositories use connection-per-operation. Every native handle opened inside a
+read tool (including by a helper) is guard-owned, query-only, and closed before
+scope exit. Cleanup failure is reported, never treated as successful release.
+External writable handles, proxy/pool objects and escaping cursors are unsupported;
+helpers consume/close cursors within their operation. No pooled state is changed.
 The audit hook is process-wide but inactive outside the context-local tool scope.
 Owner replies/rendering and conversation persistence happen OUTSIDE this scope.
 """
@@ -27,11 +30,177 @@ class ReadOnlyViolation(BaseException):
         super().__init__('read_only_capability_violation')
 
 
+@dataclass(frozen=True)
+class CleanupDiagnostic:
+    capability: str
+    stage: str
+    category: str
+    connection_ordinal: int | None = None
+    forced_close_attempted: bool = False
+    forced_close_succeeded: bool = False
+
+
+class ReadOnlyCleanupFailure(ReadOnlyViolation):
+    """Normalized resource failure; never retains raw cleanup error messages."""
+
+    def __init__(self, capability, diagnostics):
+        super().__init__(capability, 'cleanup_failure')
+        self.diagnostics = tuple(diagnostics)
+        self.quarantined = any(row.category == 'connection_leaked' for row in self.diagnostics)
+        self.args = ('read_only_cleanup_failure',)
+
+
+@dataclass
+class _OwnedConnection:
+    connection: sqlite3.Connection = field(repr=False)
+    ordinal: int
+    initialized: bool = False
+    finished: bool = False
+
+
 @dataclass
 class _Scope:
     capability: str
     category: str | None = None
-    connections: list = field(default_factory=list)
+    connections: dict = field(default_factory=dict)
+    cleanup_done: bool = False
+    cleanup_errors: tuple = ()
+
+    def track(self, connection, *, initialized=False):
+        if self.cleanup_done:
+            raise ReadOnlyViolation(self.capability, 'scope_closed')
+        key = id(connection)
+        if key not in self.connections:
+            self.connections[key] = _OwnedConnection(connection, len(self.connections) + 1)
+        record = self.connections[key]
+        record.initialized |= initialized
+        return record
+
+
+# Capture C descriptors, never trust an overridden instance cleanup/probe.
+_BASE_CLOSE = sqlite3.Connection.close
+_BASE_TRANSACTION = sqlite3.Connection.in_transaction
+
+
+def _force_close(connection):
+    _BASE_CLOSE(connection)
+
+
+def _closed(connection):
+    try:
+        _BASE_TRANSACTION.__get__(connection, sqlite3.Connection)
+    except sqlite3.ProgrammingError:
+        return True
+    return False
+
+
+def _error_category(error):
+    if isinstance(error, asyncio.CancelledError):
+        return 'cancelled'
+    if isinstance(error, sqlite3.Error):
+        return 'sqlite_error'
+    return 'internal' if isinstance(error, Exception) else 'base_exception'
+
+
+def _cleanup_owned(scope):
+    """Scope owns NEW handles, including helper-created ones, until closed.
+
+    Cursors are consumed/closed by repository operations, not separately registered.
+    External handles/proxies/pools are not adopted. Repeated cleanup is a no-op
+    with the same normalized result. Keep no handle references in diagnostics.
+    """
+    if scope.cleanup_done:
+        return scope.cleanup_errors
+    events, controls, seen = [], [], set()
+    def record(stage, error, ordinal, attempted=False, succeeded=False):
+        events.append(CleanupDiagnostic(scope.capability, stage, _error_category(error),
+            ordinal, attempted, succeeded))
+        if not isinstance(error, Exception):
+            controls.append(error)
+    try:
+        for resource in tuple(scope.connections.values()):
+            connection = resource.connection
+            if resource.finished or id(connection) in seen:
+                continue
+            seen.add(id(connection))
+            try:
+                if not isinstance(connection, sqlite3.Connection):
+                    events.append(CleanupDiagnostic(scope.capability, 'ownership',
+                        'unsupported_connection', resource.ordinal))
+                    continue
+                if _closed(connection):
+                    if not resource.initialized:
+                        # A failed C constructor may have emitted the handle
+                        # audit event. Base close distinguishes an unusable,
+                        # already-closed handle from an uncloseable partial one.
+                        try:
+                            _force_close(connection)
+                        except BaseException as error:
+                            record('forced_close', error, resource.ordinal, True, False)
+                            events.append(CleanupDiagnostic(scope.capability, 'verify',
+                                'connection_leaked', resource.ordinal, True, False))
+                    continue
+                # Rollback failure (including cancellation) NEVER skips close.
+                try:
+                    if _BASE_TRANSACTION.__get__(connection, sqlite3.Connection):
+                        connection.rollback()
+                except BaseException as error:
+                    record('rollback', error, resource.ordinal)
+                close_error = None
+                try:
+                    connection.close()
+                except BaseException as error:
+                    close_error = error
+                try:
+                    closed = _closed(connection)
+                except BaseException as error:
+                    record('verify', error, resource.ordinal)
+                    closed = False
+                forced = not closed
+                if forced:
+                    try:
+                        _force_close(connection)
+                    except BaseException as error:
+                        record('forced_close', error, resource.ordinal, True, False)
+                    try:
+                        closed = _closed(connection)
+                    except BaseException as error:
+                        record('verify', error, resource.ordinal, True, False)
+                        closed = False
+                if close_error is not None:
+                    record('close', close_error, resource.ordinal, forced, forced and closed)
+                elif forced:
+                    events.append(CleanupDiagnostic(scope.capability, 'close',
+                        'instance_close_incomplete', resource.ordinal, True, closed))
+                if not closed:
+                    events.append(CleanupDiagnostic(scope.capability, 'verify',
+                        'connection_leaked', resource.ordinal, forced, False))
+            except BaseException as error:
+                # Still clean every following connection and application state.
+                record('resource_cleanup', error, resource.ordinal)
+            finally:
+                resource.finished = True
+    finally:
+        scope.connections.clear()
+        scope.cleanup_done = True
+        scope.cleanup_errors = tuple(controls) + ((ReadOnlyCleanupFailure(scope.capability, events),) if events else ())
+    return scope.cleanup_errors
+
+
+def read_only_failure(error):
+    """Find a safe tool failure, but NEVER consume cancellation/fatal leaves."""
+    leaves = []
+    def visit(item):
+        if isinstance(item, BaseExceptionGroup):
+            for child in item.exceptions:
+                visit(child)
+        else:
+            leaves.append(item)
+    visit(error)
+    if any(not isinstance(item, (Exception, ReadOnlyViolation)) for item in leaves):
+        return None
+    return next((item for item in leaves if isinstance(item, ReadOnlyCleanupFailure)),
+        next((item for item in leaves if isinstance(item, ReadOnlyViolation)), None))
 
 
 _ACTIVE = ContextVar('assistant_read_only_execution', default=None)
@@ -83,6 +252,8 @@ def _audit(event, args):
     if scope is None:
         return
     if event == 'sqlite3.connect':
+        if scope.cleanup_done:
+            deny('scope_closed')
         if not _OPENING.get():
             deny('sqlite_open_boundary')
         raw = os.fsdecode(args[0])
@@ -90,7 +261,9 @@ def _audit(event, args):
         if raw == ':memory:' or raw.startswith('file:') or not os.path.isfile(raw):
             deny('sqlite_open')
     elif event == 'sqlite3.connect/handle':
-        scope.connections.append(args[0])
+        # The handle is not initialized yet; defer all SQLite calls until the
+        # factory returns. A failed post-construction registration is still owned.
+        scope.track(args[0])
     elif event == 'open':
         flags = args[2]
         if isinstance(flags, int) and flags & (os.O_WRONLY|os.O_RDWR|os.O_CREAT|os.O_TRUNC|os.O_APPEND):
@@ -112,10 +285,23 @@ def _query_only_connect(*args, **kwargs):
         connection = _connect(*args, **kwargs)
     finally:
         _OPENING.reset(token)
-    if _ACTIVE.get() is not None:
-        connection.execute('PRAGMA query_only=ON')
-        connection.set_authorizer(authorize_sql)
+    scope = _ACTIVE.get()
+    if scope is not None:
+        try:
+            _register_connection(scope, connection)
+            connection.execute('PRAGMA query_only=ON')
+            connection.set_authorizer(authorize_sql)
+        except BaseException as error:
+            failure = ReadOnlyCleanupFailure(scope.capability, (
+                CleanupDiagnostic(scope.capability, 'register', _error_category(error)),))
+            raise BaseExceptionGroup('read_only_connection_setup_failed', [error, failure]) from None
     return connection
+
+
+def _register_connection(scope, connection):
+    if not isinstance(connection, sqlite3.Connection):
+        raise ReadOnlyViolation(scope.capability, 'unsupported_connection')
+    scope.track(connection, initialized=True)
 
 
 sqlite3.connect = _query_only_connect
@@ -150,15 +336,20 @@ def read_only_execution(capability):
         return
     scope = _Scope(capability)
     token = _ACTIVE.set(scope)
-    with _BYTECODE_LOCK:
-        if not _BYTECODE_USERS:
-            _BYTECODE_ORIGINAL = sys.dont_write_bytecode
-        _BYTECODE_USERS += 1
-        sys.dont_write_bytecode = True
+    bytecode_acquired = False
     loop = None
     factory = None
+    factory_installed = False
     scheduling = {}
+    body_error = None
+    errors = []
     try:
+        with _BYTECODE_LOCK:
+            if not _BYTECODE_USERS:
+                _BYTECODE_ORIGINAL = sys.dont_write_bytecode
+            _BYTECODE_USERS += 1
+            bytecode_acquired = True
+            sys.dont_write_bytecode = True
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
@@ -171,28 +362,81 @@ def read_only_execution(capability):
                     deny('background_task')
                 return factory(loop, coro, **kwargs) if factory else asyncio.Task(coro, loop=loop, **kwargs)
             loop.set_task_factory(task_factory)
+            factory_installed = True
             for name in ('call_soon','call_later','call_at','call_soon_threadsafe'):
                 scheduling[name] = getattr(loop, name)
                 setattr(loop, name, _background_boundary(scheduling[name]))
         yield
+    except BaseException as error:
+        body_error = error
     finally:
-        for connection in scope.connections:
+        # Resource teardown is INSIDE an independent application-state finally.
+        # No rollback/close/cancellation may skip restoration or later handles.
+        try:
+            errors.extend(_cleanup_owned(scope))
+        except BaseException as error:
+            errors.extend((error, ReadOnlyCleanupFailure(capability, (
+                CleanupDiagnostic(capability, 'resource_cleanup', _error_category(error)),))))
+        finally:
+            restoration = []
+            def restore(stage, action):
+                try:
+                    action()
+                except BaseException as error:
+                    restoration.append(CleanupDiagnostic(capability, stage, _error_category(error)))
+                    if not isinstance(error, Exception):
+                        errors.append(error)
+            def reset_context():
+                try:
+                    _ACTIVE.reset(token)
+                except BaseException:
+                    _ACTIVE.set(None)  # outer scope only; nested scopes never own this token
+                    raise
+            def release_bytecode():
+                global _BYTECODE_USERS
+                with _BYTECODE_LOCK:
+                    _BYTECODE_USERS -= 1
+                    if not _BYTECODE_USERS:
+                        sys.dont_write_bytecode = _BYTECODE_ORIGINAL
             try:
-                connection.rollback()
-                connection.close()
-            except sqlite3.Error:
-                pass
-        if loop is not None:
-            loop.set_task_factory(factory)
-            for name, method in scheduling.items():
-                setattr(loop, name, method)
-        _ACTIVE.reset(token)
-        with _BYTECODE_LOCK:
-            _BYTECODE_USERS -= 1
-            if not _BYTECODE_USERS:
-                sys.dont_write_bytecode = _BYTECODE_ORIGINAL
-        if scope.category is not None:
-            raise ReadOnlyViolation(scope.capability, scope.category)
+                restore('registry', scope.connections.clear)
+            finally:
+                try:
+                    restore('context', reset_context)
+                finally:
+                    try:
+                        if loop is not None:
+                            if factory_installed:
+                                restore('task_factory', lambda:loop.set_task_factory(factory))
+                            for name, method in scheduling.items():
+                                restore('loop_hook', lambda name=name,method=method:setattr(loop,name,method))
+                    finally:
+                        if bytecode_acquired:
+                            restore('counter', release_bytecode)
+                            bytecode_acquired = False
+            if restoration:
+                errors.append(ReadOnlyCleanupFailure(capability, restoration))
+    if body_error is not None:
+        errors.insert(0, body_error)
+    if scope.category is not None and not any(isinstance(error,ReadOnlyViolation) for error in errors):
+        errors.append(ReadOnlyViolation(capability, scope.category))
+    if len(errors) == 1:
+        raise errors[0]
+    if errors:
+        # Preserve asyncio Task/timeout cancellation semantics, not merely a
+        # CancelledError leaf inside a non-cancelled Task's exception group.
+        primary = next((error for error in errors
+            if not isinstance(error, (Exception, ReadOnlyViolation))), None)
+        if primary is not None:
+            remaining = [error for error in errors if error is not primary]
+            if primary.__cause__ is not None and primary.__cause__ not in remaining:
+                remaining.append(primary.__cause__)
+            for error in remaining:
+                if isinstance(error, ReadOnlyCleanupFailure):
+                    _log_cleanup(error)
+            cause = remaining[0] if len(remaining)==1 else BaseExceptionGroup('read_only_cleanup_failures', remaining)
+            raise primary from cause
+        raise BaseExceptionGroup('read_only_execution_failed', errors) from None
 
 
 def read_tool(capability):
@@ -254,10 +498,26 @@ def safe_tool_errors(function):
     async def call(*args, **kwargs):
         try:
             return await function(*args, **kwargs)
-        except ReadOnlyViolation as error:
+        except (ReadOnlyViolation, BaseExceptionGroup) as error:
+            failure = read_only_failure(error)
+            if failure is None:
+                raise
             import logging
-            logging.getLogger(__name__).warning('Read-only tool denied capability=%s category=%s',
-                error.capability, error.category)
+            logger = logging.getLogger(__name__)
+            if isinstance(failure, ReadOnlyCleanupFailure):
+                _log_cleanup(failure)
+            else:
+                logger.warning('Read-only tool denied capability=%s category=%s',
+                    failure.capability, failure.category)
             event = args[0] if args else kwargs.get('message', kwargs.get('callback'))
             await event.answer('Не удалось безопасно прочитать данные. Используйте меню или попробуйте позже.')
     return call
+
+
+def _log_cleanup(failure):
+    import logging
+    for row in failure.diagnostics:
+        logging.getLogger(__name__).warning('Read-only cleanup capability=%s stage=%s category=%s '
+            'connection_ordinal=%s forced_close_attempted=%s forced_close_succeeded=%s',
+            row.capability,row.stage,row.category,row.connection_ordinal,
+            row.forced_close_attempted,row.forced_close_succeeded)

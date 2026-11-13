@@ -1,5 +1,15 @@
 # Freshness Manifest
 
+Cleanup slice revalidated offline 2026-11-13 from `e8482f5...`: independent
+rollback/close/verification and unconditional restoration finally; native forced
+close only for supported SQLite handles; explicit fatal diagnostics on unreleased
+handles. Body exceptions are preserved via grouping/control-exception chaining.
+Ownership is connection-per-operation, with idempotent duplicate/nested cleanup;
+external handles/pools/native plugins/escaping cursors remain unsupported pending
+review. Evidence: temporary-v15 fault matrix and fake evaluation, never live API.
+Schema v15/catalog/seed/migrations and production/runtime facts are unchanged or
+uninspected; no production-readiness or semantic-quality claim follows.
+
 Read-only capability slice reviewed offline 2026-11-09 from `3f7e6c...`:
 `get_required_status_snapshot` computes virtual/materialized effective status
 without persistence; ordinary overview delegates to it. Materialization belongs

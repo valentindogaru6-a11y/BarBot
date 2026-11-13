@@ -10,13 +10,14 @@ import sqlite3
 import threading
 
 import pytest
+from app.services.assistant import read_only as ro
 
 from app.models.assistant_planner import PlannerDecision, PlannerContextSnapshot
 from app.services.assistant.capabilities import CAPABILITIES
 from app.services.assistant.evaluation_business_state import unexpected_changes
 from app.services.assistant.evaluation_effects import READ_ONLY
 from app.services.assistant.evaluation_environment import IsolatedEvaluationEnvironment
-from app.services.assistant.read_only import read_only_execution, ReadOnlyViolation
+from app.services.assistant.read_only import read_only_execution, ReadOnlyViolation, read_only_failure
 from app.services.assistant.providers import HttpResponse
 
 
@@ -74,6 +75,9 @@ def test_all_bound_owner_read_executors_are_effect_free(env,identifier):
     assert before==e.business.snapshot()
     assert artifacts(e)==files
     assert e.observer.counts()==(0,0)
+    assert ro._ACTIVE.get() is None and ro._BYTECODE_USERS==0 and not ro._OPENING.get()
+    # Exercise the real following writer after the zero-effect read checks.
+    e.closing.start(actor_user_id=e.owner)
 
 
 def test_P1_status_repeat_reopen_then_explicit_start(env):
@@ -145,8 +149,10 @@ def test_executor_injected_write_is_blocked_not_only_observed(env,monkeypatch):
     def defective(**kwargs):
         with closing(sqlite3.connect(env.path)) as c:c.execute('UPDATE users SET is_active=0')
     monkeypatch.setattr(env.closing,'get_required_status_snapshot',defective)
-    with env.business.observe() as ledger, pytest.raises(ReadOnlyViolation):
+    with env.business.observe() as ledger, pytest.raises(BaseExceptionGroup) as caught:
         dispatch(env,'warehouse.required_status')
+    assert isinstance(read_only_failure(caught.value),ReadOnlyViolation)
+    assert any(isinstance(error,sqlite3.Error) for error in caught.value.exceptions)
     assert ledger and env.business.snapshot()==before
     assert unexpected_changes(before,env.business.snapshot(),ledger,READ_ONLY)
 
@@ -155,9 +161,10 @@ def test_legacy_local_status_uses_the_same_boundary(env,monkeypatch):
     def bad(**kwargs):
         with closing(sqlite3.connect(env.path)) as c:c.execute('UPDATE users SET is_active=0')
     monkeypatch.setattr(env.closing,'overview',bad)
-    with pytest.raises(ReadOnlyViolation):
+    with pytest.raises(BaseExceptionGroup) as caught:
         env.controller.dispatch('Покажи обязательные списания',actor_user_id=env.owner,
             source_chat_id=env.chat,source_message_id=1)
+    assert isinstance(read_only_failure(caught.value),ReadOnlyViolation)
 
 
 def test_local_catalog_registry_cannot_create_artifacts(env,monkeypatch):
