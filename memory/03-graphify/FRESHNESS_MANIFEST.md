@@ -1,5 +1,19 @@
 # Freshness Manifest
 
+Read isolation slice in development 2026-11-14 from `47a8e869...`: in-process
+new-handle guards do not protect pre-opened native writable handles. Owner permits
+only exact SQLite WAL/SHM runtime changes. Exec workers/typed manifest IPC/kernel
+file authority and pre-executor sealing are implemented in the working tree;
+targeted evidence is 2415 AI + 125 adjacent tests and 8 additional adversarial
+cases. Seven offline measurements give 1736.5/1932.6 ms median/p95 end-to-end and
+66,308 KiB maximum child RSS. Final full pytest: 3253 passed, including 74
+process regressions. Post-media targeted checks: 126 relevant tests and 6 media
+checks passed (overlapping coverage). All 18 read DTO results matched canonical
+execution on a pinned temporary WAL snapshot. Earlier interrupted full output
+is not pass evidence. Compile/import/link/JSONL/secret/artifact/Git checks pass.
+Schema v15, catalog/seed/migrations and production/runtime are not changed or
+revalidated by this task. No live/provider-readiness claim follows.
+
 Cleanup slice revalidated offline 2026-11-13 from `e8482f5...`: independent
 rollback/close/verification and unconditional restoration finally; native forced
 close only for supported SQLite handles; explicit fatal diagnostics on unreleased

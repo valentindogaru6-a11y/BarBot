@@ -1,6 +1,10 @@
 """Application service for user registration and local lookup."""
 
-from aiogram.types import User
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from aiogram.types import User
 
 from app.models.user import Role, UserRecord
 from app.services.audit_service import AuditService

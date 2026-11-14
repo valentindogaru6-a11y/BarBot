@@ -9,12 +9,17 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from app.keyboards.warehouse import reminder_notification_keyboard
 from app.services.access_service import AccessService
 from app.services.warehouse.business_date_service import Clock, SystemClock, utc_rfc3339
 from app.storage.warehouse_reminder_database import WarehouseReminderDatabase
 
 logger = logging.getLogger(__name__)
+
+
+def reminder_notification_keyboard():
+    # Pure settings reads do not import Telegram UI/transport composition.
+    from app.keyboards.warehouse import reminder_notification_keyboard as build
+    return build()
 
 
 class WarehouseReminderService:

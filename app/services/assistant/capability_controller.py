@@ -266,12 +266,14 @@ class AssistantCapabilityController:
             for item in self.access_policy.available_capabilities(actor_user_id)
         )
 
-    def _require(self, actor: int, capability_id: str) -> None:
+    def _require(self, actor: int, capability_id: str, *, navigation_only: bool = False) -> None:
         capability = self.registry.require(capability_id)
         available = self.access_policy.available_capabilities(actor)
         if capability not in available:
             raise AccessDeniedError("Capability is unavailable")
-        if int(capability.risk_level) == 0:
+        if not all(self.flags.get(flag, True) for flag in capability.feature_flags):
+            raise AccessDeniedError('Feature is disabled')
+        if int(capability.risk_level) == 0 and not navigation_only:
             enter_local_read(capability.id)
 
     def _proposal(
@@ -357,7 +359,9 @@ class AssistantCapabilityController:
         cleaned = " ".join(text.split())
 
         def flow(capability_id: str, message: str, action: str) -> CapabilityDispatch:
-            self._require(actor_user_id, capability_id)
+            # Pure navigation only: no business service/helper is invoked. The
+            # subsequent ordinary UI/FSM independently authorizes its callbacks.
+            self._require(actor_user_id, capability_id, navigation_only=True)
             return CapabilityDispatch(capability_id, message, ui_action=action)
 
         if _MAIN_MENU.fullmatch(cleaned):
@@ -682,6 +686,13 @@ class AssistantCapabilityController:
         from app.services.assistant.planner_policy import mark_tool_boundary
         mark_tool_boundary()
 
+        from app.services.assistant.read_broker import IN_WORKER, ReadOnlyExecutionBroker
+        if definition.risk_level is CapabilityRisk.READ and not IN_WORKER.get():
+            candidates = tuple(option.stable_id for option in snapshot.target_options
+                if option.domain == 'catalog' and option.relation_label == 'candidate')
+            return ReadOnlyExecutionBroker().dispatch(self, identifier, actor_user_id,
+                catalog=catalog, arguments=args, candidates=candidates, chat_type=chat_type)
+
         if identifier in {'catalog.search', 'catalog.get'}:
             tools = AssistantToolRegistry(catalog)
             if identifier == 'catalog.get':
@@ -726,9 +737,11 @@ class AssistantCapabilityController:
             return CapabilityDispatch(identifier, action.message or 'Проверьте складской черновик.', tool_action=action)
 
         if identifier == 'capabilities.list':
-            return self._capabilities(actor_user_id, '')
+            return self._capabilities(actor_user_id, args['query'])
         if identifier == 'navigation.main':
-            return CapabilityDispatch(identifier, 'Главное меню', ui_action='main_menu')
+            active = (self.attendance.status(actor_user_id) is not None
+                if self.attendance is not None and self.access.can_use_warehouse_attendance(actor_user_id) else None)
+            return CapabilityDispatch(identifier, 'Главное меню', ui_action='main_menu', data={'attendance_open':active})
 
         ui_routes = {
             'catalog.manage': 'catalog_manage', 'users.change_role': 'users_manage',

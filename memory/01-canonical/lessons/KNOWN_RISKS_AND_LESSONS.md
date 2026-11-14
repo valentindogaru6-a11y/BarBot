@@ -8,6 +8,19 @@ Evidence: regression tests, Git history, rollout docs, owner observations
 Depends on: callbacks, SQLite/WAL, workers, XLSX, imports, VPS environment
 Importance: High
 
+- **A connect wrapper is not authority over existing handles:** an ordinary
+  writable SQLite connection opened before a read scope can bypass a scope's
+  new-handle registry/authorizer. Evaluation-owned handles may conceal this gap.
+  Real read executors require exec/process separation, closed typed IPC and
+  kernel-mediated file authority; retain the old guard only as defense in depth.
+  SQLite RO WAL reads can require runtime sidecars. The owner's exception is
+  limited to exact validated WAL/SHM during SQLite bootstrap, not SQL/business
+  writes, arbitrary sibling files, migrations or production access. Never use
+  immutable mode to hide missing sidecars or ignore active WAL frames.
+  Materialized DTOs must also preserve safe rendering semantics: dropping an
+  opaque catalog media reference breaks equivalence; passing arbitrary paths or
+  URLs instead gives the parent transport unintended file/network authority.
+
 - **Resource teardown must not own application restoration:** the first
   read-only guard put rollback and close in one try and restored context/hooks
   afterwards. Injected rollback failure skipped close; non-SQLite close failure

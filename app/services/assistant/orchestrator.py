@@ -616,8 +616,9 @@ class AssistantOrchestrator:
 class AssistantToolRegistry:
     """Execute only catalog lookup or canonical intake preparation."""
 
-    def __init__(self, catalog: Catalog) -> None:
+    def __init__(self, catalog: Catalog, *, read_context=None) -> None:
         self.retriever = AssistantCatalogRetriever(catalog)
+        self.read_context = read_context
 
     def relevant_candidate_names(
         self,

@@ -179,7 +179,16 @@ async def _show_item(
     subcategory_id: str | None = None,
     *,
     is_admin: bool = False,
+    materialized=None,
 ) -> None:
+    if materialized is not None:
+        # An AI read result is already materialized by the isolated worker.
+        # Rendering must not re-query parent catalog/storage/services.
+        if (materialized.category.id != category_id or materialized.item.id != item_id
+                or (materialized.subcategory.id if materialized.subcategory else None) != subcategory_id):
+            raise ValueError('Materialized card mismatch')
+        await _send_item_card(message,materialized.item,category_id,subcategory_id,is_admin=is_admin)
+        return
     try:
         service = CatalogService(load_catalog(catalog_path))
     except CatalogStorageError as exc:
@@ -222,9 +231,14 @@ async def _show_item(
         )
         return
 
+    await _send_item_card(message,item,category.id,subcategory_id,is_admin=is_admin)
+
+
+async def _send_item_card(message,item,category_id,subcategory_id,*,is_admin=False):
+    """Pure rendering of an already materialized item; no service/storage read."""
     card = format_item_card(item)
     keyboard = build_item_keyboard(
-        category.id,
+        category_id,
         subcategory_id,
         item_id=item.id,
         is_admin=is_admin,
@@ -243,14 +257,8 @@ async def _show_item(
         else:
             await message.answer_photo(photo=item.photo_file_id)
             await message.answer(card, reply_markup=keyboard)
-    except TelegramAPIError as exc:
-        logger.warning(
-            "Could not send item photo for category=%s item=%s; "
-            "falling back to text: %s",
-            category.id,
-            item.id,
-            exc,
-        )
+    except TelegramAPIError:
+        logger.warning("Could not send catalog media; falling back to text")
         await edit_or_send_text(message, card, keyboard)
 
 

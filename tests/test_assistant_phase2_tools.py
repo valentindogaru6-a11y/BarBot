@@ -17,6 +17,7 @@ from app.services.assistant.tools import AssistantReadOnlyTools
 from app.services.assistant import AssistantOrchestrator, AssistantConversationMemory, AssistantToolRegistry
 from app.services.auth_service import AuthService
 from app.storage.json_storage import JsonCatalogStorage
+from app.services.assistant.evaluation_environment import IsolatedEvaluationEnvironment
 
 
 class FakeAttendance:
@@ -89,14 +90,16 @@ def test_catalog_phase2_examples_and_stable_ranking() -> None:
 
 def test_read_only_tools_recheck_super_admin_and_return_bounded_models() -> None:
     catalog = JsonCatalogStorage("data/catalog.json").load()
-    access = AccessService(frozenset({1}))
-    tools = AssistantReadOnlyTools(catalog, access, attendance=FakeAttendance())
-    sessions = tools.list_open_attendance_sessions(1)
-    assert sessions[0].employee == "Бармен"
-    assert sessions[0].duration_seconds == 3600
-    assert tools.search_tech_cards(1, SearchTechCardsInput(query="кислота"))[0].name == "Кислотный раствор"
-    with pytest.raises(AccessDeniedError):
-        tools.list_open_attendance_sessions(2)
+    # A process worker cannot inherit a fake service or parent callable. Use
+    # actual temporary v15/attendance/authorization services for this boundary.
+    with IsolatedEvaluationEnvironment() as env:
+        tools = AssistantReadOnlyTools(catalog,env.access,attendance=env.attendance,
+            capabilities=env.registry,flags=env.controller.flags,access_policy=env.policy)
+        sessions = tools.list_open_attendance_sessions(1)
+        assert sessions[0].employee == "Дмитро"
+        assert sessions[0].duration_seconds >= 0
+        assert tools.search_tech_cards(1, SearchTechCardsInput(query="кислота"))[0].name == "Кислотный раствор"
+        with pytest.raises(AccessDeniedError):tools.list_open_attendance_sessions(2)
 
 
 def test_open_attendance_question_uses_local_tool_without_provider() -> None:
@@ -106,20 +109,20 @@ def test_open_attendance_question_uses_local_tool_without_provider() -> None:
         chat=SimpleNamespace(id=1, type="private"),
         answer=AsyncMock(),
     )
-    asyncio.run(
-        assistant._run_assistant(
+    with IsolatedEvaluationEnvironment() as env:
+        asyncio.run(assistant._run_assistant(
             message,
             SimpleNamespace(),
             text=message.text,
             catalog_path=JsonCatalogStorage().path,
-            auth_service=AuthService(frozenset({1})),
+            auth_service=env.access,
             orchestrator=AssistantOrchestrator(None),
             warehouse_service=None,
             conversation_memory=AssistantConversationMemory(),
-            warehouse_attendance_service=FakeAttendance(),
-        )
-    )
-    assert "Бармен" in message.answer.await_args.args[0]
+            warehouse_attendance_service=env.attendance,
+            assistant_access_policy=env.policy,
+        ))
+    assert "Дмитро" in message.answer.await_args.args[0]
 
 
 def test_start_clears_only_assistant_context_before_main_menu() -> None:

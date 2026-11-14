@@ -5,6 +5,16 @@ Metadata: scope `working`; trust `working`; lifecycle `ephemeral`; last cleared
 
 ## Status
 
+Process-isolation work resumes at `47a8e869...` after the owner explicitly allowed
+SQLite WAL/SHM-only infrastructure changes. Short-lived exec/JSON risk-0 workers
+use kernel-mediated opens, RO main DB, strict SQL authorization and an acknowledged
+pre-executor seal. Parent handles/closures are not inherited. All 18 read bindings,
+filesystem identity/races, cleanup, fake evaluation and access regressions passed
+offline. Final full pytest: 3253 passed, including 74 process regressions; all
+18 read executors matched canonical results on a pinned temporary WAL snapshot.
+Media DTO/rendering equivalence is preserved without parent re-queries. Live provider
+quality remains pending. No production, API, systemd, push or deployment authority.
+
 Focused cleanup hardening starts from `e8482f5...`: rollback/close failure must
 not leak a read transaction or skip guard restoration. Owned native SQLite
 handles use staged idempotent cleanup, supported forced base close, normalized

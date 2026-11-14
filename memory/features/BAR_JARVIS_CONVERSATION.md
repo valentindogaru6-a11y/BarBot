@@ -5,6 +5,66 @@ Trust: implemented and tested offline; live provider/shadow evidence pending
 
 ## Read-only execution contract (P1 regression)
 
+### Process authority (development from `47a8e869...`)
+
+Risk-0 execution uses a short-lived exec worker with closed JSON IPC.
+The parent never serializes a service, callable, connection, cursor or closure.
+Parent writable SQLite handles do not survive exec/close-fds. A shared manifest
+is derived from `CAPABILITIES`, schemas and executor source hashes; it rejects
+mutations/unknown capabilities and incompatible peers. The worker rechecks
+actor/private-chat/pilot/role/flags against trusted facts and read-only DB state.
+Only a per-request opaque actor reference crosses IPC, not a Telegram identifier.
+
+Linux seccomp user notifications mediate file opens: the broker supplies a
+validated fd rather than continuing a syscall against a mutable pathname.
+Main DB access is RO; the worker itself opens `mode=ro`, enables query-only and
+deny-write authorizer, and leases a single consistent read snapshot to services.
+Only exact regular, single-link WAL/SHM siblings may be created/updated by SQLite
+bootstrap. After snapshot setup, an acknowledged irreversible seal removes new
+writable opens/writes/mappings before any capability executor runs. No network,
+new process/thread, arbitrary file or writable second DB authority is available.
+No `immutable=1`, seed, migration or business schema change is involved.
+
+Results are bounded materialized display DTOs; parent renderers must not re-query
+writable services to complete them. Catalog media preserves validated opaque
+Telegram file references, never a local path or URL supplied as media authority.
+Draft/proposal/confirmation mutations remain
+in the parent under existing centralized permission/revision/idempotency checks.
+Verification covers DB checksum/metadata, inode/link identity, sibling entries,
+business fingerprint, authorizer attempts, integrity and FK. An authorized parent
+writer is not globally blocked; a concurrent committed change can conservatively
+invalidate the read result. Partial results never count as successful execution.
+
+Worker timeout/cancellation/crash must kill/reap the child and close pipes/listener
+fds. Blocking notification receive has a bounded native thread-directed wakeup;
+its borrowed unused realtime disposition/timer/mask must always be restored.
+Supported runtime requires Linux/seccomp notify+ADDFD support and libseccomp;
+unsupported runtime fails closed, never falls back to in-process tool execution.
+Pooling/native plugins need separate adapters/review and cannot bypass the broker.
+
+Static UI/FSM navigation handoffs remain pure parent instructions after the
+central gate; they do not fetch business results or invoke a service executor.
+All 18 actual bound read capabilities use the broker. A standalone catalog cache
+can use the same zero-filesystem worker without DB authority; live handlers pass
+the real access context for the worker's repeated policy/role/flag checks.
+
+Offline measurement (7 serial calls, synthetic v15 + tracked catalog): startup
+median/p95 1326.7/1504.4 ms, execution 37.3/43.0 ms, end-to-end 1736.5/1932.6 ms;
+maximum child RSS 66,308 KiB. Two concurrent readers completed in 4527.8 ms.
+These are observations on the development host, not production SLAs; four
+concurrent children require corresponding memory/headroom. Prefer correctness
+over a persistent worker that could retain authority or user state.
+
+Targeted evidence: 2415 AI tests, 125 adjacent config/access/reminder/delivery
+tests and 8 additional DB/WAL/SHM replacement/invented-result cases passed.
+After the media DTO correction, 126 relevant tests and 6 focused media checks
+passed (overlapping suites, not additive unique coverage). Final full pytest:
+3253 passed; this includes 74 real-process/authority/cleanup regressions. An
+earlier full attempt was interrupted for the media correction, not counted as
+a pass. All 18 read bindings also matched the canonical materialized results
+on a pinned temporary WAL snapshot. Live provider quality,
+unsupported native/plugin adapters and production acceptance remain pending.
+
 ### Exception-safe ownership and teardown
 
 From development base `e8482f5...`, cleanup has independent rollback, close,
@@ -54,10 +114,10 @@ Violations unwind as a dedicated control exception, bypass provider fallback,
 and produce a safe owner error or evaluation safety exit 2. Conversation updates
 and owner reply rendering are outside the synchronous tool scope.
 
-This is an enforceable boundary for the current AI executors, not an arbitrary
-Python/plugin sandbox. Repositories must keep connection-per-operation: do not
-pass pre-existing writable SQLite/file/network handles into read executors.
-Pooling, new UDFs or native/plugin executors require a new boundary review.
+The legacy in-process guard alone does NOT protect arbitrary pre-opened writable
+handles. It remains worker defense in depth, not the authority boundary. Earlier
+tests using evaluation-owned connections could mask this gap through their
+test-only authorizer; external native handles must be tested independently.
 
 Evidence: `tests/test_assistant_read_only_boundary.py` enumerates all bound,
 owner-available risk-0 capabilities and supplies real temporary-v15 fixtures.

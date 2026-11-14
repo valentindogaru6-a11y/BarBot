@@ -139,6 +139,7 @@ class AssistantCatalogRetriever:
     """Resolve exact/token matches first and keep fuzzy matches explicit."""
 
     def __init__(self, catalog: Catalog) -> None:
+        self.catalog = catalog
         self.catalog_service = CatalogService(catalog)
 
     def retrieve(

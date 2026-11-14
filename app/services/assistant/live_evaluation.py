@@ -39,6 +39,7 @@ from app.services.assistant.evaluation_scenarios import (
 )
 from app.services.assistant.coordinator import AssistantRequestCoordinator
 from app.services.assistant.read_only import ReadOnlyViolation, ReadOnlyCleanupFailure, read_only_failure
+from app.services.assistant.read_broker import ReadWorkerFailure, await_read
 from app.models.assistant_mutation import MutationDisposition,MutationError
 from app.services.assistant.mutation_language import (
     parse_mutation,resolve_product_case,isolated_mutation_facts,bind_mutation_facts,
@@ -392,7 +393,7 @@ class LiveConversationEvaluationAdapter:
                     evidence = e.orchestrator.local_action_evidence(planning_text)
                     explicit = ('writeoff' if evidence and evidence.value=='prepare_writeoff' else
                                 'transfer' if evidence and evidence.value=='prepare_transfer' else None)
-                    result = self._invoke(decision.capability_id, read_only=decision.read_only,
+                    result = await await_read(self._invoke,decision.capability_id, read_only=decision.read_only,
                         mutation=decision.mutation, execute=lambda:e.controller.dispatch_plan(
                             decision,snapshot=current,catalog=e.storage.load(),actor_user_id=e.owner,
                             source_chat_id=e.chat,source_message_id=self.sequence,chat_type=e.chat_type,
@@ -588,6 +589,9 @@ async def run_live(options: LiveRunOptions, *, settings_loader, transport_factor
             try:
                 with env.business.observe() as mutation_events:
                     actual = await adapter.evaluate(case.request)
+            except ReadWorkerFailure:
+                counts[FailureCategory.TRANSPORT] += 1
+                actual = dict(case_id=case.request.case_id,skipped=False,safety=True,error='read_worker_infrastructure')
             except (EvaluationSafetyError, ReadOnlyViolation, BaseExceptionGroup) as error:
                 if isinstance(error, BaseExceptionGroup):
                     failure = read_only_failure(error)
@@ -633,7 +637,7 @@ async def run_live(options: LiveRunOptions, *, settings_loader, transport_factor
             if actual.get('error') not in (None,'memory_rejected','provider_call_budget_exhausted',
                                           'local_contract_rejected','safety_contract_failure') and not any(counts.values()) and not actual.get('injected_fault'):
                 counts[FailureCategory.TRANSPORT] += 1
-            scores = {} if actual['skipped'] or counts[FailureCategory.SAFETY] else score_observation(actual,case.expected)
+            scores = {} if actual['skipped'] or counts[FailureCategory.SAFETY] or actual.get('error')=='read_worker_infrastructure' else score_observation(actual,case.expected)
             counts[FailureCategory.SEMANTIC] = sum(not value for value in scores.values())
             if counts[FailureCategory.CONTRACT]:
                 actual['failure_class'] = 'contract'

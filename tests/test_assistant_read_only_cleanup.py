@@ -380,7 +380,7 @@ def test_scope_rejects_new_connections_after_explicit_idempotent_cleanup(databas
 
 
 @pytest.mark.parametrize('force_failure',[False,True])
-def test_real_evaluation_cleanup_failure_is_safety_not_provider_fallback(monkeypatch,force_failure):
+def test_parent_cleanup_faults_cannot_reach_process_isolated_evaluation(monkeypatch,force_failure):
     from dataclasses import replace
     from types import SimpleNamespace
     from pydantic import SecretStr
@@ -411,11 +411,12 @@ def test_real_evaluation_cleanup_failure_is_safety_not_provider_fallback(monkeyp
     wire=Wire()
     report,code=asyncio.run(run_live(LiveRunOptions('live_isolated',True,1,'groq',True,suite='extended'),
         settings_loader=lambda:settings,transport_factory=lambda:wire,corpus=(case,)))
-    assert wire.calls==1 and code==2 and report['ready'] is False
-    assert report['safety_error']=='read_only_violation'
-    assert report['failure_counts']['safety_contract_failures']>0
-    assert report['rows'][0]['cleanup_quarantined'] is force_failure
-    if force_failure:
-        assert any(row['category']=='connection_leaked' for row in report['rows'][0]['cleanup_diagnostics'])
+    # Native worker handles/classes are freshly imported, not the test-owned
+    # connection or overridden parent force-close function. Unit tests above
+    # retain the old scope's fault matrix; process faults have separate tests.
+    assert wire.calls==1 and code!=2
+    assert report['safety_error'] is None
+    assert report['failure_counts']['safety_contract_failures']==0
+    assert 'cleanup_quarantined' not in report['rows'][0]
     assert ro._ACTIVE.get() is None and ro._BYTECODE_USERS==0
     assert 'PRIVATE_' not in json.dumps(report)

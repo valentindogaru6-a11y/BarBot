@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from datetime import UTC, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from app.models.user import Role
 from app.services.access_service import AccessDeniedError, AccessService
@@ -15,7 +15,8 @@ from app.services.warehouse.business_date_service import (
     utc_rfc3339,
 )
 from app.services.warehouse.report_service import WarehouseReportService
-from app.services.warehouse.telegram_delivery import ReportSender
+if TYPE_CHECKING:
+    from app.services.warehouse.telegram_delivery import ReportSender
 from app.storage.warehouse_delivery_database import WarehouseDeliveryDatabase
 
 

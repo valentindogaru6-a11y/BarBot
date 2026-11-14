@@ -145,26 +145,34 @@ def test_guard_blocks_non_sql_effects(env,kind):
 
 
 def test_executor_injected_write_is_blocked_not_only_observed(env,monkeypatch):
+    from tests.test_assistant_read_process import child_patch, request
+    from app.services.assistant.read_broker import ReadOnlyExecutionBroker
     before=env.business.snapshot()
-    def defective(**kwargs):
-        with closing(sqlite3.connect(env.path)) as c:c.execute('UPDATE users SET is_active=0')
-    monkeypatch.setattr(env.closing,'get_required_status_snapshot',defective)
-    with env.business.observe() as ledger, pytest.raises(BaseExceptionGroup) as caught:
-        dispatch(env,'warehouse.required_status')
-    assert isinstance(read_only_failure(caught.value),ReadOnlyViolation)
-    assert any(isinstance(error,sqlite3.Error) for error in caught.value.exceptions)
-    assert ledger and env.business.snapshot()==before
-    assert unexpected_changes(before,env.business.snapshot(),ledger,READ_ONLY)
+    child_patch(monkeypatch,"""
+from app.services.warehouse.closing_service import WarehouseClosingService
+import sqlite3
+def defective(self,**kwargs):
+ c=sqlite3.connect(self.repository.path)
+ c.execute('UPDATE users SET is_active=0')
+WarehouseClosingService.get_required_status_snapshot=defective
+""")
+    b=ReadOnlyExecutionBroker()
+    with env.business.observe() as ledger, pytest.raises(ReadOnlyViolation):
+        b.execute(request(env,b))
+    # Parent ledger cannot mask or fabricate the child's actual SQL denial.
+    assert not ledger and b.last_metrics['authorizer_denials']>0 and b.last_metrics['business_writes']==0
+    assert env.business.snapshot()==before
 
 
 def test_legacy_local_status_uses_the_same_boundary(env,monkeypatch):
+    calls=[]
     def bad(**kwargs):
+        calls.append(True)
         with closing(sqlite3.connect(env.path)) as c:c.execute('UPDATE users SET is_active=0')
     monkeypatch.setattr(env.closing,'overview',bad)
-    with pytest.raises(BaseExceptionGroup) as caught:
-        env.controller.dispatch('Покажи обязательные списания',actor_user_id=env.owner,
-            source_chat_id=env.chat,source_message_id=1)
-    assert isinstance(read_only_failure(caught.value),ReadOnlyViolation)
+    result=env.controller.dispatch('Покажи обязательные списания',actor_user_id=env.owner,
+        source_chat_id=env.chat,source_message_id=1)
+    assert result.data=={'total':2,'resolved':0} and not calls
 
 
 def test_local_catalog_registry_cannot_create_artifacts(env,monkeypatch):
@@ -173,8 +181,8 @@ def test_local_catalog_registry_cannot_create_artifacts(env,monkeypatch):
     registry=AssistantToolRegistry(env.storage.load())
     def bad(*args,**kwargs):(env.root/'forbidden').write_text('not written')
     monkeypatch.setattr(registry.retriever,'retrieve',bad)
-    with pytest.raises(ReadOnlyViolation):
-        registry.execute(AssistantIntent(intent='find_tech_card',query='Облепиха'))
+    result=registry.execute(AssistantIntent(intent='find_tech_card',query='Облепиха'))
+    assert result.catalog_exact and len(result.search_results)==1
     assert not (env.root/'forbidden').exists()
 
 
@@ -280,9 +288,15 @@ def test_P1_real_evaluation_guard_violation_is_safety_exit_two(monkeypatch,defec
                 target_index=-1,action_code='list',needs_clarification=False,confidence_scaled=10000)
             return HttpResponse(200,json.dumps({'choices':[{'message':{'content':json.dumps(data)}}]}).encode())
     if defective:
-        def bad(self,**kwargs):
-            with closing(sqlite3.connect(self.repository.path)) as c:c.execute('UPDATE users SET is_active=0')
-        monkeypatch.setattr(WarehouseClosingService,'get_required_status_snapshot',bad)
+        from tests.test_assistant_read_process import child_patch
+        child_patch(monkeypatch,"""
+from app.services.warehouse.closing_service import WarehouseClosingService
+import sqlite3
+def bad(self,**kwargs):
+ c=sqlite3.connect(self.repository.path)
+ c.execute('UPDATE users SET is_active=0')
+WarehouseClosingService.get_required_status_snapshot=bad
+""")
     wire=Wire()
     settings=SimpleNamespace(groq_api_key=SecretStr('synthetic'),groq_planner_model='synthetic')
     report,code=asyncio.run(run_live(LiveRunOptions('live_isolated',True,1,'groq',True,suite='extended'),

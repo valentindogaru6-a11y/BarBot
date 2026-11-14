@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 from app.services.assistant.read_only import safe_tool_errors
+from app.services.assistant.read_broker import await_read
 
 import asyncio
 import logging
@@ -564,10 +565,7 @@ async def _run_assistant(
                     can_manage_catalog=auth_service.can_manage_catalog(user_id),
                     can_view_warehouse=auth_service.can_view_warehouse(user_id),
                     attendance_open=(
-                        warehouse_attendance_service.status(user_id) is not None
-                        if warehouse_attendance_service is not None
-                        and auth_service.can_use_warehouse_attendance(user_id)
-                        else None
+                        (dispatch.data or {}).get('attendance_open')
                     ),
                 ) if dispatch.ui_action == "main_menu"
                 else build_assistant_flow_keyboard(dispatch.ui_action, dispatch.data)
@@ -581,7 +579,7 @@ async def _run_assistant(
         and user_id is not None
         and planner_mode in {"local_first", "shadow"}
     ):
-        dispatch = assistant_capability_controller.dispatch(
+        dispatch = await await_read(assistant_capability_controller.dispatch,
             text,
             actor_user_id=user_id,
             source_chat_id=message.chat.id,
@@ -637,7 +635,10 @@ async def _run_assistant(
         logger.exception("Assistant catalog load failed")
         await message.answer("Каталог временно недоступен.")
         return
-    registry = AssistantToolRegistry(catalog)
+    read_context = (dict(access=auth_service,actor=user_id,policy=assistant_access_policy,
+        flags=assistant_access_policy.capability_flags,registry=assistant_access_policy.registry,chat_type=message.chat.type)
+        if isinstance(assistant_access_policy,AssistantAccessPolicy) else None)
+    registry = AssistantToolRegistry(catalog,read_context=read_context)
     normalized_command = " ".join(text.casefold().split())
     if normalized_command in _CONVERSATION_RESET_PHRASES:
         if conversation_memory is not None and user_id is not None:
@@ -686,7 +687,7 @@ async def _run_assistant(
         }).model_dump())
 
         async def typed_dispatch(decision, current_snapshot):
-            dispatch = assistant_capability_controller.dispatch_plan(
+            dispatch = await await_read(assistant_capability_controller.dispatch_plan,
                 decision, snapshot=current_snapshot, catalog=catalog,
                 actor_user_id=user_id, source_chat_id=message.chat.id,
                 source_message_id=int(getattr(message, 'message_id', 0)), chat_type=message.chat.type,
@@ -742,7 +743,7 @@ async def _run_assistant(
                 if assistant_access_policy is not None:
                     assistant_access_policy.require_assistant_access(user_id, chat_type=message.chat.type)
                 completed = (CapabilityDispatch(local_id, 'Локальный результат.', tool_action=(
-                    registry.execute(local,mutation_request=mutation_request) if mutation_request is not None else registry.execute(local))),)
+                    await await_read(registry.execute,local,mutation_request=mutation_request))),)
                 clarification = None
             else:
                 await message.answer(AI_REQUEST_BUSY_TEXT if isinstance(exc, ProviderError) and exc.kind is ProviderErrorKind.BUSY
@@ -757,7 +758,7 @@ async def _run_assistant(
                     result = action.search_results[0]
                     await _show_item(message, catalog_path, result.category.id, result.item.id,
                         result.subcategory.id if result.subcategory else None,
-                        is_admin=auth_service.is_admin(user_id))
+                        is_admin=auth_service.is_admin(user_id), materialized=result)
                 else:
                     if conversation_memory is not None:
                         conversation_memory.remember(
@@ -797,9 +798,10 @@ async def _run_assistant(
             auth_service,
             attendance=warehouse_attendance_service,
             operations=warehouse_service,
+            access_policy=assistant_access_policy,
         )
         try:
-            sessions = tools.list_open_attendance_sessions(user_id)
+            sessions = await await_read(tools.list_open_attendance_sessions,user_id)
         except AccessDeniedError:
             await message.answer("Недостаточно прав для просмотра открытых смен.")
             return
@@ -1049,7 +1051,7 @@ async def _run_assistant(
                 relation=retrieval.relation,
                 relation_target=retrieval.relation_target,
             )
-            fallback_action = registry.execute(fallback_intent)
+            fallback_action = await await_read(registry.execute,fallback_intent)
         if (
             planner_mode != "ai_first"
             and local_intent is None
@@ -1093,7 +1095,7 @@ async def _run_assistant(
                 or intent.capability_id not in allowed_capability_ids
             ):
                 raise AccessDeniedError("Provider selected unavailable capability")
-            planned = assistant_capability_controller.dispatch(
+            planned = await await_read(assistant_capability_controller.dispatch,
                 text, actor_user_id=user_id, source_chat_id=message.chat.id,
                 source_message_id=int(getattr(message, "message_id", 0)),
             )
@@ -1104,14 +1106,14 @@ async def _run_assistant(
                 return
             await send_capability(planned)
             return
-        action = registry.execute(intent,mutation_request=mutation_request) if mutation_request is not None else registry.execute(intent)
+        action = await await_read(registry.execute,intent,mutation_request=mutation_request)
 
         if (
             local_intent is None
             and retrieval.candidates
             and action.kind == "clarify"
         ):
-            candidate_action = registry.execute(
+            candidate_action = await await_read(registry.execute,
                 type(intent)(
                     intent="find_tech_card",
                     confidence=10_000,
@@ -1136,7 +1138,7 @@ async def _run_assistant(
                 or len(action.candidate_ids) != 1
                 or action.candidate_ids[0] not in allowed
             ):
-                action = registry.execute(
+                action = await await_read(registry.execute,
                     type(intent)(
                         intent="find_tech_card",
                         confidence=10_000,
@@ -1194,9 +1196,10 @@ async def _run_assistant(
         tools = AssistantReadOnlyTools(
             catalog, auth_service, attendance=warehouse_attendance_service,
             operations=warehouse_service,
+            access_policy=assistant_access_policy,
         )
         try:
-            sessions = tools.list_open_attendance_sessions(user_id) if user_id is not None else ()
+            sessions = await await_read(tools.list_open_attendance_sessions,user_id) if user_id is not None else ()
         except AccessDeniedError:
             await message.answer("Недостаточно прав для просмотра открытых смен.")
             return
@@ -1221,9 +1224,10 @@ async def _run_assistant(
         tools = AssistantReadOnlyTools(
             catalog, auth_service, attendance=warehouse_attendance_service,
             operations=warehouse_service,
+            access_policy=assistant_access_policy,
         )
         try:
-            shift = tools.get_current_shift_summary(user_id) if user_id is not None else None
+            shift = await await_read(tools.get_current_shift_summary,user_id) if user_id is not None else None
         except AccessDeniedError:
             await message.answer("Недостаточно прав для просмотра текущей смены.")
             return
@@ -1391,6 +1395,7 @@ async def _run_assistant(
                     message.from_user
                     and auth_service.is_admin(message.from_user.id)
                 ),
+                materialized=result,
             )
         else:
             if conversation_memory is not None and user_id is not None:
@@ -1676,7 +1681,12 @@ async def handle_assistant_candidate(
             callback, "Каталог временно недоступен.", show_alert=True
         )
         return
-    result = AssistantToolRegistry(catalog).retriever.by_key(key)
+    read_context = (dict(access=auth_service,actor=callback.from_user.id,policy=assistant_access_policy,
+        flags=assistant_access_policy.capability_flags,registry=assistant_access_policy.registry,chat_type=callback.message.chat.type)
+        if isinstance(assistant_access_policy,AssistantAccessPolicy) else None)
+    resolved = await await_read(AssistantToolRegistry(catalog,read_context=read_context).execute,
+        AssistantIntent(intent='find_tech_card', query=(context.last_query or 'карточка')[:200], selected_entity_id=key))
+    result = resolved.search_results[0] if resolved.catalog_exact and len(resolved.search_results) == 1 else None
     if result is None:
         assistant_conversation_memory.clear(
             callback.from_user.id, callback.message.chat.id
@@ -1725,6 +1735,7 @@ async def handle_assistant_candidate(
         result.item.id,
         result.subcategory.id if result.subcategory else None,
         is_admin=auth_service.is_admin(callback.from_user.id),
+        materialized=result,
     )
 
 

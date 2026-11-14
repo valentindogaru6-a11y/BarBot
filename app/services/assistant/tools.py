@@ -51,6 +51,7 @@ class AssistantReadOnlyTools:
         schedules: WarehouseScheduleService | None = None,
         capabilities: CapabilityRegistry | None = None,
         flags: dict[str, bool] | None = None,
+        access_policy=None,
     ) -> None:
         self.retriever = AssistantCatalogRetriever(catalog)
         self.access = access
@@ -64,6 +65,17 @@ class AssistantReadOnlyTools:
         self.schedules = schedules
         self.capabilities = capabilities or CapabilityRegistry()
         self.flags = flags or {}
+        self.access_policy = access_policy
+        if capabilities is None:
+            from app.services.assistant.capabilities import CapabilityBinding
+            services = dict(catalog=self.retriever, employees=users,
+                attendance=attendance, warehouse=operations, reports=reports,
+                recipients=recipients, reminders=reminders, schedules=schedules,
+                help=self.capabilities)
+            self.capabilities.bind({c.id: CapabilityBinding(c.id, self,
+                services[c.category], 'isolated read', 'typed result')
+                for c in self.capabilities.all if int(c.risk_level) == 0
+                and services.get(c.category) is not None})
 
     def _require_catalog_view(self, actor_user_id: int) -> None:
         if not self.access.get_context(actor_user_id).can_view_catalog:
@@ -146,7 +158,8 @@ class AssistantReadOnlyTools:
         rows, _, _ = self.users.list_users(page_size=100)
         return CapabilityResult(
             kind="users",
-            message=f"Зарегистрировано сотрудников: {len(rows)}.",
+            message=('\n'.join([f"Зарегистрировано сотрудников: {len(rows)}.",
+                *(f"• {row.display_name} — {row.role.value}" for row in rows)]))[:4000],
             data={"users": [{"name": row.display_name, "role": row.role.value, "active": row.is_active} for row in rows]},
         )
 
@@ -159,7 +172,8 @@ class AssistantReadOnlyTools:
         rows, _, _ = self.users.list_users(role=Role.BARTENDER, page_size=100)
         return CapabilityResult(
             kind="bartenders",
-            message=f"Зарегистрировано барменов: {len(rows)}.",
+            message=('\n'.join([f"Зарегистрировано барменов: {len(rows)}.",
+                *(f"• {row.display_name}" for row in rows)]))[:4000],
             data={"users": [{"name": row.display_name, "active": row.is_active} for row in rows]},
         )
 
@@ -215,7 +229,7 @@ class AssistantReadOnlyTools:
         overview = self.closing.get_required_status_snapshot(actor_user_id=actor_user_id)
         return CapabilityResult(
             kind="required_writeoffs",
-            message="Статус обязательных списаний получен.",
+            message=f"Обязательные списания: {overview.requirements_resolved} из {overview.requirements_total} выполнено.",
             data={"total": overview.requirements_total, "resolved": overview.requirements_resolved},
         )
 
@@ -232,7 +246,8 @@ class AssistantReadOnlyTools:
         if self.reports is None:
             raise RuntimeError("Reports tool is unavailable")
         rows, total = self.reports.history(actor_user_id=actor_user_id, page=0)
-        return CapabilityResult(kind="reports", message=f"Готовых отчётов: {total}.", data={"reports": [{"business_date": str(row["business_date"]), "version": int(row["version"]), "status": str(row["status"])} for row in rows]})
+        message='\n'.join([f"Готовых отчётов: {total}.",*(f"• {row['business_date']} — версия {row['version']}" for row in rows)])[:4000]
+        return CapabilityResult(kind="reports", message=message, data={"reports": [{"business_date": str(row["business_date"]), "version": int(row["version"]), "status": str(row["status"])} for row in rows]})
 
     @read_tool('recipients.list')
     def list_report_recipients(self, actor_user_id: int, payload: NoCapabilityInput | None = None) -> CapabilityResult:
@@ -240,7 +255,8 @@ class AssistantReadOnlyTools:
         if self.recipients is None:
             raise RuntimeError("Recipients tool is unavailable")
         rows = self.recipients.list_recipients(actor_user_id=actor_user_id)
-        return CapabilityResult(kind="recipients", message=f"Получателей: {len(rows)}.", data={"recipients": [{"title": str(row["title"]), "active": bool(row["is_active"])} for row in rows]})
+        message='\n'.join([f"Получателей отчётов: {len(rows)}.",*(f"• {row['title']} — {'активен' if row['is_active'] else 'отключён'}" for row in rows)])[:4000]
+        return CapabilityResult(kind="recipients", message=message, data={"recipients": [{"title": str(row["title"]), "active": bool(row["is_active"])} for row in rows]})
 
     @read_tool('reminders.get')
     def get_reminder_settings(self, actor_user_id: int, payload: NoCapabilityInput | None = None) -> CapabilityResult:

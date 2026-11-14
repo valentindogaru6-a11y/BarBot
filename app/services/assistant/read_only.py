@@ -1,9 +1,10 @@
-"""Fail-closed AI tool boundary, not a sandbox for arbitrary Python code.
+"""Worker defense in depth; process/OS authority lives in read_broker.
 
 Repositories use connection-per-operation. Every native handle opened inside a
 read tool (including by a helper) is guard-owned, query-only, and closed before
 scope exit. Cleanup failure is reported, never treated as successful release.
-External writable handles, proxy/pool objects and escaping cursors are unsupported;
+This in-process scope alone cannot protect arbitrary pre-opened writable handles.
+Proxy/pool objects and escaping cursors are unsupported within this guard;
 helpers consume/close cursors within their operation. No pooled state is changed.
 The audit hook is process-wide but inactive outside the context-local tool scope.
 Owner replies/rendering and conversation persistence happen OUTSIDE this scope.
@@ -442,9 +443,42 @@ def read_only_execution(capability):
 def read_tool(capability):
     def decorate(function):
         @wraps(function)
-        def call(*args, **kwargs):
+        def call(self, actor_user_id, payload=None):
+            from app.services.assistant.read_broker import IN_WORKER, ReadOnlyExecutionBroker
+            if not IN_WORKER.get():
+                from pydantic import TypeAdapter
+                from typing import get_type_hints
+                from app.services.access_service import AccessDeniedError
+                definition=self.capabilities.require(capability)
+                if self.access_policy is not None:
+                    self.access_policy.require_assistant_access(actor_user_id,chat_type='private')
+                available=(self.access_policy.available_capabilities(actor_user_id) if self.access_policy else
+                    self.capabilities.available_for_actor(self.access,actor_user_id,flags=self.flags))
+                if definition not in available or not all(self.flags.get(flag,True) for flag in definition.feature_flags):
+                    raise AccessDeniedError('Capability is unavailable')
+                arguments = payload.model_dump(mode='json', exclude_none=True) if payload is not None else {}
+                if capability == 'catalog.get':
+                    arguments = {'entity_ref': arguments['card_id']}
+                if capability == 'capabilities.list':
+                    arguments.setdefault('query', 'возможности')
+                broker = ReadOnlyExecutionBroker()
+                request = broker.request(capability, access=self.access, actor=actor_user_id,
+                    policy=self.access_policy, flags=self.flags, registry=self.capabilities,
+                    catalog=self.retriever.catalog, arguments=arguments, mode='tool')
+                result = broker.execute(request)
+                try:
+                    decoded=TypeAdapter(get_type_hints(function)['return']).validate_python(result)
+                    if capability in {'catalog.search','catalog.get'}:
+                        from app.services.assistant.read_broker import catalog_keys
+                        returned=decoded if isinstance(decoded,tuple) else (decoded,) if decoded is not None else ()
+                        if any(row.card_id not in catalog_keys(self.retriever.catalog) for row in returned):
+                            raise ReadOnlyViolation(capability,'result_target')
+                    return decoded
+                except (ValueError,TypeError):
+                    from app.services.assistant.read_broker import ReadWorkerFailure
+                    raise ReadWorkerFailure('result_contract') from None
             with read_only_execution(capability):
-                return function(*args, **kwargs)
+                return function(self, actor_user_id, payload)
         return call
     return decorate
 
@@ -457,7 +491,8 @@ def planned_boundary(function):
         except (KeyError, ValueError):
             # Preserve the controller's access-first rejection contract.
             definition = None
-        if definition is not None and int(definition.risk_level) == 0:
+        from app.services.assistant.read_broker import IN_WORKER
+        if IN_WORKER.get() and definition is not None and int(definition.risk_level) == 0:
             with read_only_execution(definition.id):
                 return function(self, decision, *args, **kwargs)
         return function(self, decision, *args, **kwargs)
@@ -468,6 +503,9 @@ def catalog_boundary(function):
     @wraps(function)
     def call(self, intent, *args, **kwargs):
         if intent.intent.value == 'find_tech_card':
+            from app.services.assistant.read_broker import IN_WORKER, ReadOnlyExecutionBroker
+            if not IN_WORKER.get():
+                return ReadOnlyExecutionBroker().catalog(self.retriever.catalog, intent, context=self.read_context)
             identifier = 'catalog.get' if intent.selected_entity_id else 'catalog.search'
             with read_only_execution(identifier):
                 return function(self, intent, *args, **kwargs)
@@ -477,11 +515,28 @@ def catalog_boundary(function):
 
 def local_boundary(function):
     @wraps(function)
-    def call(*args, **kwargs):
+    def call(self, text, *args, **kwargs):
         with ExitStack() as stack:
             token = _LOCAL.set(stack)
             try:
-                return function(*args, **kwargs)
+                try:
+                    return function(self, text, *args, **kwargs)
+                except _LocalReadRoute as route:
+                    from app.services.assistant.read_broker import ReadOnlyExecutionBroker
+                    from app.models.assistant_capabilities import QueryCapabilityInput, EntityCapabilityInput
+                    definition = self.registry.require(route.capability)
+                    arguments = {}
+                    if definition.input_model is QueryCapabilityInput:
+                        arguments['query'] = (next((word for word in ('смен','отч','сотруд','напомин','каталог')
+                            if word in text.casefold()), 'возможности')
+                            if route.capability == 'capabilities.list' else text[:500])
+                    if definition.input_model is EntityCapabilityInput:
+                        # Existing untyped routes are navigation/clarification,
+                        # not authority to pick a business entity from raw text.
+                        from app.services.assistant.capability_controller import CapabilityDispatch
+                        return CapabilityDispatch(route.capability, 'Уточните нужную запись.')
+                    return ReadOnlyExecutionBroker().dispatch(self, route.capability,
+                        kwargs['actor_user_id'], arguments=arguments)
             finally:
                 _LOCAL.reset(token)
     return call
@@ -490,14 +545,29 @@ def local_boundary(function):
 def enter_local_read(capability):
     stack = _LOCAL.get()
     if stack is not None:
-        stack.enter_context(read_only_execution(capability))
+        from app.services.assistant.read_broker import IN_WORKER
+        if IN_WORKER.get():
+            stack.enter_context(read_only_execution(capability))
+        else:
+            raise _LocalReadRoute(capability)
+
+
+class _LocalReadRoute(BaseException):
+    def __init__(self, capability):
+        self.capability = capability
 
 
 def safe_tool_errors(function):
     @wraps(function)
     async def call(*args, **kwargs):
+        from app.services.assistant.read_broker import ReadWorkerFailure
         try:
             return await function(*args, **kwargs)
+        except ReadWorkerFailure:
+            import logging
+            logging.getLogger(__name__).warning('Isolated read worker unavailable')
+            event = args[0] if args else kwargs.get('message', kwargs.get('callback'))
+            await event.answer('Не удалось безопасно прочитать данные. Используйте меню или попробуйте позже.')
         except (ReadOnlyViolation, BaseExceptionGroup) as error:
             failure = read_only_failure(error)
             if failure is None:
