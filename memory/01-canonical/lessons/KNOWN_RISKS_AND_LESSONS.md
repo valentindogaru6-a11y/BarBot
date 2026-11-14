@@ -8,6 +8,16 @@ Evidence: regression tests, Git history, rollout docs, owner observations
 Depends on: callbacks, SQLite/WAL, workers, XLSX, imports, VPS environment
 Importance: High
 
+- **A seal cannot revoke pre-existing writable mappings:** checking one private
+  mmap bit admitted MAP_SHARED_VALIDATE, and allowing mprotect enabled write
+  upgrades. Native memory stores do not generate write syscalls. Do not infer
+  safety from unchanged business hashes while SHM may be modified. Executors now
+  require only RO snapshot backing files, no live mappings, exact mmap flags and
+  fail-closed memory syscalls. Kernel read leases justify immutable reads only
+  with absent/empty WAL and a final unbroken lease check; otherwise fail closed.
+  Source FD mediation must not open/close the DB inode in the SQLite-owning
+  parent: POSIX locks are released by any close of that inode in that process.
+
 - **A connect wrapper is not authority over existing handles:** an ordinary
   writable SQLite connection opened before a read scope can bypass a scope's
   new-handle registry/authorizer. Evaluation-owned handles may conceal this gap.

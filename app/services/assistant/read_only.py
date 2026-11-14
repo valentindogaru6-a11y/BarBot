@@ -272,7 +272,7 @@ def _audit(event, args):
     elif event in {'os.mkdir','os.remove','os.rmdir','os.rename','os.link','os.symlink',
                    'os.chmod','os.chown','os.truncate','os.utime','subprocess.Popen',
                    'os.system','os.posix_spawn','socket.connect','socket.getaddrinfo',
-                   'socket.sendto','ctypes.dlopen'}:
+                   'socket.sendto','ctypes.dlopen','ctypes.dlsym','ctypes.dlsym/handle','import'}:
         deny('external_side_effect')
 
 

@@ -1,5 +1,14 @@
 # Freshness Manifest
 
+2026-11-14 memory isolation hardening from `a2e01b9...`: prior live-worker claims
+are superseded after two native SHM bypasses. Source-RO Backup API cloning and
+post-seal memory denial are implemented, not deployment-approved. Evidence:
+211 targeted tests, 2 strengthened mapping cleanup cases, canonical results
+18/18 and non-root runtime pass. New measured wall median/p95 3.62/4.07 s,
+worker peak RSS 61,960 KiB on small synthetic DB + tracked catalog. One final
+full pytest passed: 3294 tests; max-load/live qualification remains pending.
+Catalog/seed/DDL/migrations untouched; production facts were not inspected.
+
 Read isolation slice in development 2026-11-14 from `47a8e869...`: in-process
 new-handle guards do not protect pre-opened native writable handles. Owner permits
 only exact SQLite WAL/SHM runtime changes. Exec workers/typed manifest IPC/kernel

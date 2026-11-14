@@ -5,7 +5,32 @@ Trust: implemented and tested offline; live provider/shadow evidence pending
 
 ## Read-only execution contract (P1 regression)
 
-### Process authority (development from `47a8e869...`)
+### Process authority (memory hardening from `a2e01b9...`)
+
+The earlier live-DB worker boundary failed native shared-memory probes:
+MAP_SHARED_VALIDATE passed a private-bit check, and unconditional mprotect
+upgraded a read mapping. Checksums/business hashes did not detect direct SHM
+changes. That live-mapping architecture is superseded, not a closed finding.
+
+The parent owns a fresh 0700 temporary root/0600 clone, bounded to 64 MiB. An
+exec coordinator supervises a fixed Backup API program; neither runs capability
+code. The coordinator supplies only validated RO source DB/WAL/SHM descriptors
+via ADDFD, and RW authority only over the owned destination. It is a separate
+process because opening/closing a live DB inode in the SQLite-owning parent can
+release that parent's POSIX locks. No source sidecar creation/repair is allowed.
+
+Active WAL is read normally with existing readable sidecars. For absent/empty
+WAL only, a kernel read lease must first exclude all writable handles/mappings
+and remain unbroken until copy completion; only then is immutable reading safe.
+Lease break or unsupported RO-WAL/lease state discards the clone. Never apply
+immutable blindly to a source that may have committed WAL frames.
+
+The Backup API clone is checked (integrity/FK) and normalized to DELETE journal
+before a separate executor is spawned. No live source descriptor/mapping/path
+is passed to the executor. Source commits after that point do not alter its
+consistent snapshot. Normal/error/timeout/cancellation paths reap processes
+before clone removal. Source data never enters diagnostics. This is not an
+authorization for production access or a measured live-readiness claim.
 
 Risk-0 execution uses a short-lived exec worker with closed JSON IPC.
 The parent never serializes a service, callable, connection, cursor or closure.
@@ -15,15 +40,20 @@ mutations/unknown capabilities and incompatible peers. The worker rechecks
 actor/private-chat/pilot/role/flags against trusted facts and read-only DB state.
 Only a per-request opaque actor reference crosses IPC, not a Telegram identifier.
 
-Linux seccomp user notifications mediate file opens: the broker supplies a
+Linux seccomp user notifications mediate clone file opens: the broker supplies a
 validated fd rather than continuing a syscall against a mutable pathname.
 Main DB access is RO; the worker itself opens `mode=ro`, enables query-only and
 deny-write authorizer, and leases a single consistent read snapshot to services.
-Only exact regular, single-link WAL/SHM siblings may be created/updated by SQLite
-bootstrap. After snapshot setup, an acknowledged irreversible seal removes new
-writable opens/writes/mappings before any capability executor runs. No network,
+There are no writable file-backed mappings in this process, even before seal.
+Exact private anonymous allocations and approved-descriptor private COW remain
+allowed; shared writable/unknown sharing flags are rejected. All mprotect and
+pkey_mprotect calls, mremap, msync, remap_file_pages and new shared-memory/FD
+authority are denied, rather than tracking partial/unknown memory ranges. New
+module imports and ctypes/cffi/dynamic loading are denied after seal. Prepared
+native pointers are still hostile and constrained by the kernel/RO backing FDs.
+No network,
 new process/thread, arbitrary file or writable second DB authority is available.
-No `immutable=1`, seed, migration or business schema change is involved.
+No seed, migration or business schema change is involved.
 
 Results are bounded materialized display DTOs; parent renderers must not re-query
 writable services to complete them. Catalog media preserves validated opaque
@@ -31,9 +61,11 @@ Telegram file references, never a local path or URL supplied as media authority.
 Draft/proposal/confirmation mutations remain
 in the parent under existing centralized permission/revision/idempotency checks.
 Verification covers DB checksum/metadata, inode/link identity, sibling entries,
-business fingerprint, authorizer attempts, integrity and FK. An authorized parent
-writer is not globally blocked; a concurrent committed change can conservatively
-invalidate the read result. Partial results never count as successful execution.
+business fingerprint, authorizer attempts, integrity and FK on the clone. A live
+parent writer retains its locks/authority. A lease conflict invalidates snapshot
+creation; a later commit does not change a completed clone. Partial results never
+count as successful execution. Source bytes are protected by RO OS authority,
+not a claim that arbitrary SHM writes can be identified as SQLite-native.
 
 Worker timeout/cancellation/crash must kill/reap the child and close pipes/listener
 fds. Blocking notification receive has a bounded native thread-directed wakeup;
@@ -48,22 +80,42 @@ All 18 actual bound read capabilities use the broker. A standalone catalog cache
 can use the same zero-filesystem worker without DB authority; live handlers pass
 the real access context for the worker's repeated policy/role/flag checks.
 
-Offline measurement (7 serial calls, synthetic v15 + tracked catalog): startup
+Historical live-DB-worker measurement (not the new snapshot architecture): startup
 median/p95 1326.7/1504.4 ms, execution 37.3/43.0 ms, end-to-end 1736.5/1932.6 ms;
 maximum child RSS 66,308 KiB. Two concurrent readers completed in 4527.8 ms.
 These are observations on the development host, not production SLAs; four
 concurrent children require corresponding memory/headroom. Prefer correctness
 over a persistent worker that could retain authority or user state.
 
-Targeted evidence: 2415 AI tests, 125 adjacent config/access/reminder/delivery
+Historical pre-hardening test evidence: 2415 AI tests, 125 adjacent config/access/reminder/delivery
 tests and 8 additional DB/WAL/SHM replacement/invented-result cases passed.
 After the media DTO correction, 126 relevant tests and 6 focused media checks
 passed (overlapping suites, not additive unique coverage). Final full pytest:
 3253 passed; this includes 74 real-process/authority/cleanup regressions. An
 earlier full attempt was interrupted for the media correction, not counted as
 a pass. All 18 read bindings also matched the canonical materialized results
-on a pinned temporary WAL snapshot. Live provider quality,
+on a pinned temporary WAL snapshot. Those tests missed native mapping bypasses.
+Current snapshot/memory offline validation is complete. Live provider quality,
 unsupported native/plugin adapters and production acceptance remain pending.
+
+Current hardening evidence (offline, synthetic v15): 211 targeted tests passed,
+plus 2 stronger mapping error/cancellation checks. All 18 materialized read
+results independently matched prewarmed canonical executors. Non-root
+snapshot/seccomp/read-lease execution passed. Final full pytest: 3294 passed
+on the frozen application tree (one full run for this change).
+
+New snapshot pipeline measurement (7 serial reads, tracked catalog, synthetic
+DB approximately 0.5 MiB): median/p95 wall 3618.1/4072.4 ms, worker startup
+1864.6/2236.0 ms, execution 47.8/55.9 ms; reported helper-copy phase
+308.2/413.3 ms excludes coordinator import time. Observed peak RSS: parent
+87,360 KiB, worker 61,960 KiB, coordinator 37,520 KiB, backup helper 37,008 KiB.
+Two concurrent reads completed in 8492.0 ms; peak 4 child processes and 20
+parent FDs. FD/process/root cleanup and business-write zero checks passed.
+These small-sample observations are not a production SLA or proof of maximum
+64-MiB clones under four-way load. 1-GiB VPS sizing should begin with the
+owner-only single-flight pilot and revalidate free temp space/headroom before
+rollout. Each clone is at most 64 MiB; process virtual-memory ceilings are
+192 MiB. Native/plugins and live quality remain pending separate review.
 
 ### Exception-safe ownership and teardown
 

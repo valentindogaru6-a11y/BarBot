@@ -155,15 +155,24 @@ user-notify/ADDFD and permission to inspect the broker's own child syscall
 arguments. Unsupported hosts fail closed; AI-disabled imports do not load the
 native sandbox. No system dependency is installed automatically.
 
-The main SQLite file is always opened `mode=ro`, query-only, with deny-write
-authorization. Only exact verified WAL/SHM cache siblings may be initialized by
-SQLite; an acknowledged seal removes writable file authority before tool entry.
-No immutable-WAL shortcut, network, arbitrary file access or background executor
-is available. Read results are materialized/bounded; rendering does not re-query
-business services. Existing draft/confirmation mutations stay in the parent.
-Concurrent authorized writes are not globally blocked and can conservatively
-invalidate verification of a read result. Pool/native/plugin adapters and live
-provider quality remain separately pending; see
+Executors receive only a private consistent SQLite Backup API clone (0700 root,
+0600 file, maximum 64 MiB), never live DB/WAL/SHM descriptors or mappings. A fixed
+exec coordinator mediates the source as RO, without opening/closing its inode in
+the live parent and thereby disturbing parent POSIX locks. Active WAL is read
+normally, including committed frames. If WAL is absent/empty, immutable reading
+is allowed only while a verified kernel read lease excludes writers; lease break
+discards the clone. Unsupported RO WAL/lease conditions fail closed, not silently
+fall back. Source sidecars are never created, written or repaired.
+
+The executor opens the DELETE-journal clone RO/query-only with deny-write SQL
+authorization. File mappings require an approved RO descriptor and exact sharing
+flags; only private COW may be writable. Protection upgrades, mremap/msync, native
+shared memory, network and additional processes are denied. No new/native module
+imports or dynamic library loading are allowed after seal. Read results are
+materialized/bounded; rendering does not re-query business services. Existing
+draft/confirmation mutations stay in the parent, with live permission checks.
+Read freshness is the snapshot point, not subsequent source commits. Pool/native
+plugin adapters and live provider quality remain separately pending; see
 [the conversation contract](memory/features/BAR_JARVIS_CONVERSATION.md).
 
 Phase 1 adds an optional private-chat assistant for `super_admin`. Groq Whisper

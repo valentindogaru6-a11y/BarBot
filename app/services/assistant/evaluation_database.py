@@ -127,7 +127,9 @@ class OwnedEvaluationDatabase:
                 or root_stat.st_uid != os.geteuid() or any(self.root.iterdir())):
                 raise EvaluationSafetyError('temporary_root_not_secure')
             self.path = self.root/'evaluation.db'
-            self.fd = os.open(self.path, os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+            # Identity pin only: it must not retain writable authority or
+            # prevent the snapshot helper's kernel read-lease proof.
+            self.fd = os.open(self.path, os.O_RDONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
             created = os.fstat(self.fd)
             self.identity = created.st_dev, created.st_ino
             self.validate_identity()

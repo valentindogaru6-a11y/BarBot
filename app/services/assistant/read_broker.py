@@ -174,10 +174,20 @@ class ReadOnlyExecutionBroker:
         if not _PERMITS.acquire(blocking=False):
             raise ReadWorkerFailure('capacity')
         child = authority = listener = control = child_control = None
+        snapshot = None
         before_main = before_entries = None
         sealed = False
         try:
             if request.database:
+                # No live DB path/FD/mapping reaches an untrusted executor.
+                # A fixed, separately confined Backup API helper is the only
+                # source reader; it cannot write source DB/WAL/SHM.
+                from app.services.assistant.read_snapshot import prepare
+                snapshot = prepare(request.database, request.database_identity,
+                    deadline=request.deadline, cancel=_CANCEL.get())
+                request = request.model_copy(update=dict(database=str(snapshot.path),
+                    database_identity=snapshot.identity))
+                raw = encode(request)
                 try:
                     authority = FileAuthority(request.database)
                 except ValueError:
@@ -278,7 +288,8 @@ class ReadOnlyExecutionBroker:
                 raise ReadOnlyViolation(request.capability_id, 'response_contract')
             self.last_metrics = dict(startup_ms=response.startup_ms, execution_ms=response.execution_ms,
                 rss_kib=response.rss_kib, business_writes=response.business_writes,
-                authorizer_denials=response.authorizer_denials)
+                authorizer_denials=response.authorizer_denials,
+                snapshot_ms=snapshot.elapsed_ms if snapshot else 0)
             if response.status == 'safety' or response.business_writes or response.authorizer_denials or not response.integrity:
                 raise ReadOnlyViolation(request.capability_id, response.category)
             if response.status != 'ok':
@@ -305,17 +316,25 @@ class ReadOnlyExecutionBroker:
                     except (ValueError, OSError):
                         verification_error = ReadOnlyViolation(request.capability_id, 'filesystem_boundary')
             finally:
-                if listener is not None:
-                    os.close(listener)
-                if control:
-                    control.close()
-                if child_control:
-                    child_control.close()
-                if authority:
-                    authority.close()
-                with _LOCK:
-                    _CHILDREN.discard(child)
-                _PERMITS.release()
+                try:
+                    if listener is not None:
+                        os.close(listener)
+                    if control:
+                        control.close()
+                    if child_control:
+                        child_control.close()
+                    if authority:
+                        authority.close()
+                finally:
+                    try:
+                        if snapshot:
+                            try:snapshot.close()
+                            except (OSError, ValueError):
+                                verification_error = ReadOnlyViolation(request.capability_id, 'snapshot_cleanup')
+                    finally:
+                        with _LOCK:
+                            _CHILDREN.discard(child)
+                        _PERMITS.release()
             if verification_error:
                 raise verification_error
 

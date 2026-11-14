@@ -56,6 +56,16 @@ def child_patch(monkeypatch, code):
     monkeypatch.setattr(broker_module.subprocess, 'Popen', popen)
 
 
+def coordinator_patch(monkeypatch,code):
+    original=broker_module.subprocess.Popen
+    def popen(command,*args,**kwargs):
+        command=list(command);marker='from app.services.assistant.read_snapshot import coordinate;'
+        if isinstance(command[-1],str) and marker in command[-1]:
+            command[-1]=command[-1].replace(marker,marker+'exec('+repr(code)+');')
+        return original(command,*args,**kwargs)
+    monkeypatch.setattr(broker_module.subprocess,'Popen',popen)
+
+
 @pytest.mark.parametrize('identifier', [c.id for c in CAPABILITIES if int(c.risk_level) == 0])
 def test_eighteen_real_broker_executors(env, identifier):
     target = None; args = {}
@@ -108,6 +118,7 @@ def test_exact_external_parent_handle_and_closure_cannot_reach_worker(env,monkey
     native=contextvars.Context().run(sqlite3.connect,env.path)
     assert type(native) is sqlite3.Connection
     assert native.execute('PRAGMA query_only').fetchone()[0]==0
+    native.execute('SELECT count(*) FROM users').fetchone()
     calls=[]
     def malicious(**kwargs):
         calls.append(True)
@@ -209,19 +220,22 @@ def test_worker_side_effect_or_invalid_result_is_fatal(env,monkeypatch,patch):
 def test_spawn_environment_and_parent_fds_are_not_inherited(env,monkeypatch):
     monkeypatch.setenv('SYNTHETIC_PRIVATE_KEY','not-for-worker')
     external=contextvars.Context().run(sqlite3.connect,env.path)
+    external.execute('SELECT count(*) FROM users').fetchone()
     # Fail unless the child was exec'd, given only a minimal environment, and
     # inherited no SQLite data descriptor. The control socket is the sole pass_fd.
     original=broker_module.subprocess.Popen
     seen=[]
     def inspect(command,*a,**kw):
-        assert kw['close_fds'] and len(kw['pass_fds'])==1
+        assert kw['close_fds']
+        coordinator='read_snapshot import coordinate' in command[-1]
+        assert not kw.get('pass_fds') if coordinator else len(kw['pass_fds'])==1
         assert set(kw['env'])=={'LANG','TZ'}
         assert '-I' in command and '-B' in command
         seen.append(True);return original(command,*a,**kw)
     monkeypatch.setattr(broker_module.subprocess,'Popen',inspect)
     try:assert dispatch(env,'warehouse.required_status').data['total']==2
     finally:external.close()
-    assert seen==[True];following_write(env)
+    assert seen==[True,True];following_write(env)
 
 
 @pytest.mark.parametrize('suffix', ['-wal','-shm'])
@@ -245,21 +259,27 @@ def test_db_or_sidecar_replacement_between_validation_and_open_is_fatal(env,monk
     pin=contextvars.Context().run(sqlite3.connect,env.path)
     pin.execute('SELECT count(*) FROM users').fetchone()
     b=ReadOnlyExecutionBroker();r=request(env,b)
-    original=kernel.FileAuthority._open;swapped=[]
-    def replace(self,path,flags):
-        target=Path(str(env.path)+suffix)
-        if path==str(target) and not swapped:
-            saved=env.root/'saved-original';target.rename(saved)
-            target.write_bytes(saved.read_bytes());swapped.append(saved)
-            try:return original(self,path,flags)
-            finally:
-                target.unlink();saved.rename(target)
-        return original(self,path,flags)
-    monkeypatch.setattr(kernel.FileAuthority,'_open',replace)
+    marker=env.root/'race-marker'
+    coordinator_patch(monkeypatch,'''
+import app.services.assistant.read_snapshot as s
+original=s.SnapshotAuthority._open
+swapped=False
+def replace(self,path,flags):
+ global swapped
+ target=s.Path(str(self.path)+%r)
+ if path==str(target) and not swapped:
+  swapped=True
+  saved=target.parent/'saved-original';target.rename(saved)
+  target.write_bytes(saved.read_bytes());(target.parent/'race-marker').write_text('called')
+  try:return original(self,path,flags)
+  finally:target.unlink();saved.rename(target)
+ return original(self,path,flags)
+s.SnapshotAuthority._open=replace
+''' % suffix)
     try:
         with pytest.raises(ReadOnlyViolation):b.execute(r)
     finally:pin.close()
-    assert swapped
+    assert marker.exists();marker.unlink()
     following_write(env)
 
 
@@ -268,37 +288,49 @@ def test_db_or_sidecar_replacement_after_open_is_fatal(env,monkeypatch,suffix):
     pin=contextvars.Context().run(sqlite3.connect,env.path)
     pin.execute('SELECT count(*) FROM users').fetchone()
     b=ReadOnlyExecutionBroker();r=request(env,b)
-    original=kernel.FileAuthority._open;swapped=[]
-    def replace(self,path,flags):
-        result=original(self,path,flags)
-        if path==str(env.path)+suffix and not swapped:
-            p=Path(path);saved=env.root/'saved-open-file';p.rename(saved)
-            p.write_bytes(saved.read_bytes());swapped.append((p,saved))
-        return result
-    monkeypatch.setattr(kernel.FileAuthority,'_open',replace)
+    marker=env.root/'race-marker'
+    coordinator_patch(monkeypatch,'''
+import app.services.assistant.read_snapshot as s,atexit
+original=s.SnapshotAuthority._open
+swapped=False
+def replace(self,path,flags):
+ global swapped
+ result=original(self,path,flags)
+ if path==str(self.path)+%r and not swapped:
+  swapped=True
+  p=s.Path(path);saved=p.parent/'saved-open-file';p.rename(saved)
+  p.write_bytes(saved.read_bytes());(p.parent/'race-marker').write_text('called')
+  def restore():p.unlink();saved.rename(p)
+  atexit.register(restore)
+ return result
+s.SnapshotAuthority._open=replace
+''' % suffix)
     try:
         with pytest.raises(ReadOnlyViolation):b.execute(r)
-        assert swapped
+        assert marker.exists()
     finally:
-        for p,saved in swapped:p.unlink();saved.rename(p)
+        if marker.exists():marker.unlink()
         pin.close()
     following_write(env)
 
 
 def test_sealed_executor_cannot_use_native_sidecar_write_fd(env,monkeypatch):
     child_patch(monkeypatch,"""
-import app.services.assistant.read_worker as w,os
+import app.services.assistant.read_worker as w,os,ctypes as C
+lib=C.CDLL(None,use_errno=True)
+native_open=lib.open;native_open.argtypes=[C.c_char_p,C.c_int]
 def wrong(r,c):
  for fd in range(3,64):
   try:target=os.readlink('/proc/self/fd/'+str(fd))
   except OSError:continue
   if target.endswith('-shm'):
-   try:os.write(fd,b'corrupt')
-   except OSError:pass
-   return {'capability_id':r.capability_id,'message':'ignored','data':{'total':2,'resolved':0},'ui_action':None,'tool_action':None}
- raise AssertionError('missing synthetic SHM fd')
+   raise AssertionError('live SHM inherited')
+ # Clone is DELETE journal and has no SHM. Even a known source sidecar cannot
+ # be opened by the executor, regardless of prepared native function pointers.
+ native_open(%r,os.O_RDWR)
+ return {'capability_id':r.capability_id,'message':'ignored','data':{'total':2,'resolved':0},'ui_action':None,'tool_action':None}
 w._run=wrong
-""")
+""" % os.fsencode(str(env.path)+'-shm'))
     before=env.business.snapshot();b=ReadOnlyExecutionBroker()
     with pytest.raises(ReadOnlyViolation):b.execute(request(env,b))
     assert before==env.business.snapshot();following_write(env)
@@ -352,7 +384,7 @@ def test_worker_rechecks_role_after_request_snapshot(env):
     following_write(env)
 
 
-def test_concurrent_committed_parent_write_invalidates_result_not_writer(env,monkeypatch):
+def test_concurrent_committed_parent_write_does_not_change_frozen_clone(env,monkeypatch):
     import threading
     from concurrent.futures import ThreadPoolExecutor
     child_patch(monkeypatch,"""
@@ -378,7 +410,7 @@ w._run=delayed
             assert ready.wait(8)
             pin.execute("UPDATE users SET first_name='Concurrent synthetic writer' WHERE telegram_user_id=?",(env.employee,))
             pin.commit()
-            with pytest.raises(ReadOnlyViolation):future.result(timeout=10)
+            assert future.result(timeout=10)['data']=={'total':2,'resolved':0}
         assert pin.execute('SELECT first_name FROM users WHERE telegram_user_id=?',(env.employee,)).fetchone()[0]=='Concurrent synthetic writer'
     finally:pin.close()
     following_write(env)

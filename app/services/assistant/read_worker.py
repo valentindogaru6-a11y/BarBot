@@ -8,6 +8,7 @@ import resource
 import socket
 import sqlite3
 import sys
+import builtins
 from zoneinfo import ZoneInfo
 from pydantic import BaseModel, TypeAdapter
 
@@ -183,6 +184,7 @@ def _execute(request, facts, control):
                 isolation_level=None, timeout=.25)
             connection.row_factory = sqlite3.Row
             connection.execute('PRAGMA query_only=ON')
+            connection.execute('PRAGMA temp_store=MEMORY')
             def authorizer(action, name, value, db, source):
                 # Verification SQL has the same deny-write policy even outside
                 # the nested tool scope; no gap before/after executor entry.
@@ -205,8 +207,22 @@ def _execute(request, facts, control):
                 return SnapshotLease(connection)
             sqlite3.connect = connect
         seal(control)
-        with ro.read_only_execution(request.capability_id):
-            result = _run(request, connection)
+        # No new module/library authority after seal. Cached native pointers
+        # are still treated as hostile: the OS/file boundary constrains them.
+        original_import = builtins.__import__
+        loaded = frozenset(sys.modules)
+        def restricted_import(name, globals=None, locals=None, fromlist=(), level=0):
+            root = name.split('.')[0]
+            if root in {'ctypes','_ctypes','cffi','_cffi_backend','subprocess',
+                        'multiprocessing','socket','importlib','runpy','marshal','pickle'} or (not level and name not in loaded):
+                raise ro.ReadOnlyViolation(request.capability_id, 'sealed_import')
+            return original_import(name,globals,locals,fromlist,level)
+        builtins.__import__ = restricted_import
+        try:
+            with ro.read_only_execution(request.capability_id):
+                result = _run(request, connection)
+        finally:
+            builtins.__import__ = original_import
         if connection:
             connection.rollback()
             connection.execute('BEGIN')
@@ -245,7 +261,7 @@ def main(control_fd):
     ZoneInfo('Europe/Kyiv'); ZoneInfo('UTC')
     resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
     resource.setrlimit(resource.RLIMIT_CPU, (8, 8))
-    resource.setrlimit(resource.RLIMIT_AS, (768*1024*1024, 768*1024*1024))
+    resource.setrlimit(resource.RLIMIT_AS, (192*1024*1024, 192*1024*1024))
     started = monotonic(); facts = {}
     status, category, result = 'ok', 'ok', None
     try:

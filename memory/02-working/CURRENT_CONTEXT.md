@@ -5,6 +5,16 @@ Metadata: scope `working`; trust `working`; lifecycle `ephemeral`; last cleared
 
 ## Status
 
+Memory-boundary hardening from `a2e01b9...`: live SHM mappings are removed from
+executors. A separate fixed coordinator/Backup API helper creates an owned RO
+clone without disturbing live-parent POSIX locks or writing source sidecars.
+Exact mmap policy, denied protection upgrades and native fault regressions pass
+211 targeted tests plus 2 stronger mapping cleanup cases. Canonical equivalence
+is 18/18; non-root execution passes. Snapshot wall median/p95 is 3.62/4.07 s on
+synthetic data, not a production SLA. One final full pytest passed: 3294 tests. Final
+security review, maximum-load qualification and live quality remain pending.
+No production/API/systemd/push/deployment authority.
+
 Process-isolation work resumes at `47a8e869...` after the owner explicitly allowed
 SQLite WAL/SHM-only infrastructure changes. Short-lived exec/JSON risk-0 workers
 use kernel-mediated opens, RO main DB, strict SQL authorization and an acknowledged

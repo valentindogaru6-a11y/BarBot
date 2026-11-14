@@ -51,7 +51,8 @@ NOTIFIED = (
     'mkdir', 'mkdirat', 'rmdir', 'symlink', 'symlinkat', 'chmod', 'fchmod',
     'fchmodat', 'chown', 'fchown', 'lchown', 'utime', 'utimes', 'utimensat',
     'mknod', 'mknodat', 'ioctl', 'dup', 'dup2', 'dup3',
-    'fcntl', 'mmap',
+    'fcntl', 'mmap', 'mprotect', 'pkey_mprotect', 'mremap', 'msync', 'fsync', 'fdatasync',
+    'remap_file_pages', 'shmget', 'shmat', 'shmdt', 'shmctl',
 )
 
 # Default is NOTIFY/DENY, not default-ALLOW with a best-effort blacklist. New
@@ -60,7 +61,7 @@ PURE_SYSCALLS = (
     'read', 'readv', 'pread64', 'preadv', 'preadv2', 'close', 'lseek',
     'fstat', 'newfstatat', 'stat', 'lstat', 'statx', 'access', 'faccessat',
     'faccessat2', 'readlink', 'readlinkat', 'getcwd',
-    'brk', 'munmap', 'mremap', 'mprotect', 'madvise',
+    'brk', 'munmap', 'madvise',
     'futex', 'futex_waitv', 'sched_yield', 'sched_getaffinity',
     'rt_sigaction', 'rt_sigprocmask', 'rt_sigreturn', 'sigaltstack',
     'clock_gettime', 'clock_getres', 'clock_nanosleep', 'nanosleep', 'gettimeofday', 'time',
@@ -110,9 +111,11 @@ def install(control: socket.socket):
         for command in (fcntl.F_GETFD, fcntl.F_SETFD, fcntl.F_GETFL,
                         fcntl.F_GETLK, fcntl.F_SETLK, fcntl.F_SETLKW):
             allow('fcntl', Compare(1, 4, command, 0))
-        allow('mmap', Compare(2, 7, 2, 0))  # no PROT_WRITE
-        allow('mmap', Compare(3, 7, 2, 2))  # MAP_PRIVATE/COW
-        allow('mmap', Compare(3, 7, 32, 32))  # anonymous, no external file
+        # Only CPython's exact private anonymous allocation is unconditional.
+        # MAP_SHARED_VALIDATE=3 is NOT private despite containing bit 2.
+        # File mappings are mediated against the actual approved descriptor.
+        allow('mmap', Compare(2, 7, 0xfffffffffffffffC, 0),
+              Compare(3, 4, 0x22, 0))  # PROT_{NONE,READ,WRITE}, PRIVATE|ANON
         if lib.seccomp_load(ctx):
             raise RuntimeError('sandbox_load')
         listener = lib.seccomp_notify_fd(ctx)
@@ -302,6 +305,7 @@ class FileAuthority:
         self.sealed = False
         self.denials = []
         self.notifications = 0
+        self.read_only_fallback = False
         lib = library()
         self.names = {lib.seccomp_syscall_resolve_name(n.encode()): n for n in NOTIFIED}
         self.root = os.open(self.path.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
@@ -335,7 +339,11 @@ class FileAuthority:
             raise ValueError('read_open_denied_' + ('entropy' if path == '/dev/urandom' else 'other'))
         name = target.name
         is_main = name == self.path.name
-        if self.sealed and flags & (os.O_WRONLY | os.O_RDWR | os.O_CREAT):
+        if flags & (os.O_WRONLY | os.O_RDWR | os.O_CREAT):
+            if self.read_only_fallback and not is_main:
+                # Fixed backup helper only: SQLite retries SHM open as RO.
+                # No executor runs in that process; no write is authorized.
+                raise PermissionError(errno.EACCES, 'snapshot_read_only')
             raise ValueError('read_sealed_open')
         if flags & (os.O_TRUNC | os.O_APPEND | getattr(os, 'O_TMPFILE', 0)):
             raise ValueError('read_open_flags')
@@ -343,8 +351,7 @@ class FileAuthority:
             raise ValueError('read_main_write')
         expected = self.identities[name]
         actual_flags = flags | os.O_NOFOLLOW | os.O_CLOEXEC
-        if is_main:
-            actual_flags |= os.O_NOATIME
+        actual_flags |= os.O_NOATIME
         if expected is None:
             if not flags & os.O_CREAT or is_main:
                 raise FileNotFoundError
@@ -360,7 +367,7 @@ class FileAuthority:
             if actual != file_identity(target):
                 raise ValueError('read_open_replaced')
             self.identities[name] = actual
-            return fd, not is_main
+            return fd, False
         except BaseException:
             os.close(fd)
             raise
@@ -368,6 +375,9 @@ class FileAuthority:
     def handle(self, listener):
         notification = Notification()
         _ioctl(listener, 0xc0502100, notification)
+        return self._handle(listener,notification)
+
+    def _handle(self, listener, notification):
         self.notifications += 1
         name = self.names.get(notification.data.nr, 'unknown')
         response = Response(notification.id, 0, -errno.EPERM, 0)
@@ -389,15 +399,28 @@ class FileAuthority:
                 finally:
                     os.close(opened)
             # SQLite mmap/write operations may update ONLY approved sidecars.
-            if name in {'write', 'writev', 'pwrite64', 'pwritev', 'pwritev2', 'ftruncate'}:
+            if name in {'write', 'writev', 'pwrite64', 'pwritev', 'pwritev2', 'ftruncate', 'fsync', 'fdatasync'}:
                 if not self.sealed and self.allowed_fds.get(notification.data.args[0], False):
                     # CONTINUE is safe here: fd number cannot be duplicated or
                     # replaced; every subsequent open is broker-owned too.
                     response.error = 0; response.flags = 1
                 else:
                     self.violation = True
-            elif name == 'mmap' and not self.sealed and self.allowed_fds.get(notification.data.args[4], False):
-                response.error = 0; response.flags = 1
+            elif name == 'mmap':
+                args = notification.data.args
+                sharing = args[3] & 0xf
+                # No unknown/extra flags, no EXEC, no shared writable mappings.
+                # A private COW mapping of an approved RO fd cannot modify it.
+                known = args[3] in (1, 2, 3) and sharing in (1, 2, 3)
+                if (known and args[2] in (0, 1, 2, 3)
+                        and args[4] in self.allowed_fds
+                        and (not args[2] & 2 or sharing == 2)):
+                    response.error = 0; response.flags = 1
+                elif (not self.sealed and self.allowed_fds.get(args[4], False)
+                      and args[3] in (1, 3) and args[2] in (0, 1, 2, 3)):
+                    response.error = 0; response.flags = 1
+                else:
+                    self.violation = True
             elif name == 'fchown' and not self.sealed and self.allowed_fds.get(notification.data.args[0], False):
                 owner = self.path.stat()
                 if notification.data.args[1] in (owner.st_uid, 0xffffffff) and notification.data.args[2] in (owner.st_gid, 0xffffffff):
@@ -408,16 +431,39 @@ class FileAuthority:
                 # Files were already created 0600. Do not broaden their mode to
                 # the main DB's potentially more permissive group/other bits.
                 response.error = 0
+            elif (self.read_only_fallback and name in {'fchown','fchmod'}
+                    and notification.data.args[0] in self.allowed_fds):
+                response.error = -errno.EACCES
             elif name in {'unlink', 'unlinkat'}:
                 # RO SQLite's optional last-close cache deletion is denied. Never
                 # unlink a live runtime sidecar or a replaced pathname.
                 address = notification.data.args[0 if name == 'unlink' else 1]
                 path = Path(read_path(notification.pid, address))
                 if path not in {Path(str(self.path)+'-wal'), Path(str(self.path)+'-shm')}:
+                    if not self.unlink_owned(path):
+                        self.violation = True
+                    else:
+                        response.error = 0
+            elif name == 'fcntl' and self.read_only_fallback:
+                import fcntl
+                args = notification.data.args
+                if (args[0] in self.allowed_fds and not self.allowed_fds[args[0]]
+                        and (args[1] == fcntl.F_GETLEASE or
+                             args[1] == fcntl.F_SETLEASE and args[2] in (fcntl.F_RDLCK,fcntl.F_UNLCK))):
+                    response.error = 0;response.flags = 1
+                else:
                     self.violation = True
+            elif name == 'mremap' and self.read_only_fallback and not self.sealed:
+                # Fixed Backup API program only; never an executor process.
+                response.error = 0;response.flags = 1
             else:
                 self.violation = True
                 self.denials.append(name)
+        except PermissionError:
+            if self.read_only_fallback:
+                response.error = -errno.EACCES
+            else:
+                self.violation = True
         except FileNotFoundError:
             response.error = -errno.ENOENT
         except (ValueError, OSError) as error:
@@ -428,3 +474,6 @@ class FileAuthority:
         except OSError as error:
             if error.errno != errno.ENOENT:
                 raise
+
+    def unlink_owned(self, path):
+        return False
