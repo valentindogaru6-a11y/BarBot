@@ -156,13 +156,29 @@ arguments. Unsupported hosts fail closed; AI-disabled imports do not load the
 native sandbox. No system dependency is installed automatically.
 
 Executors receive only a private consistent SQLite Backup API clone (0700 root,
-0600 file, maximum 64 MiB), never live DB/WAL/SHM descriptors or mappings. A fixed
+0600 file, maximum 16 MiB), never live DB/WAL/SHM descriptors or mappings. A fixed
 exec coordinator mediates the source as RO, without opening/closing its inode in
 the live parent and thereby disturbing parent POSIX locks. Active WAL is read
-normally, including committed frames. If WAL is absent/empty, immutable reading
-is allowed only while a verified kernel read lease excludes writers; lease break
-discards the clone. Unsupported RO WAL/lease conditions fail closed, not silently
-fall back. Source sidecars are never created, written or repaired.
+normally, including committed frames. Source `immutable=1` is forbidden. A
+rollback-journal classifier checks header/size/RESERVED-lock state; potentially
+hot or ambiguous journals produce terminal `source_recovery_required`, never
+automatic recovery. Idle WAL without sidecars can use a stable main-file copy
+only under an unbroken kernel read lease and rechecked non-hot journal; NORMAL
+SQLite on private staging and Backup API then produce the final clone.
+Unsupported RO WAL/lease conditions fail closed. Source sidecars are never
+created, written or repaired.
+
+Snapshot roots are versioned and private inside the fixed per-OS-UID directory
+`/tmp/barbot-read-snapshots-v1-<uid>`; only that namespace is scavenged at enabled
+AI startup and before allocation. Manifests contain opaque identity, process
+start/boot/namespace identity and lifecycle state, never source paths/messages.
+Live owners are retained; dead-owner roots are checked/reaped and recovered,
+including interrupted cleanup. Unknown/tampered roots are quarantined and block
+allocation. Legacy unmanifested temporary roots are not automatically deleted.
+Limits: 2 in-flight snapshots, 16 MiB per snapshot, 258 MiB total reserved root
+budget, 300-second use TTL, 5-second backup and 8-second worker phase ceilings
+within the request deadline. All child exec bootstraps arm/check parent-death
+signals before application imports; cancellation waits for kill/reap/cleanup.
 
 The executor opens the DELETE-journal clone RO/query-only with deny-write SQL
 authorization. File mappings require an approved RO descriptor and exact sharing

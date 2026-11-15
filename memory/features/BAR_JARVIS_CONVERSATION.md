@@ -5,7 +5,62 @@ Trust: implemented and tested offline; live provider/shadow evidence pending
 
 ## Read-only execution contract (P1 regression)
 
-### Process authority (memory hardening from `a2e01b9...`)
+### Crash-safe source/snapshot authority (from `ce9bf55...`)
+
+The former source-immutable/read-lease proof was insufficient: a dead DELETE
+writer can leave a hot rollback journal and already-spilled uncommitted pages.
+Integrity/FK checks still pass on a mixed clone. Source immutable is now forbidden.
+Journal state uses size/header and RESERVED-lock evidence; malformed, truncated,
+potentially hot and uncertain states are recovery-required, with no automatic
+source recovery or worker start. Exact cache-spill/crash regression is mandatory.
+
+Source transactions use normal SQLite semantics. Active committed WAL frames
+are read normally. For idle WAL that cannot initialize auxiliary files RO, only
+after acquiring a kernel read lease AND rechecking non-hot journal/no WAL frames,
+copy stable committed main bytes to owned staging. Use normal private SQLite
+there, then Backup API to final DELETE-journal clone. A lease break discards it.
+This is not permission to ignore any journal or mutate source files.
+
+Roots use a fixed dedicated per-OS-UID base, versioned append-committed manifests
+and serialized allocation/recovery. Record opaque root ID, owner PID/start/boot/
+PID-namespace identity, creation time and lifecycle, never source paths or user
+content. Startup/lazy-start scavenge preserves live owners, reaps verified old
+children and deletes only recognized dead-owner roots. Tombstones cover cleanup
+unlink/rmdir crash windows. Unknown/tampered/initially incomplete ownership
+proofs are quarantined, not guessed/deleted. Legacy unmanifested /tmp roots are
+outside automatic recovery. SIGKILL/host failure recovery is on safe startup;
+it is not a claim that a dead parent executes cleanup itself.
+
+All exec bootstrap stages arm parent-death signals and check the parent race
+before application imports. The executor cannot detach/fork under seccomp.
+Resource policy for the owner-only pilot: 2 global snapshots, 16 MiB per clone,
+129 MiB per-root reservation / 258 MiB total, 300-second use TTL, 5-second backup
+and 8-second worker ceilings. Expired live-owner roots remain protected but
+cannot be reused. Eight pre-owned data/sidecar files each have a 16 MiB helper
+file-size ceiling; 129 MiB/root reserves this worst case plus the manifest.
+Two slots are conservative for the approximately 1 GiB owner-only pilot; this
+is not maximum-load qualification or permission to enlarge the limits silently.
+
+Offline evidence: final crash/lifecycle/identity suite 35 passed; broader boundary
+checks and canonical results cover all 18 bound reads. On a synthetic 516096-byte
+v15 source plus the tracked catalog, 7 serial reads measured median/max
+4.35/5.07 seconds; two concurrent reads each took about 9.70 seconds. Sampled
+peak child RSS was 125264 KiB total (worker maximum 62828 KiB), 4 processes and
+2 roots; owned disk peak was 1099156 bytes. No broker children, roots or FDs
+remained after closing the deliberately pinned parent connection; the following
+legitimate parent write passed. SQLite may retain source FD caches while that
+connection is still alive, so compare settled ownership, not a raw mid-test count.
+These are development-host observations, not production SLAs. The single full
+pytest covered 3326 cases: 3323 passed, while 3 safe `file:///tmp` clone reopens
+were falsely rejected by an extra offline audit wrapper's URI parsing. Correcting
+only that temporary wrapper and rerunning the snapshot suite gave 10 passed,
+including all 3 affected cases; application code was unchanged and no second
+full run was made. Combined evidence covers 3326/3326 cases, not a claim that
+the first command exited zero. The 243 focused boundary cases are included.
+Compile/import/link/JSONL/secret/ID/artifact/Git checks pass. Live provider quality
+and production qualification remain pending.
+
+### Historical process authority (memory hardening from `a2e01b9...`)
 
 The earlier live-DB worker boundary failed native shared-memory probes:
 MAP_SHARED_VALIDATE passed a private-bit check, and unconditional mprotect
@@ -19,11 +74,9 @@ via ADDFD, and RW authority only over the owned destination. It is a separate
 process because opening/closing a live DB inode in the SQLite-owning parent can
 release that parent's POSIX locks. No source sidecar creation/repair is allowed.
 
-Active WAL is read normally with existing readable sidecars. For absent/empty
-WAL only, a kernel read lease must first exclude all writable handles/mappings
-and remain unbroken until copy completion; only then is immutable reading safe.
-Lease break or unsupported RO-WAL/lease state discards the clone. Never apply
-immutable blindly to a source that may have committed WAL frames.
+The old source-immutable branch is superseded: a lease cannot prove absence of
+pending rollback recovery. Use the crash-safe policy above. Historical test and
+measurement figures below are not evidence that the hot-journal defect was safe.
 
 The Backup API clone is checked (integrity/FK) and normalized to DELETE journal
 before a separate executor is spawned. No live source descriptor/mapping/path

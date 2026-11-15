@@ -13,7 +13,7 @@ import pytest
 from app.services.assistant import read_broker as broker,read_snapshot as snapshots
 from app.services.assistant.read_only import ReadOnlyViolation
 from app.services.assistant.read_broker import ReadOnlyExecutionBroker,ReadWorkerFailure
-from tests.test_assistant_read_memory import env,source_bytes
+from tests.test_assistant_read_memory import env,source_bytes,managed_roots
 from tests.test_assistant_read_process import request,following_write,coordinator_patch
 
 
@@ -43,7 +43,7 @@ def test_backup_is_consistent_private_delete_clone_without_source_changes(env,mo
                 assert not clone.execute('PRAGMA foreign_key_check').fetchall()
             # Snapshot itself never modifies source bytes; the writer above is
             # intentionally later and must not change the already frozen clone.
-            assert set(os.listdir(root))=={'read.sqlite'}
+            assert set(os.listdir(root))=={'read.sqlite','manifest.json'}
         finally:snap.close()
         assert not root.exists()
     finally:
@@ -73,11 +73,11 @@ def test_busy_source_fails_closed_and_cleans_clone(env):
     before=source_bytes(env)
     pin=contextvars.Context().run(sqlite3.connect,env.path)
     pin.execute('BEGIN EXCLUSIVE')
-    roots=set(Path('/tmp').glob('barbot-read-snapshot-*'))
+    roots=managed_roots()
     try:
         with pytest.raises((ReadWorkerFailure,ReadOnlyViolation)):b.execute(r)
         assert source_bytes(env)==before
-        assert roots==set(Path('/tmp').glob('barbot-read-snapshot-*'))
+        assert roots==managed_roots()
     finally:pin.rollback();pin.close()
     following_write(env)
 
@@ -94,9 +94,9 @@ def writer(path):
  fd=os.open(path,os.O_RDWR);os.close(fd)
 def intercept(self,path,flags):
  global opened
- if s.Path(path)==self.path:
+ if s.Path(path)==self.destination.parent/'stage.sqlite':
   opened+=1
-  if opened==2:
+  if opened==1:
    threading.Thread(target=writer,args=(self.path,)).start();time.sleep(.1)
  return original(self,path,flags)
 s.SnapshotAuthority._open=intercept
@@ -114,10 +114,10 @@ def test_helper_failure_timeout_or_size_bound_cleans_owned_root(env,monkeypatch,
         if marker in command[-1]:command[-1]=command[-1].replace(marker,marker+'exec('+repr(code)+');')
         return original(command,*a,**kw)
     monkeypatch.setattr(broker.subprocess,'Popen',spawn)
-    roots=set(Path('/tmp').glob('barbot-read-snapshot-*'));fds=len(os.listdir('/proc/self/fd'))
+    roots=managed_roots();fds=len(os.listdir('/proc/self/fd'))
     before=source_bytes(env);b=ReadOnlyExecutionBroker(timeout=2)
     with pytest.raises((ReadWorkerFailure,ReadOnlyViolation)):b.execute(request(env,b))
-    assert source_bytes(env)==before and roots==set(Path('/tmp').glob('barbot-read-snapshot-*'))
+    assert source_bytes(env)==before and roots==managed_roots()
     assert len(os.listdir('/proc/self/fd'))==fds
     following_write(env)
 

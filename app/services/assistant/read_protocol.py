@@ -59,6 +59,7 @@ def manifest():
         arguments=c.input_model.model_json_schema(), result=c.result_model.model_json_schema())
         for c in CAPABILITIES]
     names = ('read_kernel.py', 'read_protocol.py', 'read_broker.py', 'read_worker.py', 'read_snapshot.py',
+             'read_journal.py','read_lifecycle.py','read_process.py',
              'read_only.py', 'read_results.py', 'tools.py', 'orchestrator.py', 'capability_controller.py', 'retrieval.py')
     hashes = {name: hashlib.sha256(Path(__file__).with_name(name).read_bytes()).hexdigest() for name in names}
     return hashlib.sha256(encode(dict(version=VERSION, rows=rows, code=hashes))).hexdigest()

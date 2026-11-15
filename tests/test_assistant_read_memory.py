@@ -16,6 +16,7 @@ from app.services.assistant.evaluation_environment import IsolatedEvaluationEnvi
 from app.services.assistant.read_broker import ReadOnlyExecutionBroker, ReadWorkerFailure, await_read
 from app.services.assistant.read_only import ReadOnlyViolation
 from tests.test_assistant_read_process import child_patch, request, following_write
+from app.services.assistant import read_lifecycle
 
 pytestmark = pytest.mark.skipif(sys.platform != 'linux' or os.uname().machine != 'x86_64',reason='Linux x86-64 sandbox')
 
@@ -30,6 +31,10 @@ def env():
 def source_bytes(e):
     return {suffix:hashlib.sha256(Path(str(e.path)+suffix).read_bytes()).hexdigest()
             for suffix in ('','-wal','-shm') if Path(str(e.path)+suffix).exists()}
+
+
+def managed_roots():
+    return {p for p in read_lifecycle.BASE.iterdir() if p.name.startswith('snapshot-')} if read_lifecycle.BASE.exists() else set()
 
 
 NATIVE = '''
@@ -92,14 +97,14 @@ def test_native_post_seal_attempt_is_fatal_without_any_backing_change(env,monkey
     pin=contextvars.Context().run(sqlite3.connect,env.path)
     pin.execute('SELECT count(*) FROM users').fetchone()
     before=source_bytes(env);state=env.business.snapshot()
-    roots=set(Path('/tmp').glob('barbot-read-snapshot-*'));fds=len(os.listdir('/proc/self/fd'))
+    roots=managed_roots();fds=len(os.listdir('/proc/self/fd'))
     child_patch(monkeypatch,NATIVE.replace('{body}',body))
     try:
         b=ReadOnlyExecutionBroker()
         # Ignoring a native syscall's errno must not hide the attempt.
         with pytest.raises(ReadOnlyViolation):b.execute(request(env,b))
         assert before==source_bytes(env) and state==env.business.snapshot()
-        assert set(Path('/tmp').glob('barbot-read-snapshot-*'))==roots
+        assert managed_roots()==roots
         assert len(os.listdir('/proc/self/fd'))==fds
         following_write(env)
     finally:pin.close()
@@ -136,7 +141,7 @@ def test_mapping_cleanup_after_error_or_cancellation(env,monkeypatch,failure):
         if value==b'R':ready.set()
         return value
     monkeypatch.setattr(broker.os,'read',observe)
-    before=source_bytes(env);roots=set(Path('/tmp').glob('barbot-read-snapshot-*'))
+    before=source_bytes(env);roots=managed_roots()
     async def run():
         b=ReadOnlyExecutionBroker();r=request(env,b)
         task=asyncio.create_task(await_read(b.execute,r))
@@ -151,5 +156,5 @@ def test_mapping_cleanup_after_error_or_cancellation(env,monkeypatch,failure):
             with pytest.raises(ReadWorkerFailure):await task
     asyncio.run(run())
     assert before==source_bytes(env)
-    assert roots==set(Path('/tmp').glob('barbot-read-snapshot-*'))
+    assert roots==managed_roots()
     following_write(env)

@@ -33,7 +33,7 @@ IN_WORKER = ContextVar('assistant_read_worker', default=False)
 _CANCEL = ContextVar('assistant_read_cancel', default=None)
 _CHILDREN = set()
 _LOCK = threading.Lock()
-_PERMITS = threading.BoundedSemaphore(4)
+_PERMITS = threading.BoundedSemaphore(2)
 PROJECT = Path(__file__).resolve().parents[3]
 
 
@@ -46,7 +46,10 @@ class ReadWorkerFailure(BaseException):
 
 def _stop(child):
     if child.poll() is None:
-        child.kill()
+        try:
+            if os.getpgid(child.pid)==child.pid:os.killpg(child.pid,9)
+            else:child.kill()
+        except ProcessLookupError:pass
     child.wait(timeout=3)
     for pipe in (child.stdin, child.stdout):
         if pipe:
@@ -199,7 +202,11 @@ class ReadOnlyExecutionBroker:
                 before_main = _main_fingerprint(request.database)
                 before_entries = _entries(authority.path.parent, set(authority.identities))
             control, child_control = socket.socketpair(socket.AF_UNIX, socket.SOCK_SEQPACKET)
+            from app.services.assistant.read_lifecycle import WORKER_SECONDS
+            request=request.model_copy(update=dict(deadline=min(request.deadline,monotonic()+WORKER_SECONDS)))
+            raw=encode(request)
             bootstrap = (f'import sys;sys.path.insert(0,{str(PROJECT)!r});'
+                         f'from app.services.assistant.read_process import arm_parent_death;arm_parent_death({os.getpid()});'
                          f'from app.services.assistant.read_worker import main;main({child_control.fileno()})')
             child = subprocess.Popen([sys.executable, '-I', '-B', '-c', bootstrap], cwd=PROJECT,
                 env={'LANG':'C.UTF-8', 'TZ':'UTC'}, close_fds=True, pass_fds=(child_control.fileno(),),
@@ -207,6 +214,9 @@ class ReadOnlyExecutionBroker:
             child_control.close(); child_control = None
             with _LOCK:
                 _CHILDREN.add(child)
+            if snapshot:
+                snapshot.register(child);snapshot.append(dict(state='in_use'))
+                before_entries = _entries(authority.path.parent,set(authority.identities))
             os.set_blocking(child.stdin.fileno(), False); os.set_blocking(child.stdout.fileno(), False)
             output = bytearray(); offset = 0; eof = False
             cancel = _CANCEL.get()

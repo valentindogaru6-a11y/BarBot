@@ -1,5 +1,17 @@
 # Freshness Manifest
 
+2026-11-15 crash-safety slice from `ce9bf55...`: source-immutable claim superseded
+by hot rollback-journal failure. New normal-SQLite/journal classification,
+PDEATHSIG bootstrap and versioned managed-root recovery policy implemented.
+35 final crash/lifecycle/identity regressions passed; canonical equivalence 18/18.
+Synthetic-source/tracked-catalog serial median/max 4.35/5.07 s, two concurrent
+reads about 9.70 s, sampled total child RSS 125264 KiB. Cleanup/next writer pass.
+Full run once: 3323 passed, 3 extra-audit URI false failures; corrected temporary
+audit wrapper's snapshot-suite repeat: 10 passed, including the 3 affected cases.
+Application unchanged; combined coverage 3326/3326, no second full run or claim
+that the first command exited zero. Final static checks pass. Runtime/live facts are not inspected,
+and catalog/seed/DDL/migrations are unchanged. No rollout authority follows.
+
 2026-11-14 memory isolation hardening from `a2e01b9...`: prior live-worker claims
 are superseded after two native SHM bypasses. Source-RO Backup API cloning and
 post-seal memory denial are implemented, not deployment-approved. Evidence:

@@ -262,6 +262,13 @@ async def main() -> None:
         format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
     )
     settings = Settings()
+    if settings.ai_assistant_enabled:
+        # Dedicated snapshot namespace only; never scans production paths or
+        # arbitrary /tmp entries. A failure disables subsequent allocation.
+        from app.services.assistant.read_lifecycle import scavenge, LifecycleError
+        try:scavenge()
+        except LifecycleError as error:
+            logging.getLogger(__name__).warning('AI snapshot recovery unavailable (%s)',error.category)
     audit_service = AuditService(PROJECT_ROOT / "logs" / "admin_audit.jsonl")
     user_database = UserDatabase(settings.database_path)
     user_database.initialize()

@@ -5,6 +5,20 @@ Metadata: scope `working`; trust `working`; lifecycle `ephemeral`; last cleared
 
 ## Status
 
+Crash-safety fix from `ce9bf55...`: source immutable removed; journal classifier
+and terminal recovery-required policy added. Idle-WAL staging preserves normal
+SQLite semantics under a verified lease/non-hot journal. Bootstrap parent-death
+checks and dedicated manifest roots/scavenge/TTL/budgets passed 35 final targeted
+regressions. All 18 canonical read results matched; resource probes leave no
+broker process/root/FD and allow the next parent write. Serial median/max is
+4.35/5.07 seconds on a small synthetic v15 source plus tracked catalog, not an SLA.
+One full pytest: 3323 passed and 3 false audit-wrapper URI denials. Fixing only
+the temporary wrapper and rerunning the snapshot suite gave 10 passed, covering
+all 3 affected cases without application edits or a second full run. Combined
+coverage is 3326/3326; this is not a zero-exit claim for the first full command.
+Catalog/seed/DDL/migrations untouched; no production/API/systemd/push/deployment
+authority. Final independent security review/live qualification remain pending.
+
 Memory-boundary hardening from `a2e01b9...`: live SHM mappings are removed from
 executors. A separate fixed coordinator/Backup API helper creates an owned RO
 clone without disturbing live-parent POSIX locks or writing source sidecars.
